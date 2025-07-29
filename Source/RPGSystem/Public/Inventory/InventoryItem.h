@@ -1,36 +1,51 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "UObject/NoExportTypes.h"
+#include "ItemDataAsset.h"
 #include "InventoryItem.generated.h"
 
-class UItemDataAsset;
-
-/**
- * A single stack of items in an inventory slot at runtime.
- */
 USTRUCT(BlueprintType)
 struct FInventoryItem
 {
 	GENERATED_BODY()
 
-	/** Reference to the static item definition asset */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Inventory")
+	FInventoryItem()
+		: ItemData(nullptr)
+		, Quantity(0)
+		, ItemIndex(-1)
+	{}
+
+	FInventoryItem(UItemDataAsset* InItemData, int32 InQuantity, int32 InItemIndex = -1)
+		: ItemData(InItemData)
+		, Quantity(InQuantity)
+		, ItemIndex(InItemIndex)
+	{}
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	TSoftObjectPtr<UItemDataAsset> ItemData;
 
-	/** How many items are in this stack */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Inventory")
-	int32 Quantity = 1;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	int32 Quantity;
 
-	/** Which slot this item occupies (for UI convenience) */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Inventory")
-	int32 SlotIndex = -1;
+	/** The index this item occupies in the inventory array, for UI or reference */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	int32 ItemIndex;
 
-	/** Returns true if this struct currently holds a valid item */
+	// Utility: Is this slot valid/occupied?
 	bool IsValid() const
 	{
-		return ItemData.IsValid();
+		return ItemData.IsValid() && Quantity > 0;
 	}
 
-	/** Returns true if this item can stack (MaxStackSize > 1) */
-	bool IsStackable() const;
+	// (Optional) Is this item stackable? (Uses ItemData settings if present)
+	bool IsStackable() const
+	{
+		if (ItemData.IsValid())
+		{
+			UItemDataAsset* Asset = ItemData.Get();
+			return Asset && Asset->MaxStackSize > 1;
+		}
+		return false;
+	}
 };

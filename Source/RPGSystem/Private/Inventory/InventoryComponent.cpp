@@ -1,23 +1,16 @@
-﻿// InventoryComponent.cpp
-#include "Inventory/InventoryComponent.h"
+﻿#include "Inventory/InventoryComponent.h"
 #include "Net/UnrealNetwork.h"
-#include "Inventory/ItemDataAsset.h"
+#include "GameFramework/Actor.h"
 
 UInventoryComponent::UInventoryComponent()
 {
-    PrimaryComponentTick.bCanEverTick = false;
     SetIsReplicatedByDefault(true);
+    Items.SetNum(MaxSlots);
 }
 
 void UInventoryComponent::BeginPlay()
 {
     Super::BeginPlay();
-    Items.SetNum(MaxSlots);
-
-    if (!InventoryBehaviorTag.IsValid())
-    {
-        InventoryBehaviorTag = FGameplayTag::RequestGameplayTag(FName("Inventory.Behavior.WeightLimited"), false);
-    }
 }
 
 void UInventoryComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -26,42 +19,199 @@ void UInventoryComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& 
     DOREPLIFETIME(UInventoryComponent, Items);
 }
 
-FInventoryItem UInventoryComponent::GetItem(int32 SlotIndex) const
+// --- Actions ---
+bool UInventoryComponent::AddItem(UItemDataAsset* ItemData, int32 Quantity)
 {
-    return Items.IsValidIndex(SlotIndex) ? Items[SlotIndex] : FInventoryItem();
-}
+    if (!ItemData || Quantity <= 0)
+        return false;
 
-void UInventoryComponent::OnRep_InventoryItems()
-{
-    for (int32 i = 0; i < Items.Num(); ++i)
+    int32 StackSlot = FindStackableSlot(ItemData);
+    int32 FreeSlot = (StackSlot == INDEX_NONE) ? FindFreeSlot() : StackSlot;
+    if (FreeSlot == INDEX_NONE)
+        return false;
+
+    // Capacity check
+    if (GetCurrentWeight() + ItemData->Weight * Quantity > MaxCarryWeight)
+        return false;
+    if (GetCurrentVolume() + ItemData->Volume * Quantity > MaxCarryVolume)
+        return false;
+
+    if (Items[FreeSlot].IsValid())
     {
-        OnInventoryUpdated.Broadcast(i);
+        int32 AddQty = FMath::Min(Quantity, ItemData->MaxStackSize - Items[FreeSlot].Quantity);
+        Items[FreeSlot].Quantity += AddQty;
+        Quantity -= AddQty;
     }
-    OnInventoryChanged.Broadcast();
+    else
+    {
+        Items[FreeSlot] = FInventoryItem(ItemData, Quantity, FreeSlot);
+    }
+
+    NotifySlotChanged(FreeSlot);
+    NotifyInventoryChanged();
+    UpdateItemIndexes();
+    return true;
 }
 
-void UInventoryComponent::NotifySlotChanged(int32 SlotIndex)
+bool UInventoryComponent::RemoveItem(int32 SlotIndex, int32 Quantity)
 {
-    OnInventoryUpdated.Broadcast(SlotIndex);
+    if (!Items.IsValidIndex(SlotIndex) || Quantity <= 0)
+        return false;
+
+    FInventoryItem& Item = Items[SlotIndex];
+    if (!Item.IsValid() || Item.Quantity < Quantity)
+        return false;
+
+    Item.Quantity -= Quantity;
+    if (Item.Quantity <= 0)
+        Items[SlotIndex] = FInventoryItem();
+
+    NotifySlotChanged(SlotIndex);
+    NotifyInventoryChanged();
+    UpdateItemIndexes();
+    return true;
 }
 
-void UInventoryComponent::NotifyInventoryChanged()
+bool UInventoryComponent::RemoveItemByID(FGameplayTag ItemID, int32 Quantity)
 {
-    OnInventoryChanged.Broadcast();
+    int32 SlotIndex = FindSlotWithItemID(ItemID);
+    return RemoveItem(SlotIndex, Quantity);
+}
+
+bool UInventoryComponent::MoveItem(int32 FromIndex, int32 ToIndex)
+{
+    if (!Items.IsValidIndex(FromIndex) || !Items.IsValidIndex(ToIndex) || FromIndex == ToIndex)
+        return false;
+
+    FInventoryItem& From = Items[FromIndex];
+    FInventoryItem& To = Items[ToIndex];
+    if (!From.IsValid())
+        return false;
+
+    if (To.IsValid() && From.ItemData == To.ItemData && From.IsStackable())
+    {
+        int32 TransferQty = FMath::Min(From.Quantity, To.ItemData.Get()->MaxStackSize - To.Quantity);
+        if (TransferQty <= 0) return false;
+
+        To.Quantity += TransferQty;
+        From.Quantity -= TransferQty;
+        if (From.Quantity <= 0)
+            From = FInventoryItem();
+    }
+    else
+    {
+        Swap(From, To);
+    }
+
+    NotifySlotChanged(FromIndex);
+    NotifySlotChanged(ToIndex);
+    NotifyInventoryChanged();
+    UpdateItemIndexes();
+    return true;
+}
+
+bool UInventoryComponent::TransferItemToInventory(int32 FromIndex, UInventoryComponent* TargetInventory)
+{
+    if (!TargetInventory || !Items.IsValidIndex(FromIndex))
+        return false;
+
+    FInventoryItem& Item = Items[FromIndex];
+    if (!Item.IsValid())
+        return false;
+
+    UItemDataAsset* ItemData = Item.ItemData.Get();
+    int32 Quantity = Item.Quantity;
+
+    bool bAdded = TargetInventory->TryAddItem(ItemData, Quantity);
+    if (bAdded)
+    {
+        Items[FromIndex] = FInventoryItem();
+        NotifySlotChanged(FromIndex);
+        NotifyInventoryChanged();
+        UpdateItemIndexes();
+        TargetInventory->NotifyInventoryChanged();
+        return true;
+    }
+    return false;
+}
+
+bool UInventoryComponent::TryAddItem(UItemDataAsset* ItemData, int32 Quantity)
+{
+    AActor* Owner = GetOwner();
+    if (Owner && Owner->HasAuthority())
+        return AddItem(ItemData, Quantity);
+    ServerAddItem(ItemData, Quantity);
+    return false;
+}
+
+bool UInventoryComponent::TryRemoveItem(int32 SlotIndex, int32 Quantity)
+{
+    AActor* Owner = GetOwner();
+    if (Owner && Owner->HasAuthority())
+        return RemoveItem(SlotIndex, Quantity);
+    ServerRemoveItem(SlotIndex, Quantity);
+    return false;
+}
+
+bool UInventoryComponent::TryMoveItem(int32 FromIndex, int32 ToIndex)
+{
+    AActor* Owner = GetOwner();
+    if (Owner && Owner->HasAuthority())
+        return MoveItem(FromIndex, ToIndex);
+    ServerMoveItem(FromIndex, ToIndex);
+    return false;
+}
+
+bool UInventoryComponent::TryTransferItem(int32 FromIndex, UInventoryComponent* TargetInventory)
+{
+    AActor* Owner = GetOwner();
+    if (Owner && Owner->HasAuthority())
+        return TransferItemToInventory(FromIndex, TargetInventory);
+    ServerTransferItem(FromIndex, TargetInventory);
+    return false;
+}
+
+bool UInventoryComponent::RequestTransferItem(UInventoryComponent* SourceInventory, int32 SourceIndex, UInventoryComponent* TargetInventory, int32 TargetIndex)
+{
+    if (!SourceInventory || !TargetInventory) return false;
+    AActor* Owner = GetOwner();
+    if (Owner && Owner->HasAuthority())
+    {
+        // Example: Pull from source, add to target, clear source slot
+        FInventoryItem Item = SourceInventory->GetItem(SourceIndex);
+        if (!Item.IsValid()) return false;
+        if (TargetInventory->TryAddItem(Item.ItemData.Get(), Item.Quantity))
+        {
+            SourceInventory->RemoveItem(SourceIndex, Item.Quantity);
+            return true;
+        }
+        return false;
+    }
+    else
+    {
+        Server_TransferItem(SourceInventory, SourceIndex, TargetInventory, TargetIndex);
+        return false;
+    }
+}
+
+// --- Queries ---
+bool UInventoryComponent::IsInventoryFull() const
+{
+    for (const FInventoryItem& Item : Items)
+        if (!Item.IsValid()) return false;
+    return true;
 }
 
 float UInventoryComponent::GetCurrentWeight() const
 {
     float Total = 0.f;
-    for (const FInventoryItem& Slot : Items)
+    for (const FInventoryItem& Item : Items)
     {
-        if (Slot.IsValid())
+        if (Item.IsValid())
         {
-            UItemDataAsset* Data = Slot.ItemData.IsValid() ? Slot.ItemData.Get() : Slot.ItemData.LoadSynchronous();
+            UItemDataAsset* Data = Item.ItemData.Get();
             if (Data)
-            {
-                Total += Data->Weight * Slot.Quantity;
-            }
+                Total += Data->Weight * Item.Quantity;
         }
     }
     return Total;
@@ -69,40 +219,30 @@ float UInventoryComponent::GetCurrentWeight() const
 
 float UInventoryComponent::GetCurrentVolume() const
 {
-    float TotalVol = 0.f;
-    for (const FInventoryItem& Slot : Items)
+    float Total = 0.f;
+    for (const FInventoryItem& Item : Items)
     {
-        if (Slot.IsValid())
+        if (Item.IsValid())
         {
-            UItemDataAsset* Data = Slot.ItemData.IsValid() ? Slot.ItemData.Get() : Slot.ItemData.LoadSynchronous();
+            UItemDataAsset* Data = Item.ItemData.Get();
             if (Data)
-            {
-                TotalVol += Data->Volume * Slot.Quantity;
-            }
+                Total += Data->Volume * Item.Quantity;
         }
     }
-    return TotalVol;
+    return Total;
 }
 
-void UInventoryComponent::SetMaxCarryWeight(float NewMaxWeight)
+FInventoryItem UInventoryComponent::GetItem(int32 SlotIndex) const
 {
-    MaxCarryWeight = NewMaxWeight;
-}
-
-void UInventoryComponent::SetMaxCarryVolume(float NewMaxVolume)
-{
-    MaxCarryVolume = NewMaxVolume;
+    if (Items.IsValidIndex(SlotIndex))
+        return Items[SlotIndex];
+    return FInventoryItem();
 }
 
 int32 UInventoryComponent::FindFreeSlot() const
 {
     for (int32 i = 0; i < Items.Num(); ++i)
-    {
-        if (!Items[i].IsValid())
-        {
-            return i;
-        }
-    }
+        if (!Items[i].IsValid()) return i;
     return INDEX_NONE;
 }
 
@@ -113,122 +253,9 @@ int32 UInventoryComponent::FindStackableSlot(UItemDataAsset* ItemData) const
     {
         const FInventoryItem& Slot = Items[i];
         if (Slot.IsValid() && Slot.ItemData == ItemData && Slot.Quantity < ItemData->MaxStackSize)
-        {
             return i;
-        }
     }
     return INDEX_NONE;
-}
-
-bool UInventoryComponent::AddItem(UItemDataAsset* ItemData, int32 Quantity)
-{
-    if (!ItemData || Quantity <= 0)
-        return false;
-
-    if (InventoryBehaviorTag == FGameplayTag::RequestGameplayTag(FName("Inventory.Behavior.WeightLimited"), false))
-    {
-        if (GetCurrentWeight() + ItemData->Weight * Quantity > MaxCarryWeight)
-            return false;
-    }
-    else if (InventoryBehaviorTag == FGameplayTag::RequestGameplayTag(FName("Inventory.Behavior.VolumeLimited"), false))
-    {
-        if (GetCurrentVolume() + ItemData->Volume * Quantity > MaxCarryVolume)
-            return false;
-    }
-
-    int32 SlotIndex = FindStackableSlot(ItemData);
-    if (SlotIndex == INDEX_NONE)
-        SlotIndex = FindFreeSlot();
-    if (SlotIndex == INDEX_NONE)
-        return false;
-
-    FInventoryItem& Slot = Items[SlotIndex];
-    if (!Slot.IsValid())
-    {
-        Slot.ItemData  = ItemData;
-        Slot.Quantity  = Quantity;
-        Slot.SlotIndex = SlotIndex;
-    }
-    else
-    {
-        Slot.Quantity = FMath::Clamp(Slot.Quantity + Quantity, 0, ItemData->MaxStackSize);
-    }
-
-    NotifySlotChanged(SlotIndex);
-    NotifyInventoryChanged();
-    return true;
-}
-
-bool UInventoryComponent::RemoveItem(int32 SlotIndex, int32 Quantity)
-{
-    if (!Items.IsValidIndex(SlotIndex) || Quantity <= 0)
-        return false;
-
-    FInventoryItem& Slot = Items[SlotIndex];
-    if (!Slot.IsValid() || Slot.Quantity < Quantity)
-        return false;
-
-    Slot.Quantity -= Quantity;
-    if (Slot.Quantity <= 0)
-        Slot = FInventoryItem();
-
-    NotifySlotChanged(SlotIndex);
-    NotifyInventoryChanged();
-    return true;
-}
-
-bool UInventoryComponent::MoveItem(int32 FromIndex, int32 ToIndex)
-{
-    if (!Items.IsValidIndex(FromIndex) || !Items.IsValidIndex(ToIndex) || FromIndex == ToIndex)
-        return false;
-
-    FInventoryItem& From = Items[FromIndex];
-    FInventoryItem& To   = Items[ToIndex];
-    if (!From.IsValid())
-        return false;
-
-    if (To.IsValid() && From.ItemData == To.ItemData && From.IsStackable())
-    {
-        int32 TransferQty = FMath::Min(From.Quantity, To.ItemData->MaxStackSize - To.Quantity);
-        To.Quantity   += TransferQty;
-        From.Quantity -= TransferQty;
-        if (From.Quantity <= 0)
-            From = FInventoryItem();
-
-        NotifySlotChanged(FromIndex);
-        NotifySlotChanged(ToIndex);
-        NotifyInventoryChanged();
-        return true;
-    }
-
-    Swap(From, To);
-    From.SlotIndex = FromIndex;
-    To.SlotIndex   = ToIndex;
-
-    NotifySlotChanged(FromIndex);
-    NotifySlotChanged(ToIndex);
-    NotifyInventoryChanged();
-    return true;
-}
-
-bool UInventoryComponent::TransferItemToInventory(int32 FromIndex, UInventoryComponent* TargetInventory)
-{
-    if (!Items.IsValidIndex(FromIndex) || !TargetInventory || TargetInventory == this)
-        return false;
-
-    FInventoryItem FromSlot = GetItem(FromIndex);
-    if (!FromSlot.IsValid())
-        return false;
-
-    UItemDataAsset* Asset = FromSlot.ItemData.IsValid() ? FromSlot.ItemData.Get() : FromSlot.ItemData.LoadSynchronous();
-    if (!Asset)
-        return false;
-
-    bool bSuccess = TargetInventory->AddItem(Asset, FromSlot.Quantity);
-    if (bSuccess)
-        RemoveItem(FromIndex, FromSlot.Quantity);
-
-    return bSuccess;
 }
 
 int32 UInventoryComponent::FindSlotWithItemID(FGameplayTag ItemID) const
@@ -236,12 +263,9 @@ int32 UInventoryComponent::FindSlotWithItemID(FGameplayTag ItemID) const
     for (int32 i = 0; i < Items.Num(); ++i)
     {
         const FInventoryItem& Slot = Items[i];
-        if (Slot.IsValid())
-        {
-            UItemDataAsset* Data = Slot.ItemData.IsValid() ? Slot.ItemData.Get() : Slot.ItemData.LoadSynchronous();
-            if (Data && Data->ItemIDTag == ItemID)
-                return i;
-        }
+        UItemDataAsset* Data = Slot.ItemData.Get();
+        if (Data && Data->ItemIDTag == ItemID)
+            return i;
     }
     return INDEX_NONE;
 }
@@ -249,30 +273,79 @@ int32 UInventoryComponent::FindSlotWithItemID(FGameplayTag ItemID) const
 FInventoryItem UInventoryComponent::GetItemByID(FGameplayTag ItemID) const
 {
     int32 SlotIndex = FindSlotWithItemID(ItemID);
-    return SlotIndex != INDEX_NONE ? Items[SlotIndex] : FInventoryItem();
+    return (SlotIndex != INDEX_NONE) ? Items[SlotIndex] : FInventoryItem();
 }
 
+// --- Delegates ---
+void UInventoryComponent::NotifySlotChanged(int32 SlotIndex)
+{
+    OnInventoryUpdated.Broadcast(SlotIndex);
+}
+
+void UInventoryComponent::NotifyInventoryChanged()
+{
+    OnInventoryChanged.Broadcast();
+}
+
+void UInventoryComponent::UpdateItemIndexes()
+{
+    for (int32 i = 0; i < Items.Num(); ++i)
+    {
+        Items[i].ItemIndex = i;
+    }
+}
+
+// --- Settings ---
+void UInventoryComponent::SetMaxCarryWeight(float NewMaxWeight)
+{
+    MaxCarryWeight = NewMaxWeight;
+}
+void UInventoryComponent::SetMaxCarryVolume(float NewMaxVolume)
+{
+    MaxCarryVolume = NewMaxVolume;
+}
+
+// --- Replication ---
+void UInventoryComponent::OnRep_InventoryItems()
+{
+    NotifyInventoryChanged();
+}
+
+// --- RPCs ---
 void UInventoryComponent::ServerAddItem_Implementation(UItemDataAsset* ItemData, int32 Quantity)
 {
-    bool bResult = AddItem(ItemData, Quantity);
-    ClientAddItemResponse(bResult);
+    bool bSuccess = AddItem(ItemData, Quantity);
+    ClientAddItemResponse(bSuccess);
 }
+bool UInventoryComponent::ServerAddItem_Validate(UItemDataAsset* ItemData, int32 Quantity) { return true; }
+
+void UInventoryComponent::ClientAddItemResponse_Implementation(bool bSuccess) {}
 
 void UInventoryComponent::ServerRemoveItem_Implementation(int32 SlotIndex, int32 Quantity)
 {
-    bool bResult = RemoveItem(SlotIndex, Quantity);
-    ClientRemoveItemResponse(bResult);
+    RemoveItem(SlotIndex, Quantity);
 }
+bool UInventoryComponent::ServerRemoveItem_Validate(int32 SlotIndex, int32 Quantity) { return true; }
 
-void UInventoryComponent::ServerMoveItem_Implementation( int32 FromIndex, int32 ToIndex)
+void UInventoryComponent::ServerRemoveItemByID_Implementation(FGameplayTag ItemID, int32 Quantity)
+{
+    RemoveItemByID(ItemID, Quantity);
+}
+bool UInventoryComponent::ServerRemoveItemByID_Validate(FGameplayTag ItemID, int32 Quantity) { return true; }
+
+void UInventoryComponent::ClientRemoveItemResponse_Implementation(bool bSuccess) {}
+
+void UInventoryComponent::ServerMoveItem_Implementation(int32 FromIndex, int32 ToIndex)
 {
     MoveItem(FromIndex, ToIndex);
 }
+bool UInventoryComponent::ServerMoveItem_Validate(int32 FromIndex, int32 ToIndex) { return true; }
 
 void UInventoryComponent::ServerTransferItem_Implementation(int32 FromIndex, UInventoryComponent* TargetInventory)
 {
     TransferItemToInventory(FromIndex, TargetInventory);
 }
+bool UInventoryComponent::ServerTransferItem_Validate(int32 FromIndex, UInventoryComponent* TargetInventory) { return true; }
 
 void UInventoryComponent::ServerPullItem_Implementation(int32 FromIndex, UInventoryComponent* SourceInventory)
 {
@@ -283,75 +356,21 @@ void UInventoryComponent::ServerPullItem_Implementation(int32 FromIndex, UInvent
     if (!FromSlot.IsValid())
         return;
 
-    UItemDataAsset* Asset = FromSlot.ItemData.IsValid() ? FromSlot.ItemData.Get() : FromSlot.ItemData.LoadSynchronous();
+    UItemDataAsset* Asset = FromSlot.ItemData.Get();
     int32 Quantity = FromSlot.Quantity;
 
-    if (Asset && AddItem(Asset, Quantity))
+    if (Asset && TryAddItem(Asset, Quantity))
         SourceInventory->RemoveItem(FromIndex, Quantity);
 }
+bool UInventoryComponent::ServerPullItem_Validate(int32 FromIndex, UInventoryComponent* SourceInventory) { return true; }
 
-void UInventoryComponent::ClientAddItemResponse_Implementation(bool bSuccess) {}
-void UInventoryComponent::ClientRemoveItemResponse_Implementation(bool bSuccess) {}
-
-void UInventoryComponent::ServerRemoveItemByID_Implementation(FGameplayTag ItemID, int32 Quantity)
+void UInventoryComponent::Server_TransferItem_Implementation(UInventoryComponent* SourceInventory, int32 SourceIndex, UInventoryComponent* TargetInventory, int32 TargetIndex)
 {
-    int32 SlotIndex = FindSlotWithItemID(ItemID);
-    if (SlotIndex != INDEX_NONE)
-        RemoveItem(SlotIndex, Quantity);
+    if (!SourceInventory || !TargetInventory) return;
+    FInventoryItem Item = SourceInventory->GetItem(SourceIndex);
+    if (!Item.IsValid()) return;
+
+    if (TargetInventory->TryAddItem(Item.ItemData.Get(), Item.Quantity))
+        SourceInventory->RemoveItem(SourceIndex, Item.Quantity);
 }
-
-bool UInventoryComponent::TryAddItem(UItemDataAsset* ItemData, int32 Quantity)
-{
-    if (GetOwner()->HasAuthority())
-    {
-        return AddItem(ItemData, Quantity);
-    }
-    ServerAddItem(ItemData, Quantity);
-    return true;
-}
-
-bool UInventoryComponent::TryRemoveItem(int32 SlotIndex, int32 Quantity)
-{
-    if (GetOwner()->HasAuthority())
-    {
-        return RemoveItem(SlotIndex, Quantity);
-    }
-    ServerRemoveItem(SlotIndex, Quantity);
-    return true;
-}
-
-bool UInventoryComponent::TryMoveItem(int32 FromIndex, int32 ToIndex)
-{
-    if (GetOwner()->HasAuthority())
-    {
-        return MoveItem(FromIndex, ToIndex);
-    }
-    ServerMoveItem(FromIndex, ToIndex);
-    return true;
-}
-
-bool UInventoryComponent::TryTransferItem(int32 FromIndex, UInventoryComponent* TargetInventory)
-{
-    if (GetOwner()->HasAuthority())
-    {
-        return TransferItemToInventory(FromIndex, TargetInventory);
-    }
-    ServerTransferItem(FromIndex, TargetInventory);
-    return true;
-}
-
-bool UInventoryComponent::IsInventoryFull() const
-{
-    const bool bNoSlots = (FindFreeSlot() == INDEX_NONE);
-
-    if (InventoryBehaviorTag == FGameplayTag::RequestGameplayTag(FName("Inventory.Behavior.WeightLimited"), false))
-        return GetCurrentWeight() >= MaxCarryWeight;
-
-    if (InventoryBehaviorTag == FGameplayTag::RequestGameplayTag(FName("Inventory.Behavior.VolumeLimited"), false))
-        return GetCurrentVolume() >= MaxCarryVolume;
-
-    if (InventoryBehaviorTag == FGameplayTag::RequestGameplayTag(FName("Inventory.Behavior.NoLimit"), false))
-        return false;
-
-    return bNoSlots;
-}
+bool UInventoryComponent::Server_TransferItem_Validate(UInventoryComponent* SourceInventory, int32 SourceIndex, UInventoryComponent* TargetInventory, int32 TargetIndex) { return true; }

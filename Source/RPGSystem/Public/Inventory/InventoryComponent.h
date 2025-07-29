@@ -1,21 +1,19 @@
-﻿// InventoryComponent.h
-
-#pragma once
+﻿#pragma once
 
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
+#include "InventoryItem.h"
+#include "ItemDataAsset.h"
 #include "GameplayTagContainer.h"
-#include "Inventory/InventoryItem.h"
 #include "InventoryComponent.generated.h"
 
-// Forward declaration
-class UItemDataAsset;
-
-// Delegates
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnInventoryUpdated, int32, SlotIndex);
+// Delegates for UI and system hooks
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnInventorySlotUpdated, int32, SlotIndex);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnInventoryChanged);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnWeightChanged, float, NewWeight);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnVolumeChanged, float, NewVolume);
 
-UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
+UCLASS(Blueprintable, ClassGroup = (Custom), meta = (BlueprintSpawnableComponent))
 class RPGSYSTEM_API UInventoryComponent : public UActorComponent
 {
     GENERATED_BODY()
@@ -23,120 +21,138 @@ class RPGSYSTEM_API UInventoryComponent : public UActorComponent
 public:
     UInventoryComponent();
 
-    // Replication
-    virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+    // --- 1_Inventory|Actions ---
+    UFUNCTION(BlueprintCallable, Category = "1_Inventory|Actions")
+    virtual bool AddItem(UItemDataAsset* ItemData, int32 Quantity);
 
-    // Core inventory functions
-    UFUNCTION(BlueprintCallable, Category="Inventory")
-    FInventoryItem GetItem(int32 SlotIndex) const;
+    UFUNCTION(BlueprintCallable, Category = "1_Inventory|Actions")
+    virtual bool RemoveItem(int32 SlotIndex, int32 Quantity);
 
-    UFUNCTION(BlueprintCallable, Category="Inventory")
-    float GetCurrentWeight() const;
+    UFUNCTION(BlueprintCallable, Category = "1_Inventory|Actions")
+    virtual bool RemoveItemByID(FGameplayTag ItemID, int32 Quantity);
 
-    UFUNCTION(BlueprintCallable, Category="Inventory")
-    float GetCurrentVolume() const;
+    UFUNCTION(BlueprintCallable, Category = "1_Inventory|Actions")
+    virtual bool MoveItem(int32 FromIndex, int32 ToIndex);
 
-    UFUNCTION(BlueprintCallable, Category="Inventory")
-    void SetMaxCarryWeight(float NewMaxWeight);
+    UFUNCTION(BlueprintCallable, Category = "1_Inventory|Actions")
+    virtual bool TransferItemToInventory(int32 FromIndex, UInventoryComponent* TargetInventory);
 
-    UFUNCTION(BlueprintCallable, Category="Inventory")
-    void SetMaxCarryVolume(float NewMaxVolume);
+    UFUNCTION(BlueprintCallable, Category = "1_Inventory|Actions")
+    virtual bool TryAddItem(UItemDataAsset* ItemData, int32 Quantity);
 
-    UFUNCTION(BlueprintCallable, Category="Inventory")
-    int32 FindFreeSlot() const;
+    UFUNCTION(BlueprintCallable, Category = "1_Inventory|Actions")
+    virtual bool TryRemoveItem(int32 SlotIndex, int32 Quantity);
 
-    UFUNCTION(BlueprintCallable, Category="Inventory")
-    int32 FindStackableSlot(UItemDataAsset* ItemData) const;
+    UFUNCTION(BlueprintCallable, Category = "1_Inventory|Actions")
+    virtual bool TryMoveItem(int32 FromIndex, int32 ToIndex);
 
-    UFUNCTION(BlueprintCallable, Category="Inventory")
-    bool AddItem(UItemDataAsset* ItemData, int32 Quantity);
+    UFUNCTION(BlueprintCallable, Category = "1_Inventory|Actions")
+    virtual bool TryTransferItem(int32 FromIndex, UInventoryComponent* TargetInventory);
 
-    UFUNCTION(BlueprintCallable, Category="Inventory")
-    bool RemoveItem(int32 SlotIndex, int32 Quantity);
+    UFUNCTION(BlueprintCallable, Category = "1_Inventory|Actions")
+    virtual bool RequestTransferItem(UInventoryComponent* SourceInventory, int32 SourceIndex, UInventoryComponent* TargetInventory, int32 TargetIndex);
 
-    UFUNCTION(BlueprintCallable, Category="Inventory")
-    bool MoveItem(int32 FromIndex, int32 ToIndex);
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "1_Inventory|Type")
+    FGameplayTag InventoryTypeTag;
 
-    UFUNCTION(BlueprintCallable, Category="Inventory")
-    bool TransferItemToInventory(int32 FromIndex, UInventoryComponent* TargetInventory);
+    // --- 2_Inventory|Queries ---
+    UFUNCTION(BlueprintCallable, BlueprintPure, Category = "2_Inventory|Queries")
+    virtual bool IsInventoryFull() const;
 
-    UFUNCTION(BlueprintCallable, Category="Inventory")
-    int32 FindSlotWithItemID(FGameplayTag ItemID) const;
+    UFUNCTION(BlueprintCallable, BlueprintPure, Category = "2_Inventory|Queries")
+    virtual float GetCurrentWeight() const;
 
-    UFUNCTION(BlueprintCallable, Category="Inventory")
-    FInventoryItem GetItemByID(FGameplayTag ItemID) const;
+    UFUNCTION(BlueprintCallable, BlueprintPure, Category = "2_Inventory|Queries")
+    virtual float GetCurrentVolume() const;
 
-    // Try versions for client/server convenience
-    UFUNCTION(BlueprintCallable, Category="Inventory")
-    bool TryAddItem(UItemDataAsset* ItemData, int32 Quantity);
+    UFUNCTION(BlueprintCallable, BlueprintPure, Category = "2_Inventory|Queries")
+    virtual FInventoryItem GetItem(int32 SlotIndex) const;
 
-    UFUNCTION(BlueprintCallable, Category="Inventory")
-    bool TryRemoveItem(int32 SlotIndex, int32 Quantity);
+    UFUNCTION(BlueprintCallable, BlueprintPure, Category = "2_Inventory|Queries")
+    virtual int32 FindFreeSlot() const;
 
-    UFUNCTION(BlueprintCallable, Category="Inventory")
-    bool TryMoveItem(int32 FromIndex, int32 ToIndex);
+    UFUNCTION(BlueprintCallable, BlueprintPure, Category = "2_Inventory|Queries")
+    virtual int32 FindStackableSlot(UItemDataAsset* ItemData) const;
 
-    UFUNCTION(BlueprintCallable, Category="Inventory")
-    bool TryTransferItem(int32 FromIndex, UInventoryComponent* TargetInventory);
+    UFUNCTION(BlueprintCallable, BlueprintPure, Category = "2_Inventory|Queries")
+    virtual int32 FindSlotWithItemID(FGameplayTag ItemID) const;
 
-    UFUNCTION(BlueprintCallable, BlueprintPure, Category="Inventory")
-    bool IsInventoryFull() const;
+    UFUNCTION(BlueprintCallable, BlueprintPure, Category = "2_Inventory|Queries")
+    virtual FInventoryItem GetItemByID(FGameplayTag ItemID) const;
 
-    // Notifiers for UI
+    // --- 3_Inventory|Events (Delegates) ---
+    UPROPERTY(BlueprintAssignable, Category = "3_Inventory|Events")
+    FOnInventorySlotUpdated OnInventoryUpdated;
+
+    UPROPERTY(BlueprintAssignable, Category = "3_Inventory|Events")
+    FOnInventoryChanged OnInventoryChanged;
+
+    UPROPERTY(BlueprintAssignable, Category = "3_Inventory|Events")
+    FOnWeightChanged OnWeightChanged;
+
+    UPROPERTY(BlueprintAssignable, Category = "3_Inventory|Events")
+    FOnVolumeChanged OnVolumeChanged;
+
+    // --- 4_Inventory|Settings ---
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "4_Inventory|Settings")
+    int32 MaxSlots = 20;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "4_Inventory|Settings")
+    float MaxCarryWeight = 100.f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "4_Inventory|Settings")
+    float MaxCarryVolume = 100.f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "4_Inventory|Settings")
+    FGameplayTag InventoryBehaviorTag;
+
+    UFUNCTION(BlueprintCallable, Category = "4_Inventory|Settings")
+    virtual void SetMaxCarryWeight(float NewMaxWeight);
+
+    UFUNCTION(BlueprintCallable, Category = "4_Inventory|Settings")
+    virtual void SetMaxCarryVolume(float NewMaxVolume);
+
+protected:
+    virtual void BeginPlay() override;
+
+    UPROPERTY(ReplicatedUsing = OnRep_InventoryItems, BlueprintReadOnly, Category = "4_Inventory|Data")
+    TArray<FInventoryItem> Items;
+
     UFUNCTION()
     void OnRep_InventoryItems();
 
     void NotifySlotChanged(int32 SlotIndex);
     void NotifyInventoryChanged();
+    void UpdateItemIndexes();
 
-    // Replication
-    UPROPERTY(ReplicatedUsing=OnRep_InventoryItems)
-    TArray<FInventoryItem> Items;
+public:
+    virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
-    // Delegates for UI
-    UPROPERTY(BlueprintAssignable, Category="Inventory")
-    FOnInventoryUpdated OnInventoryUpdated;
-
-    UPROPERTY(BlueprintAssignable, Category="Inventory")
-    FOnInventoryChanged OnInventoryChanged;
-
-    // Networking
-    UFUNCTION(Server, Reliable)
+    // --- 5_Inventory|RPCs ---
+    UFUNCTION(Server, Reliable, WithValidation)
     void ServerAddItem(UItemDataAsset* ItemData, int32 Quantity);
 
     UFUNCTION(Client, Reliable)
     void ClientAddItemResponse(bool bSuccess);
 
-    UFUNCTION(Server, Reliable)
+    UFUNCTION(Server, Reliable, WithValidation)
     void ServerRemoveItem(int32 SlotIndex, int32 Quantity);
+
+    UFUNCTION(Server, Reliable, WithValidation)
+    void ServerRemoveItemByID(FGameplayTag ItemID, int32 Quantity);
 
     UFUNCTION(Client, Reliable)
     void ClientRemoveItemResponse(bool bSuccess);
 
-    UFUNCTION(Server, Reliable)
+    UFUNCTION(Server, Reliable, WithValidation)
     void ServerMoveItem(int32 FromIndex, int32 ToIndex);
 
-    UFUNCTION(Server, Reliable)
+    UFUNCTION(Server, Reliable, WithValidation)
     void ServerTransferItem(int32 FromIndex, UInventoryComponent* TargetInventory);
 
-    UFUNCTION(Server, Reliable)
+    UFUNCTION(Server, Reliable, WithValidation)
     void ServerPullItem(int32 FromIndex, UInventoryComponent* SourceInventory);
 
-    UFUNCTION(Server, Reliable)
-    void ServerRemoveItemByID(FGameplayTag ItemID, int32 Quantity);
-
-protected:
-    virtual void BeginPlay() override;
-
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Inventory")
-    int32 MaxSlots = 40;
-
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Inventory")
-    float MaxCarryWeight = 100.0f;
-
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Inventory")
-    float MaxCarryVolume = 200.0f;
-
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Inventory")
-    FGameplayTag InventoryBehaviorTag;
+    UFUNCTION(Server, Reliable, WithValidation)
+    void Server_TransferItem(UInventoryComponent* SourceInventory, int32 SourceIndex, UInventoryComponent* TargetInventory, int32 TargetIndex);
 };
