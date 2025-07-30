@@ -155,4 +155,25 @@ public:
 
     UFUNCTION(Server, Reliable, WithValidation)
     void Server_TransferItem(UInventoryComponent* SourceInventory, int32 SourceIndex, UInventoryComponent* TargetInventory, int32 TargetIndex);
+
+    // Utility: Count occupied slots
+    UFUNCTION(BlueprintCallable, Category="2_Inventory|Queries")
+    virtual int32 GetNumOccupiedSlots() const;
+
+    // Utility: Total quantity of a specific item (by ItemIDTag)
+    UFUNCTION(BlueprintCallable, Category="2_Inventory|Queries")
+    virtual int32 GetNumItemsOfType(FGameplayTag ItemID) const;
+
+    // Utility: Swap two slots (can be useful for sorting, UI, etc)
+    UFUNCTION(BlueprintCallable, Category="1_Inventory|Actions")
+    virtual bool SwapItems(int32 IndexA, int32 IndexB);
+
+    // --- 5_Inventory|Container Restrictions ---
+    /** Optional: Only allow storing items with these ItemIDs (empty = allow all) */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="5_Inventory|Container")
+    TArray<FGameplayTag> AllowedItemIDs;
+
+    /** Returns true if this inventory accepts this ItemDataAsset */
+    UFUNCTION(BlueprintCallable, Category="5_Inventory|Container")
+    virtual bool CanAcceptItem(UItemDataAsset* ItemData) const;
 };

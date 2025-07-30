@@ -374,3 +374,40 @@ void UInventoryComponent::Server_TransferItem_Implementation(UInventoryComponent
         SourceInventory->RemoveItem(SourceIndex, Item.Quantity);
 }
 bool UInventoryComponent::Server_TransferItem_Validate(UInventoryComponent* SourceInventory, int32 SourceIndex, UInventoryComponent* TargetInventory, int32 TargetIndex) { return true; }
+
+int32 UInventoryComponent::GetNumOccupiedSlots() const
+{
+    int32 Count = 0;
+    for (const FInventoryItem& Item : Items)
+        if (Item.IsValid()) ++Count;
+    return Count;
+}
+
+int32 UInventoryComponent::GetNumItemsOfType(FGameplayTag ItemID) const
+{
+    int32 Count = 0;
+    for (const FInventoryItem& Item : Items)
+        if (Item.IsValid() && Item.ItemData.IsValid() && Item.ItemData.Get()->ItemIDTag == ItemID)
+            Count += Item.Quantity;
+    return Count;
+}
+
+bool UInventoryComponent::SwapItems(int32 IndexA, int32 IndexB)
+{
+    if (!Items.IsValidIndex(IndexA) || !Items.IsValidIndex(IndexB) || IndexA == IndexB)
+        return false;
+    Swap(Items[IndexA], Items[IndexB]);
+    UpdateItemIndexes();
+    NotifySlotChanged(IndexA);
+    NotifySlotChanged(IndexB);
+    NotifyInventoryChanged();
+    return true;
+}
+
+bool UInventoryComponent::CanAcceptItem(UItemDataAsset* ItemData) const
+{
+    if (!ItemData) return false;
+    if (AllowedItemIDs.Num() == 0)
+        return true; // No restriction
+    return AllowedItemIDs.Contains(ItemData->ItemIDTag);
+}
