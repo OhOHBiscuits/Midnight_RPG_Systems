@@ -7,6 +7,19 @@
 #include "GameplayTagContainer.h"
 #include "ItemDataAsset.generated.h"
 
+USTRUCT(BlueprintType)
+struct FFuelByproduct
+{
+    GENERATED_BODY()
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Fuel")
+    FGameplayTag ByproductItemID;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Fuel")
+    int32 Amount = 1;
+};
+
+
 UCLASS(BlueprintType)
 class RPGSYSTEM_API UItemDataAsset : public UDataAsset
 {
@@ -65,6 +78,9 @@ public:
 
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Fuel", meta=(EditCondition="bIsFuel"))
     float BurnRate = 0.f;
+
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Fuel")
+    TArray<FFuelByproduct> FuelByproducts;
 
     // World Placement
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="World")
