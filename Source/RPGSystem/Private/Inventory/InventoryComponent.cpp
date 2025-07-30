@@ -137,11 +137,19 @@ bool UInventoryComponent::TransferItemToInventory(int32 FromIndex, UInventoryCom
 
 bool UInventoryComponent::TryAddItem(UItemDataAsset* ItemData, int32 Quantity)
 {
-    AActor* Owner = GetOwner();
-    if (Owner && Owner->HasAuthority())
+    if (!GetOwner())
+        return false;
+    if (GetOwner()->HasAuthority())
+    {
+        // Only the server does the real logic and returns a real result.
         return AddItem(ItemData, Quantity);
-    ServerAddItem(ItemData, Quantity);
-    return false;
+    }
+    else
+    {
+        // Client: Ask the server to do it, but return true to mean "request sent"
+        ServerAddItem(ItemData, Quantity);
+        return true;
+    }
 }
 
 bool UInventoryComponent::TryRemoveItem(int32 SlotIndex, int32 Quantity)

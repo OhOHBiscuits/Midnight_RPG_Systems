@@ -80,6 +80,10 @@ public:
     UFUNCTION(BlueprintCallable, BlueprintPure, Category = "2_Inventory|Queries")
     virtual FInventoryItem GetItemByID(FGameplayTag ItemID) const;
 
+    // ---- NEW: Expose Items array safely for Fuel/Decay etc. ----
+    UFUNCTION(BlueprintCallable, BlueprintPure, Category = "2_Inventory|Queries")
+    const TArray<FInventoryItem>& GetAllItems() const { return Items; }
+
     // --- 3_Inventory|Events (Delegates) ---
     UPROPERTY(BlueprintAssignable, Category = "3_Inventory|Events")
     FOnInventorySlotUpdated OnInventoryUpdated;

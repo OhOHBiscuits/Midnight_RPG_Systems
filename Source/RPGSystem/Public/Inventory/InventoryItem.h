@@ -48,4 +48,8 @@ struct FInventoryItem
 		}
 		return false;
 	}
-};
+	FORCEINLINE FGameplayTag GetItemID() const
+	{
+		return ItemData.IsValid() ? ItemData->ItemIDTag : FGameplayTag();
+	}
+	};
