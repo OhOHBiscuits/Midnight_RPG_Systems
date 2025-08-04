@@ -1,6 +1,7 @@
 ﻿#pragma once
 
 #include "CoreMinimal.h"
+#include "GameplayTagContainer.h" // <-- This fixes the undefined FGameplayTag error!
 #include "UObject/Interface.h"
 #include "InteractionInterface.generated.h"
 
@@ -16,4 +17,7 @@ class IInteractionInterface
 public:
 	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category="Interaction")
 	void Interact(AActor* Interactor);
+
+	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category="Interaction")
+	FGameplayTag GetInteractionTypeTag() const;
 };

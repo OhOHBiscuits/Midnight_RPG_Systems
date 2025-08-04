@@ -1,6 +1,7 @@
 ﻿#include "Inventory/InventoryComponent.h"
 #include "Net/UnrealNetwork.h"
 #include "GameFramework/Actor.h"
+#include "Inventory/ItemDataAsset.h"
 
 UInventoryComponent::UInventoryComponent()
 {
@@ -419,3 +420,26 @@ bool UInventoryComponent::CanAcceptItem(UItemDataAsset* ItemData) const
         return true; // No restriction
     return AllowedItemIDs.Contains(ItemData->ItemIDTag);
 }
+
+int32 UInventoryComponent::GetNumUISlots() const
+{
+    return Items.Num();
+}
+
+void UInventoryComponent::GetUISlotInfo(
+    TArray<int32>& OutSlotIndices,
+    TArray<UItemDataAsset*>& OutItemData,
+    TArray<int32>& OutQuantities) const
+{
+    OutSlotIndices.Empty();
+    OutItemData.Empty();
+    OutQuantities.Empty();
+
+    for (int32 i = 0; i < Items.Num(); ++i)
+    {
+        OutSlotIndices.Add(i);
+        OutItemData.Add(Items[i].ItemData.Get());   // Use .Get() for soft object pointer
+        OutQuantities.Add(Items[i].Quantity);
+    }
+}
+

@@ -1,56 +1,27 @@
 ﻿#pragma once
 
+#include "CoreMinimal.h"
 #include "Kismet/BlueprintFunctionLibrary.h"
-#include "Inventory/InventoryComponent.h"
-#include "GameFramework/PlayerController.h"
-#include "GameFramework/PlayerState.h"
-#include "GameFramework/Pawn.h"
+#include "GameplayTagContainer.h"
 #include "InventoryHelpers.generated.h"
 
+class UInventoryComponent;
+class UItemDataAsset;
+
+/**
+ * Blueprint Function Library for Inventory Utilities
+ */
 UCLASS()
 class RPGSYSTEM_API UInventoryHelpers : public UBlueprintFunctionLibrary
 {
 	GENERATED_BODY()
 public:
-	// Universal inventory getter. Works for Pawn, PlayerController, PlayerState, or any Actor with an InventoryComponent.
+
+	// Get an inventory component from any relevant actor/controller/pawn/playerstate/owner chain.
 	UFUNCTION(BlueprintCallable, Category="Inventory")
-	static UInventoryComponent* GetInventoryComponent(AActor* Actor)
-	{
-		if (!Actor) return nullptr;
+	static UInventoryComponent* GetInventoryComponent(AActor* Actor);
 
-		// 1. Actor itself
-		if (UInventoryComponent* Comp = Actor->FindComponentByClass<UInventoryComponent>())
-			return Comp;
-
-		// 2. PlayerController
-		if (APlayerController* PC = Cast<APlayerController>(Actor))
-		{
-			if (UInventoryComponent* Comp = PC->FindComponentByClass<UInventoryComponent>())
-				return Comp;
-			if (PC->PlayerState)
-				if (UInventoryComponent* Comp = PC->PlayerState->FindComponentByClass<UInventoryComponent>())
-					return Comp;
-		}
-
-		// 3. Pawn
-		if (APawn* Pawn = Cast<APawn>(Actor))
-		{
-			if (UInventoryComponent* Comp = Pawn->FindComponentByClass<UInventoryComponent>())
-				return Comp;
-			if (AController* C = Pawn->GetController())
-			{
-				if (UInventoryComponent* Comp = C->FindComponentByClass<UInventoryComponent>())
-					return Comp;
-				if (C->PlayerState)
-					if (UInventoryComponent* Comp = C->PlayerState->FindComponentByClass<UInventoryComponent>())
-						return Comp;
-			}
-		}
-
-		// 4. Owner (traverse chain)
-		if (AActor* Owner = Actor->GetOwner())
-			return GetInventoryComponent(Owner);
-
-		return nullptr;
-	}
+	// Find item data asset by tag (brute force, for prototyping; replace with DataTable or AssetManager later)
+	UFUNCTION(BlueprintCallable, Category="Inventory")
+	static UItemDataAsset* FindItemDataByTag(UObject* WorldContextObject, const FGameplayTag& ItemID);
 };

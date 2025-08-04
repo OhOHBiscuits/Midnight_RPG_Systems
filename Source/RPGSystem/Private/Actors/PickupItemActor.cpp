@@ -1,20 +1,30 @@
-﻿#include "Actors\PickupItemActor.h"
+﻿#include "Actors/PickupItemActor.h"
+#include "Inventory\InventoryHelpers.h"
 #include "Inventory/InventoryComponent.h"
+#include "Kismet/GameplayStatics.h"
+#include "Blueprint/UserWidget.h"
 
 APickupItemActor::APickupItemActor()
 {
-	PrimaryActorTick.bCanEverTick = false;
-	bReplicates = true;
+	bUseEfficiency = false; // Pickups do NOT use efficiency
 }
-
 void APickupItemActor::Interact_Implementation(AActor* Interactor)
 {
+	Super::Interact_Implementation(Interactor);
+	if (!HasAuthority())
+		return;
+
 	if (!ItemData || Quantity <= 0 || !Interactor) return;
 
-	UInventoryComponent* Inv = Interactor->FindComponentByClass<UInventoryComponent>();
+	UInventoryComponent* Inv = UInventoryHelpers::GetInventoryComponent(Interactor);
 	if (Inv && Inv->TryAddItem(ItemData, Quantity))
 	{
 		Destroy();
 	}
-	// Optional: else play "inventory full" sound or feedback, or drop some but not all, etc.
+	else
+	{
+		TriggerWorldItemUI(Interactor);
+	}
 }
+
+	

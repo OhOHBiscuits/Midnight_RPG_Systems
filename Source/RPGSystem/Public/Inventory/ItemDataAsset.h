@@ -103,4 +103,26 @@ public:
 
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Tags")
     TArray<FGameplayTag> AllowedActions;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="ItemData")
+    float EfficiencyRating = 1.0f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Fuel")
+    float BurnDays = 0.0f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Fuel")
+    float BurnHours = 0.0f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Fuel")
+    float BurnMinutes = 0.0f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Fuel")
+    float BurnSeconds = 30.0f; // Default to 30s for example
+
+    // Helper (C++ only):
+    float GetTotalBurnSeconds() const
+    {
+        return BurnDays * 86400.0f + BurnHours * 3600.0f + BurnMinutes * 60.0f + BurnSeconds;
+    }
+
 };

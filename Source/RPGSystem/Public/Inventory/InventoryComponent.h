@@ -116,6 +116,14 @@ public:
     UFUNCTION(BlueprintCallable, Category = "4_Inventory|Settings")
     virtual void SetMaxCarryVolume(float NewMaxVolume);
 
+    UFUNCTION(BlueprintCallable, Category="Inventory")
+    int32 GetNumUISlots() const;
+
+    // Returns all the data needed for the UI to build slots
+    UFUNCTION(BlueprintCallable, Category="Inventory")
+    void GetUISlotInfo(TArray<int32>& OutSlotIndices, TArray<UItemDataAsset*>& OutItemData, TArray<int32>& OutQuantities) const;
+    
+    FORCEINLINE const TArray<FInventoryItem>& GetItems() const { return Items; }
 protected:
     virtual void BeginPlay() override;
 
