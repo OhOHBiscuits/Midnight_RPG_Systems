@@ -7,11 +7,15 @@
 #include "GameplayTagContainer.h"
 #include "InventoryComponent.generated.h"
 
-// Delegates for UI and system hooks
+// --- UI/Event Hooks ---
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnInventorySlotUpdated, int32, SlotIndex);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnInventoryChanged);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnWeightChanged, float, NewWeight);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnVolumeChanged, float, NewVolume);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnInventoryFull, bool, bIsFull);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnItemAdded, const FInventoryItem&, Item, int32, QuantityAdded);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnItemRemoved, const FInventoryItem&, Item);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnItemTransferSuccess, const FInventoryItem&, Item);
 
 UCLASS(Blueprintable, ClassGroup = (Custom), meta = (BlueprintSpawnableComponent))
 class RPGSYSTEM_API UInventoryComponent : public UActorComponent
@@ -21,7 +25,7 @@ class RPGSYSTEM_API UInventoryComponent : public UActorComponent
 public:
     UInventoryComponent();
 
-    // --- 1_Inventory|Actions ---
+    //1_Inventory|Actions 
     UFUNCTION(BlueprintCallable, Category = "1_Inventory|Actions")
     virtual bool AddItem(UItemDataAsset* ItemData, int32 Quantity);
 
@@ -55,79 +59,153 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "1_Inventory|Type")
     FGameplayTag InventoryTypeTag;
 
-    // --- 2_Inventory|Queries ---
-    UFUNCTION(BlueprintCallable, BlueprintPure, Category = "2_Inventory|Queries")
+    // Inventory|Queries 
+    UFUNCTION(BlueprintCallable, BlueprintPure, Category = "1_Inventory|Queries")
     virtual bool IsInventoryFull() const;
 
-    UFUNCTION(BlueprintCallable, BlueprintPure, Category = "2_Inventory|Queries")
+    UFUNCTION(BlueprintCallable, BlueprintPure, Category = "1_Inventory|Queries")
     virtual float GetCurrentWeight() const;
 
-    UFUNCTION(BlueprintCallable, BlueprintPure, Category = "2_Inventory|Queries")
+    UFUNCTION(BlueprintCallable, BlueprintPure, Category = "1_Inventory|Queries")
     virtual float GetCurrentVolume() const;
 
-    UFUNCTION(BlueprintCallable, BlueprintPure, Category = "2_Inventory|Queries")
+    UFUNCTION(BlueprintCallable, BlueprintPure, Category = "1_Inventory|Queries")
     virtual FInventoryItem GetItem(int32 SlotIndex) const;
 
-    UFUNCTION(BlueprintCallable, BlueprintPure, Category = "2_Inventory|Queries")
+    UFUNCTION(BlueprintCallable, BlueprintPure, Category = "1_Inventory|Queries")
     virtual int32 FindFreeSlot() const;
 
-    UFUNCTION(BlueprintCallable, BlueprintPure, Category = "2_Inventory|Queries")
+    UFUNCTION(BlueprintCallable, BlueprintPure, Category = "1_Inventory|Queries")
     virtual int32 FindStackableSlot(UItemDataAsset* ItemData) const;
 
-    UFUNCTION(BlueprintCallable, BlueprintPure, Category = "2_Inventory|Queries")
+    UFUNCTION(BlueprintCallable, BlueprintPure, Category = "1_Inventory|Queries")
     virtual int32 FindSlotWithItemID(FGameplayTag ItemID) const;
 
-    UFUNCTION(BlueprintCallable, BlueprintPure, Category = "2_Inventory|Queries")
+    UFUNCTION(BlueprintCallable, BlueprintPure, Category = "1_Inventory|Queries")
     virtual FInventoryItem GetItemByID(FGameplayTag ItemID) const;
 
-    // ---- NEW: Expose Items array safely for Fuel/Decay etc. ----
-    UFUNCTION(BlueprintCallable, BlueprintPure, Category = "2_Inventory|Queries")
+    UFUNCTION(BlueprintCallable, BlueprintPure, Category = "1_Inventory|Queries")
     const TArray<FInventoryItem>& GetAllItems() const { return Items; }
 
-    // --- 3_Inventory|Events (Delegates) ---
-    UPROPERTY(BlueprintAssignable, Category = "3_Inventory|Events")
+    //  3_Inventory|Events 
+    UPROPERTY(BlueprintAssignable, Category = "1_Inventory|Events")
     FOnInventorySlotUpdated OnInventoryUpdated;
 
-    UPROPERTY(BlueprintAssignable, Category = "3_Inventory|Events")
+    UPROPERTY(BlueprintAssignable, Category = "1_Inventory|Events")
     FOnInventoryChanged OnInventoryChanged;
 
-    UPROPERTY(BlueprintAssignable, Category = "3_Inventory|Events")
+    UPROPERTY(BlueprintAssignable, Category = "1_Inventory|Events")
     FOnWeightChanged OnWeightChanged;
 
-    UPROPERTY(BlueprintAssignable, Category = "3_Inventory|Events")
+    UPROPERTY(BlueprintAssignable, Category = "1_Inventory|Events")
     FOnVolumeChanged OnVolumeChanged;
 
-    // --- 4_Inventory|Settings ---
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "4_Inventory|Settings")
+    UPROPERTY(BlueprintAssignable, Category = "1_Inventory|Events")
+    FOnInventoryFull OnInventoryFull;
+
+    UPROPERTY(BlueprintAssignable, Category = "1_Inventory|Events")
+    FOnItemAdded OnItemAdded;
+
+    UPROPERTY(BlueprintAssignable, Category = "1_Inventory|Events")
+    FOnItemRemoved OnItemRemoved;
+
+    UPROPERTY(BlueprintAssignable, Category = "1_Inventory|Events")
+    FOnItemTransferSuccess OnItemTransferSuccess;
+
+    //  Inventory|Settings
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "1_Inventory|Settings")
     int32 MaxSlots = 20;
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "4_Inventory|Settings")
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "1_Inventory|Settings")
     float MaxCarryWeight = 100.f;
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "4_Inventory|Settings")
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "1_Inventory|Settings")
     float MaxCarryVolume = 100.f;
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "4_Inventory|Settings")
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "1_Inventory|Settings")
     FGameplayTag InventoryBehaviorTag;
-
-    UFUNCTION(BlueprintCallable, Category = "4_Inventory|Settings")
+    
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="1_Inventory|Settings")
+    bool bAutoSort = false;
+    
+    UFUNCTION(BlueprintCallable, Category = "1_Inventory|Settings")
     virtual void SetMaxCarryWeight(float NewMaxWeight);
 
-    UFUNCTION(BlueprintCallable, Category = "4_Inventory|Settings")
+    UFUNCTION(BlueprintCallable, Category = "1_Inventory|Settings")
     virtual void SetMaxCarryVolume(float NewMaxVolume);
 
-    UFUNCTION(BlueprintCallable, Category="Inventory")
+    UFUNCTION(BlueprintCallable, Category="1_Inventory")
     int32 GetNumUISlots() const;
 
-    // Returns all the data needed for the UI to build slots
-    UFUNCTION(BlueprintCallable, Category="Inventory")
+    UFUNCTION(BlueprintCallable, Category="1_Inventory")
     void GetUISlotInfo(TArray<int32>& OutSlotIndices, TArray<UItemDataAsset*>& OutItemData, TArray<int32>& OutQuantities) const;
+
+    // --- Helpers for limit behaviors ---
+    UFUNCTION(BlueprintCallable, BlueprintPure, Category = "1_Inventory")
+    bool IsSlotLimited() const;
+
+    UFUNCTION(BlueprintCallable, BlueprintPure, Category = "1_Inventory")
+    bool IsWeightLimited() const;
+
+    UFUNCTION(BlueprintCallable, BlueprintPure, Category = "1_Inventory")
+    bool IsVolumeLimited() const;
+
+    UFUNCTION(BlueprintCallable, BlueprintPure, Category = "1_Inventory")
+    bool IsUnlimited() const;
+
+    UFUNCTION(BlueprintCallable, Category="1_Inventory|Actions")
+    void SortInventoryByName();
+
+    UFUNCTION(Server, Reliable, WithValidation)
+    void ServerSortInventoryByName();
+
+    UFUNCTION(BlueprintCallable, Category="1_Inventory|Actions")
+    void RequestSortInventoryByName();
+
+    // --- Actions ---
+    UFUNCTION(BlueprintCallable, Category="1_Inventory|Actions")
+    virtual bool SplitStack(int32 SlotIndex, int32 SplitQuantity);
+
+    UFUNCTION(Server, Reliable, WithValidation)
+    void ServerSplitStack(int32 SlotIndex, int32 SplitQuantity);
+
+    UFUNCTION(BlueprintCallable, Category="1_Inventory|Actions")
+    virtual bool TrySplitStack(int32 SlotIndex, int32 SplitQuantity);
+
     
+    UFUNCTION(BlueprintCallable, Category = "1_Inventory|Sort")
+    void RequestSortInventoryByRarity();
+
+    UFUNCTION(BlueprintCallable, Category = "1_Inventory|Sort")
+    void RequestSortInventoryByType();
+
+    UFUNCTION(BlueprintCallable, Category = "1_Inventory|Sort")
+    void RequestSortInventoryByCategory();
+
+    UFUNCTION(BlueprintCallable, Category = "1_Inventory|Sort")
+    void SortInventoryByRarity();
+
+    UFUNCTION(BlueprintCallable, Category = "1_Inventory|Sort")
+    void SortInventoryByType();
+
+    UFUNCTION(BlueprintCallable, Category = "1_Inventory|Sort")
+    void SortInventoryByCategory();
+
+    UFUNCTION(Server, Reliable, WithValidation)
+    void ServerSortInventoryByRarity();
+
+    UFUNCTION(Server, Reliable, WithValidation)
+    void ServerSortInventoryByType();
+
+    UFUNCTION(Server, Reliable, WithValidation)
+    void ServerSortInventoryByCategory();
+      
     FORCEINLINE const TArray<FInventoryItem>& GetItems() const { return Items; }
+
 protected:
     virtual void BeginPlay() override;
 
-    UPROPERTY(ReplicatedUsing = OnRep_InventoryItems, BlueprintReadOnly, Category = "4_Inventory|Data")
+    UPROPERTY(ReplicatedUsing = OnRep_InventoryItems, BlueprintReadOnly, Category = "1_Inventory|Data")
     TArray<FInventoryItem> Items;
 
     UFUNCTION()
@@ -137,10 +215,19 @@ protected:
     void NotifyInventoryChanged();
     void UpdateItemIndexes();
 
+    // Internal helpers for limit behavior
+   
+    
+    void AdjustSlotCountIfNeeded();
+
 public:
     virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
-    // --- 5_Inventory|RPCs ---
+    // Inventory|RPCs 
+
+    UFUNCTION(BlueprintCallable, Category="1_Inventory|Settings")
+    void SetMaxSlots(int32 NewMaxSlots);
+    
     UFUNCTION(Server, Reliable, WithValidation)
     void ServerAddItem(UItemDataAsset* ItemData, int32 Quantity);
 
@@ -168,24 +255,35 @@ public:
     UFUNCTION(Server, Reliable, WithValidation)
     void Server_TransferItem(UInventoryComponent* SourceInventory, int32 SourceIndex, UInventoryComponent* TargetInventory, int32 TargetIndex);
 
-    // Utility: Count occupied slots
-    UFUNCTION(BlueprintCallable, Category="2_Inventory|Queries")
+    UFUNCTION(BlueprintCallable, Category="1_Inventory|Queries")
     virtual int32 GetNumOccupiedSlots() const;
 
-    // Utility: Total quantity of a specific item (by ItemIDTag)
-    UFUNCTION(BlueprintCallable, Category="2_Inventory|Queries")
+    UFUNCTION(BlueprintCallable, Category="1_Inventory|Queries")
     virtual int32 GetNumItemsOfType(FGameplayTag ItemID) const;
 
-    // Utility: Swap two slots (can be useful for sorting, UI, etc)
     UFUNCTION(BlueprintCallable, Category="1_Inventory|Actions")
     virtual bool SwapItems(int32 IndexA, int32 IndexB);
 
-    // --- 5_Inventory|Container Restrictions ---
-    /** Optional: Only allow storing items with these ItemIDs (empty = allow all) */
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="5_Inventory|Container")
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="1_Inventory|Container")
     TArray<FGameplayTag> AllowedItemIDs;
 
-    /** Returns true if this inventory accepts this ItemDataAsset */
-    UFUNCTION(BlueprintCallable, Category="5_Inventory|Container")
+    UFUNCTION(BlueprintCallable, Category="1_Inventory|Container")
     virtual bool CanAcceptItem(UItemDataAsset* ItemData) const;
+
+    // Filter by single tag
+    UFUNCTION(BlueprintCallable, BlueprintPure, Category = "1_Inventory|Queries")
+    TArray<FInventoryItem> FilterItemsByRarity(FGameplayTag RarityTag) const;
+
+    UFUNCTION(BlueprintCallable, BlueprintPure, Category = "1_Inventory|Queries")
+    TArray<FInventoryItem> FilterItemsByCategory(FGameplayTag CategoryTag) const;
+
+    UFUNCTION(BlueprintCallable, BlueprintPure, Category = "1_Inventory|Queries")
+    TArray<FInventoryItem> FilterItemsBySubCategory(FGameplayTag SubCategoryTag) const;
+
+    UFUNCTION(BlueprintCallable, BlueprintPure, Category = "1_Inventory|Queries")
+    TArray<FInventoryItem> FilterItemsByType(FGameplayTag TypeTag) const;
+
+    // (Optional advanced use) - filter by multiple tags at once
+    UFUNCTION(BlueprintCallable, BlueprintPure, Category = "1_Inventory|Queries")
+    TArray<FInventoryItem> FilterItemsByTags(FGameplayTagContainer Tags, bool bMatchAll = false) const;
 };

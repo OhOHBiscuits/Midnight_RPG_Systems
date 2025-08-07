@@ -62,6 +62,26 @@ public:
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Decay", meta=(EditCondition="bCanDecay"))
     float DecayRate = 0.f;
 
+    // In ItemDataAsset.h, under "Decay"
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Decay")
+    float DecayDays = 0.0f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Decay")
+    float DecayHours = 0.0f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Decay")
+    float DecayMinutes = 0.0f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Decay")
+    float DecaySeconds = 30.0f; // default for fast testing
+
+    // Helper:
+    float GetTotalDecaySeconds() const
+    {
+        return DecayDays * 86400.0f + DecayHours * 3600.0f + DecayMinutes * 60.0f + DecaySeconds;
+    }
+
+
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Decay", meta=(EditCondition="bCanDecay"))
     TSoftObjectPtr<UItemDataAsset> DecaysInto;
 
