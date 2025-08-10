@@ -56,6 +56,9 @@ public:
 
 
     // Decay
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Decay")
+    TSoftClassPtr<AActor> DecaysIntoActorClass;
+    
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Decay")
     bool bCanDecay = false;
 

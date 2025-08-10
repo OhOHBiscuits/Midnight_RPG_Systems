@@ -214,10 +214,8 @@ protected:
     void NotifySlotChanged(int32 SlotIndex);
     void NotifyInventoryChanged();
     void UpdateItemIndexes();
-
     // Internal helpers for limit behavior
-   
-    
+     
     void AdjustSlotCountIfNeeded();
 
 public:
