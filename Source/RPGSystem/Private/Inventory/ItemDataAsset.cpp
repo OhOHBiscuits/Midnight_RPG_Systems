@@ -2,10 +2,9 @@
 #include "Engine/StreamableManager.h"
 #include "Engine/AssetManager.h"
 
-
 void LoadMeshAsync(UItemDataAsset* ItemData, TFunction<void(UStaticMesh*)> OnLoaded)
 {
-	if (!ItemData || !ItemData->WorldMesh.IsValid() && !ItemData->WorldMesh.ToSoftObjectPath().IsValid())
+	if (!ItemData || (!ItemData->WorldMesh.IsValid() && !ItemData->WorldMesh.ToSoftObjectPath().IsValid()))
 	{
 		OnLoaded(nullptr);
 		return;

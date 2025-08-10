@@ -7,6 +7,8 @@
 #include "GameplayTagContainer.h"
 #include "ItemDataAsset.generated.h"
 
+class AActor;
+
 USTRUCT(BlueprintType)
 struct FFuelByproduct
 {
@@ -19,7 +21,6 @@ struct FFuelByproduct
     int32 Amount = 1;
 };
 
-
 UCLASS(BlueprintType)
 class RPGSYSTEM_API UItemDataAsset : public UDataAsset
 {
@@ -27,9 +28,10 @@ class RPGSYSTEM_API UItemDataAsset : public UDataAsset
 
 public:
 
+    // ---------- UI / General ----------
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "UI")
     TSoftObjectPtr<UTexture2D> Icon;
-    // General
+
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Item")
     FGameplayTag ItemIDTag;
 
@@ -54,48 +56,56 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Item")
     bool bStackable = true;
 
-
-    // Decay
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Decay")
-    TSoftClassPtr<AActor> DecaysIntoActorClass;
-    
+    // ---------- Decay ----------
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Decay")
     bool bCanDecay = false;
 
+    // Legacy single-value seconds (kept for older assets)
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Decay", meta=(EditCondition="bCanDecay"))
     float DecayRate = 0.f;
 
-    // In ItemDataAsset.h, under "Decay"
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Decay")
+    // NEW: Time breakdown like Fuel
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Decay", meta=(EditCondition="bCanDecay"))
     float DecayDays = 0.0f;
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Decay")
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Decay", meta=(EditCondition="bCanDecay"))
     float DecayHours = 0.0f;
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Decay")
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Decay", meta=(EditCondition="bCanDecay"))
     float DecayMinutes = 0.0f;
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Decay")
-    float DecaySeconds = 30.0f; // default for fast testing
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Decay", meta=(EditCondition="bCanDecay"))
+    float DecaySeconds = 0.0f;
 
-    // Helper:
-    float GetTotalDecaySeconds() const
-    {
-        return DecayDays * 86400.0f + DecayHours * 3600.0f + DecayMinutes * 60.0f + DecaySeconds;
-    }
-
-
+    // Inventory output when this item decays (used by containers/inventories)
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Decay", meta=(EditCondition="bCanDecay"))
     TSoftObjectPtr<UItemDataAsset> DecaysInto;
 
-    // Durability
+    // Optional: world actor to spawn when a *world pickup* finishes decaying
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Decay", meta=(EditCondition="bCanDecay"))
+    TSoftClassPtr<AActor> DecaysIntoActorClass;
+
+    // Helper: total seconds for decay. If all new fields are 0, falls back to DecayRate.
+    UFUNCTION(BlueprintCallable, BlueprintPure, Category="Decay")
+    float GetTotalDecaySeconds() const
+    {
+        const float Total =
+            DecayDays    * 86400.0f +
+            DecayHours   * 3600.0f  +
+            DecayMinutes * 60.0f    +
+            DecaySeconds;
+
+        return (Total > 0.0f) ? Total : FMath::Max(0.0f, DecayRate);
+    }
+
+    // ---------- Durability ----------
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Durability")
     bool bHasDurability = false;
 
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Durability", meta=(EditCondition="bHasDurability"))
     int32 MaxDurability = 100;
 
-    // Burning/Fuel
+    // ---------- Fuel ----------
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Fuel")
     bool bIsFuel = false;
 
@@ -112,6 +122,7 @@ public:
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "World")
     TSoftObjectPtr<UStaticMesh> WorldMesh;
 
+    // Tags
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Tags")
     FGameplayTag ItemType;
 
@@ -130,6 +141,7 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="ItemData")
     float EfficiencyRating = 1.0f;
 
+    // ---------- Fuel time breakdown ----------
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Fuel")
     float BurnDays = 0.0f;
 
@@ -140,12 +152,11 @@ public:
     float BurnMinutes = 0.0f;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Fuel")
-    float BurnSeconds = 30.0f; // Default to 30s for example
+    float BurnSeconds = 30.0f; // Default
 
-    // Helper (C++ only):
+    // Helper (C++ only)
     float GetTotalBurnSeconds() const
     {
         return BurnDays * 86400.0f + BurnHours * 3600.0f + BurnMinutes * 60.0f + BurnSeconds;
     }
-
 };
