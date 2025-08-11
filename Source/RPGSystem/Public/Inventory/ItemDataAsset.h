@@ -7,156 +7,146 @@
 #include "GameplayTagContainer.h"
 #include "ItemDataAsset.generated.h"
 
-class AActor;
+class UCraftingRecipeDataAsset;
 
 USTRUCT(BlueprintType)
 struct FFuelByproduct
 {
-    GENERATED_BODY()
+	GENERATED_BODY()
 
-    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Fuel")
-    FGameplayTag ByproductItemID;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Fuel")
+	FGameplayTag ByproductItemID;
 
-    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Fuel")
-    int32 Amount = 1;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Fuel")
+	int32 Amount = 1;
 };
 
 UCLASS(BlueprintType)
 class RPGSYSTEM_API UItemDataAsset : public UDataAsset
 {
-    GENERATED_BODY()
+	GENERATED_BODY()
 
 public:
+	// UI
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="UI")
+	TSoftObjectPtr<UTexture2D> Icon;
 
-    // ---------- UI / General ----------
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "UI")
-    TSoftObjectPtr<UTexture2D> Icon;
+	// Searchable in cooked
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Item", meta=(AssetRegistrySearchable))
+	FGameplayTag ItemIDTag;
 
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Item")
-    FGameplayTag ItemIDTag;
+	// Display
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="UI")
+	FText Name;
 
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="UI")
-    FText Name;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="UI")
+	FText ShortDescription;
 
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="UI")
-    FText ShortDescription;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="UI")
+	FText Description;
 
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="UI")
-    FText Description;
+	// Physical
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Item")
+	float Weight = 1.0f;
 
-    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Item")
-    float Weight = 1.0f;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Item")
+	float Volume = 1.f;
 
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Item")
-    float Volume = 1.f;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Item")
+	int32 MaxStackSize = 1;
 
-    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Item")
-    int32 MaxStackSize = 1;
-    
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Item")
-    bool bStackable = true;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Item")
+	bool bStackable = true;
 
-    // ---------- Decay ----------
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Decay")
-    bool bCanDecay = false;
+	// Decay
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Decay")
+	bool bCanDecay = false;
 
-    // Legacy single-value seconds (kept for older assets)
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Decay", meta=(EditCondition="bCanDecay"))
-    float DecayRate = 0.f;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Decay", meta=(EditCondition="bCanDecay"))
+	float DecayRate = 0.f;
 
-    // NEW: Time breakdown like Fuel
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Decay", meta=(EditCondition="bCanDecay"))
-    float DecayDays = 0.0f;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Decay", meta=(EditCondition="bCanDecay"))
+	TSoftObjectPtr<UItemDataAsset> DecaysInto;
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Decay", meta=(EditCondition="bCanDecay"))
-    float DecayHours = 0.0f;
+	// Durability
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Durability")
+	bool bHasDurability = false;
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Decay", meta=(EditCondition="bCanDecay"))
-    float DecayMinutes = 0.0f;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Durability", meta=(EditCondition="bHasDurability"))
+	int32 MaxDurability = 100;
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Decay", meta=(EditCondition="bCanDecay"))
-    float DecaySeconds = 0.0f;
+	// Fuel
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Fuel")
+	bool bIsFuel = false;
 
-    // Inventory output when this item decays (used by containers/inventories)
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Decay", meta=(EditCondition="bCanDecay"))
-    TSoftObjectPtr<UItemDataAsset> DecaysInto;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Fuel", meta=(EditCondition="bIsFuel"))
+	float BurnRate = 0.f;
 
-    // Optional: world actor to spawn when a *world pickup* finishes decaying
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Decay", meta=(EditCondition="bCanDecay"))
-    TSoftClassPtr<AActor> DecaysIntoActorClass;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Fuel")
+	TArray<FFuelByproduct> FuelByproducts;
 
-    // Helper: total seconds for decay. If all new fields are 0, falls back to DecayRate.
-    UFUNCTION(BlueprintCallable, BlueprintPure, Category="Decay")
-    float GetTotalDecaySeconds() const
-    {
-        const float Total =
-            DecayDays    * 86400.0f +
-            DecayHours   * 3600.0f  +
-            DecayMinutes * 60.0f    +
-            DecaySeconds;
+	// World
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="World")
+	TSoftClassPtr<AActor> WorldActorClass;
 
-        return (Total > 0.0f) ? Total : FMath::Max(0.0f, DecayRate);
-    }
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="World")
+	TSoftObjectPtr<UStaticMesh> WorldMesh;
 
-    // ---------- Durability ----------
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Durability")
-    bool bHasDurability = false;
+	// Tags
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Tags")
+	FGameplayTag ItemType;
 
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Durability", meta=(EditCondition="bHasDurability"))
-    int32 MaxDurability = 100;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Tags")
+	FGameplayTag ItemCategory;
 
-    // ---------- Fuel ----------
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Fuel")
-    bool bIsFuel = false;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Tags")
+	FGameplayTag ItemSubCategory;
 
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Fuel", meta=(EditCondition="bIsFuel"))
-    float BurnRate = 0.f;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Tags")
+	FGameplayTag Rarity;
 
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Fuel")
-    TArray<FFuelByproduct> FuelByproducts;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Tags")
+	TArray<FGameplayTag> AllowedActions;
 
-    // World Placement
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="World")
-    TSoftClassPtr<AActor> WorldActorClass;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="ItemData")
+	float EfficiencyRating = 1.0f;
 
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "World")
-    TSoftObjectPtr<UStaticMesh> WorldMesh;
+	// Burn time
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Fuel")
+	float BurnDays = 0.0f;
 
-    // Tags
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Tags")
-    FGameplayTag ItemType;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Fuel")
+	float BurnHours = 0.0f;
 
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Tags")
-    FGameplayTag ItemCategory;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Fuel")
+	float BurnMinutes = 0.0f;
 
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Tags")
-    FGameplayTag ItemSubCategory;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Fuel")
+	float BurnSeconds = 30.0f;
 
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Tags")
-    FGameplayTag Rarity;
+	// Crafting metadata for UI
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="1_Inventory|Crafting")
+	bool bCraftingEnabled = false;
 
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Tags")
-    TArray<FGameplayTag> AllowedActions;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="1_Inventory|Crafting", meta=(EditCondition="bCraftingEnabled"))
+	TArray<TSoftObjectPtr<UCraftingRecipeDataAsset>> CraftableRecipes;
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="ItemData")
-    float EfficiencyRating = 1.0f;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="1_Inventory|Crafting", meta=(EditCondition="bCraftingEnabled"))
+	TArray<TSoftObjectPtr<UCraftingRecipeDataAsset>> UsedInRecipes;
 
-    // ---------- Fuel time breakdown ----------
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Fuel")
-    float BurnDays = 0.0f;
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category="1_Inventory|Crafting")
+	bool CanBeCrafted() const { return bCraftingEnabled && CraftableRecipes.Num() > 0; }
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Fuel")
-    float BurnHours = 0.0f;
+	// Helpers for cooked
+	UFUNCTION(BlueprintCallable, Category="1_Inventory|ItemData")
+	float GetTotalBurnSeconds() const
+	{
+		return BurnDays * 86400.0f + BurnHours * 3600.0f + BurnMinutes * 60.0f + BurnSeconds;
+	}
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Fuel")
-    float BurnMinutes = 0.0f;
+	UFUNCTION(BlueprintCallable, Category="1_Inventory|ItemData")
+	UStaticMesh* GetWorldMeshSync() const { return WorldMesh.IsNull() ? nullptr : WorldMesh.LoadSynchronous(); }
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Fuel")
-    float BurnSeconds = 30.0f; // Default
-
-    // Helper (C++ only)
-    float GetTotalBurnSeconds() const
-    {
-        return BurnDays * 86400.0f + BurnHours * 3600.0f + BurnMinutes * 60.0f + BurnSeconds;
-    }
+	UFUNCTION(BlueprintCallable, Category="1_Inventory|ItemData")
+	UTexture2D* GetIconSync() const { return Icon.IsNull() ? nullptr : Icon.LoadSynchronous(); }
 };
