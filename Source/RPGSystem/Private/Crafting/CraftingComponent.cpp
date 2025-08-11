@@ -9,6 +9,12 @@
 #include "FuelSystem/FuelComponent.h"
 #include "Crafting/CraftingRecipeDataAsset.h"
 
+#include "Crafting/CraftingProficiencyInterface.h"
+#include "Crafting/CraftingProficiencyComponent.h"
+#include "GameFramework/PlayerController.h"
+#include "GameFramework/PlayerState.h"
+#include "GameFramework/Pawn.h"
+
 UCraftingComponent::UCraftingComponent()
 {
 	PrimaryComponentTick.bCanEverTick = false;
@@ -33,6 +39,71 @@ bool UCraftingComponent::IsFuelSatisfied(UCraftingRecipeDataAsset* Recipe) const
 {
 	if (!Recipe || !Recipe->bRequiresFuel) return true;
 	return FuelComponent && FuelComponent->bIsBurning;
+}
+
+static UCraftingProficiencyComponent* FindProficiencyComponentOnChain(AActor* Actor)
+{
+	if (!Actor) return nullptr;
+
+	if (UCraftingProficiencyComponent* C = Actor->FindComponentByClass<UCraftingProficiencyComponent>())
+		return C;
+
+	if (APawn* Pawn = Cast<APawn>(Actor))
+	{
+		if (UCraftingProficiencyComponent* C2 = Pawn->FindComponentByClass<UCraftingProficiencyComponent>())
+			return C2;
+		if (AController* Cntrl = Pawn->GetController())
+		{
+			if (UCraftingProficiencyComponent* C3 = Cntrl->FindComponentByClass<UCraftingProficiencyComponent>())
+				return C3;
+			if (Cntrl->PlayerState)
+				if (UCraftingProficiencyComponent* C4 = Cntrl->PlayerState->FindComponentByClass<UCraftingProficiencyComponent>())
+					return C4;
+		}
+	}
+
+	if (APlayerController* PC = Cast<APlayerController>(Actor))
+	{
+		if (UCraftingProficiencyComponent* C5 = PC->FindComponentByClass<UCraftingProficiencyComponent>())
+			return C5;
+		if (PC->PlayerState)
+			if (UCraftingProficiencyComponent* C6 = PC->PlayerState->FindComponentByClass<UCraftingProficiencyComponent>())
+				return C6;
+	}
+
+	if (AActor* Owner = Actor->GetOwner())
+		return FindProficiencyComponentOnChain(Owner);
+
+	return nullptr;
+}
+
+int32 UCraftingComponent::GetInteractorProficiency(AActor* Interactor, const FGameplayTag& SkillTag) const
+{
+	if (!Interactor || !SkillTag.IsValid()) return 0;
+
+	if (Interactor->GetClass()->ImplementsInterface(UCraftingProficiencyInterface::StaticClass()))
+	{
+		return ICraftingProficiencyInterface::Execute_GetCraftingProficiencyLevel(Interactor, SkillTag);
+	}
+
+	if (const UCraftingProficiencyComponent* Comp = FindProficiencyComponentOnChain(Interactor))
+	{
+		return Comp->GetLevel(SkillTag);
+	}
+
+	return 0;
+}
+
+bool UCraftingComponent::IsProficiencySatisfied(UCraftingRecipeDataAsset* Recipe, AActor* Interactor, int32& OutCurrentLevel) const
+{
+	OutCurrentLevel = 0;
+	if (!Recipe) return false;
+
+	if (!Recipe->RequiredSkillTag.IsValid() || Recipe->RequiredSkillLevel <= 0)
+		return true;
+
+	OutCurrentLevel = GetInteractorProficiency(Interactor, Recipe->RequiredSkillTag);
+	return OutCurrentLevel >= Recipe->RequiredSkillLevel;
 }
 
 void UCraftingComponent::GatherInputSources(AActor* Interactor, TArray<UInventoryComponent*>& OutSources) const
@@ -171,6 +242,11 @@ bool UCraftingComponent::CanCraft(UCraftingRecipeDataAsset* Recipe, AActor* Inte
 	if (!Recipe) return false;
 	if (Recipe->StationTypeTag.IsValid() && !StationTypeTag.MatchesTagExact(Recipe->StationTypeTag))
 		return false;
+
+	int32 CurLvl = 0;
+	if (!IsProficiencySatisfied(Recipe, Interactor, CurLvl))
+		return false;
+
 	return HasRequiredInputs(Recipe, Interactor) && HasOutputSpace(Recipe, Interactor) && IsFuelSatisfied(Recipe);
 }
 
@@ -200,6 +276,14 @@ void UCraftingComponent::TryCancelCraft()
 bool UCraftingComponent::StartCraft_Internal(UCraftingRecipeDataAsset* Recipe, int32 RepeatCount, AActor* Interactor)
 {
 	if (!Recipe || bIsCrafting) return false;
+
+	int32 CurLvl = 0;
+	if (!IsProficiencySatisfied(Recipe, Interactor, CurLvl))
+	{
+		OnCraftingProficiencyFailed.Broadcast(Recipe->RequiredSkillTag, Recipe->RequiredSkillLevel, CurLvl);
+		return false;
+	}
+
 	if (!CanCraft(Recipe, Interactor)) return false;
 	if (!SelectOutputInventory(Interactor)) return false;
 
@@ -211,15 +295,30 @@ bool UCraftingComponent::StartCraft_Internal(UCraftingRecipeDataAsset* Recipe, i
 	RemainingRepeats = RepeatCount - 1;
 	CachedInteractor = Interactor;
 
-	StartCraftTimer(Recipe);
+	StartCraftTimer(Recipe, CurLvl);
 	OnCraftingStarted.Broadcast(ActiveRecipeID);
 	return true;
 }
 
-void UCraftingComponent::StartCraftTimer(UCraftingRecipeDataAsset* Recipe)
+void UCraftingComponent::StartCraftTimer(UCraftingRecipeDataAsset* Recipe, int32 InteractorLevel)
 {
+	const float BaseSeconds = FMath::Max(0.f, Recipe->CraftSeconds);
+	float Factor = 1.0f;
+
+	if (Recipe->ProficiencyToTimeFactor)
+	{
+		Factor = FMath::Max(0.01f, Recipe->ProficiencyToTimeFactor->GetFloatValue((float)InteractorLevel));
+	}
+
+	if (CachedInteractor.IsValid() && CachedInteractor->GetClass()->ImplementsInterface(UCraftingProficiencyInterface::StaticClass()))
+	{
+		const float IfcFactor = ICraftingProficiencyInterface::Execute_GetCraftingTimeFactor(CachedInteractor.Get(), Recipe->RequiredSkillTag);
+		if (IfcFactor > 0.f) Factor *= IfcFactor;
+	}
+
 	const float Speed = FMath::Max(0.01f, CraftSpeedMultiplier);
-	RemainingSeconds = FMath::Max(0.f, Recipe->CraftSeconds) / Speed;
+	RemainingSeconds = (BaseSeconds * Factor) / Speed;
+
 	GetWorld()->GetTimerManager().SetTimer(CraftTimer, this, &UCraftingComponent::CraftTick, 1.0f, true);
 }
 
@@ -235,16 +334,24 @@ void UCraftingComponent::ConsumeInputs(UCraftingRecipeDataAsset* Recipe, AActor*
 	}
 }
 
-void UCraftingComponent::GrantOutputs(UCraftingRecipeDataAsset* Recipe, AActor* Interactor)
+void UCraftingComponent::GrantOutputs(UCraftingRecipeDataAsset* Recipe, AActor* Interactor, int32 InteractorLevel)
 {
 	if (UInventoryComponent* OutInv = SelectOutputInventory(Interactor))
 	{
 		for (const auto& Out : Recipe->Outputs)
 		{
 			if (!Out.ItemID.IsValid() || Out.Quantity <= 0) continue;
+
+			int32 Qty = Out.Quantity;
+			if (Recipe->ProficiencyToYieldFactor)
+			{
+				const float YieldFactor = FMath::Max(0.f, Recipe->ProficiencyToYieldFactor->GetFloatValue((float)InteractorLevel));
+				Qty = FMath::Max(0, FMath::FloorToInt(Out.Quantity * (YieldFactor <= 0.f ? 1.f : YieldFactor)));
+			}
+
 			if (UItemDataAsset* OutAsset = UInventoryHelpers::FindItemDataByTag(this, Out.ItemID))
 			{
-				OutInv->TryAddItem(OutAsset, Out.Quantity);
+				if (Qty > 0) OutInv->TryAddItem(OutAsset, Qty);
 			}
 		}
 	}
@@ -269,16 +376,22 @@ void UCraftingComponent::CraftTick()
 
 	if (RemainingSeconds <= 0.f)
 	{
-		GrantOutputs(ActiveRecipe, CachedInteractor.Get());
+		const int32 CurLvl = CachedInteractor.IsValid()
+			? GetInteractorProficiency(CachedInteractor.Get(), ActiveRecipe->RequiredSkillTag)
+			: 0;
+
+		GrantOutputs(ActiveRecipe, CachedInteractor.Get(), CurLvl);
 		OnCraftingCompleted.Broadcast(ActiveRecipeID);
 
 		if (RemainingRepeats > 0)
 		{
-			if (CanCraft(ActiveRecipe, CachedInteractor.Get()))
+			int32 RecheckLvl = 0;
+			if (IsProficiencySatisfied(ActiveRecipe, CachedInteractor.Get(), RecheckLvl) &&
+				HasRequiredInputs(ActiveRecipe, CachedInteractor.Get()))
 			{
 				ConsumeInputs(ActiveRecipe, CachedInteractor.Get());
 				--RemainingRepeats;
-				StartCraftTimer(ActiveRecipe);
+				StartCraftTimer(ActiveRecipe, RecheckLvl);
 			}
 			else
 			{

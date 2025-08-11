@@ -28,28 +28,37 @@ struct FInventoryItem
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	int32 Quantity;
 
-	/** The index this item occupies in the inventory array, for UI or reference */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	int32 ItemIndex;
 
-	// Utility: Is this slot valid/occupied?
+	/** Consider a slot valid if it has a non-null soft reference and positive quantity (works in Standalone even if not loaded). */
 	bool IsValid() const
 	{
-		return ItemData.IsValid() && Quantity > 0;
+		return !ItemData.IsNull() && Quantity > 0;
 	}
 
-	// (Optional) Is this item stackable? (Uses ItemData settings if present)
+	/** True if data says it can stack (safe if asset isn’t loaded yet). */
 	bool IsStackable() const
 	{
-		if (ItemData.IsValid())
-		{
-			UItemDataAsset* Asset = ItemData.Get();
-			return Asset && Asset->MaxStackSize > 1;
-		}
-		return false;
+		if (ItemData.IsNull()) return false;
+		const UItemDataAsset* Asset = ItemData.Get();
+		return Asset && Asset->MaxStackSize > 1;
 	}
+
 	FORCEINLINE FGameplayTag GetItemID() const
 	{
-		return ItemData.IsValid() ? ItemData->ItemIDTag : FGameplayTag();
+		return (!ItemData.IsNull() && ItemData.Get()) ? ItemData->ItemIDTag : FGameplayTag();
 	}
-	};
+
+	/** Use this only when you truly need the asset; will sync‑load in Standalone if not resident. */
+	UItemDataAsset* ResolveItemData() const
+	{
+		if (ItemData.IsNull()) return nullptr;
+		UItemDataAsset* Data = ItemData.Get();
+		if (!Data && ItemData.ToSoftObjectPath().IsValid())
+		{
+			Data = ItemData.LoadSynchronous();
+		}
+		return Data;
+	}
+};

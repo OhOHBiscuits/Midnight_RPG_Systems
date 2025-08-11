@@ -1,8 +1,3 @@
-﻿
-// InventoryItem.cpp
-
-#include "Inventory/InventoryItem.h"
+﻿#include "Inventory/InventoryItem.h"
 #include "Inventory/ItemDataAsset.h"
-
-
-	
+// Intentionally minimal; logic lives inline in the struct.

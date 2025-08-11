@@ -2,7 +2,7 @@
 #include "Engine/StreamableManager.h"
 #include "Engine/AssetManager.h"
 
-// Example utility if you keep async mesh loading around
+// Optional async example kept (safe in PIE; in cooked prefer the sync helpers above)
 void LoadMeshAsync(UItemDataAsset* ItemData, TFunction<void(UStaticMesh*)> OnLoaded)
 {
 	if (!ItemData || (!ItemData->WorldMesh.IsValid() && !ItemData->WorldMesh.ToSoftObjectPath().IsValid()))
