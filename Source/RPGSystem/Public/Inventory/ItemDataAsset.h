@@ -161,15 +161,7 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="1_Inventory|Crafting")
 	bool bCraftingEnabled = false;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="1_Inventory|Crafting", meta=(EditCondition="bCraftingEnabled"))
-	TArray<TSoftObjectPtr<UCraftingRecipeDataAsset>> CraftableRecipes;
-
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="1_Inventory|Crafting", meta=(EditCondition="bCraftingEnabled"))
-	TArray<TSoftObjectPtr<UCraftingRecipeDataAsset>> UsedInRecipes;
-
-	UFUNCTION(BlueprintCallable, BlueprintPure, Category="1_Inventory|Crafting")
-	bool CanBeCrafted() const { return bCraftingEnabled && CraftableRecipes.Num() > 0; }
-
+	
 	// --- Cook-safe sync helpers ---
 	UFUNCTION(BlueprintCallable, Category="1_Inventory|ItemData")
 	UStaticMesh* GetWorldMeshSync() const { return WorldMesh.IsNull() ? nullptr : WorldMesh.LoadSynchronous(); }
