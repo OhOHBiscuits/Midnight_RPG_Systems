@@ -2,8 +2,9 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
-#include "Interfaces\InteractionInterface.h"
-#include "Inventory\ItemDataAsset.h"
+#include "GameplayTagContainer.h"
+#include "Interfaces/InteractionInterface.h"
+#include "Inventory/ItemDataAsset.h"
 #include "BaseWorldItemActor.generated.h"
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnEfficiencyChanged, float, NewEfficiency);

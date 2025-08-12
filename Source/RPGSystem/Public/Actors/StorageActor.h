@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Actors/BaseWorldItemActor.h"
+#include "Inventory/InventoryHelpers.h"
 #include "Inventory/InventoryComponent.h"
 #include "StorageActor.generated.h"
 
@@ -16,4 +17,7 @@ public:
 	UInventoryComponent* InventoryComp;
 
 	virtual void Interact_Implementation(AActor* Interactor) override;
+
+protected:
+	virtual void BeginPlay() override;
 };

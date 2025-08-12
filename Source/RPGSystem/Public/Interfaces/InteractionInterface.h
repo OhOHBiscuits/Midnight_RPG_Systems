@@ -1,7 +1,7 @@
-﻿#pragma once
-
+﻿// InteractionInterface.h
+#pragma once
 #include "CoreMinimal.h"
-#include "GameplayTagContainer.h" // <-- This fixes the undefined FGameplayTag error!
+#include "GameplayTagContainer.h" // <-- required
 #include "UObject/Interface.h"
 #include "InteractionInterface.generated.h"
 

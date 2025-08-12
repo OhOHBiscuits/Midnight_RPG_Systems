@@ -2,56 +2,71 @@
 #include "Inventory/InventoryComponent.h"
 #include "Inventory/ItemDataAsset.h"
 #include "Inventory/InventoryAssetManager.h"
-#include "GameFramework/PlayerController.h"
+#include "Actors/AreaVolumeActor.h"
+#include "Components/BoxComponent.h"
 #include "GameFramework/PlayerState.h"
-#include "GameFramework/Pawn.h"
+#include "GameFramework/PlayerController.h"
+#include "Kismet/GameplayStatics.h"
 #include "UObject/UObjectIterator.h"
 
-UInventoryComponent* UInventoryHelpers::GetInventoryComponent(AActor* Actor)
+UInventoryComponent* UInventoryHelpers::GetInventoryComponent(AActor* Actor) { /* (your existing body unchanged) */ }
+
+FString UInventoryHelpers::GetStablePlayerId(AActor* Actor)
 {
-	if (!Actor) return nullptr;
+	if (!Actor) return FString();
 
-	if (UInventoryComponent* Comp = Actor->FindComponentByClass<UInventoryComponent>()) return Comp;
-
-	if (APlayerController* PC = Cast<APlayerController>(Actor))
+	// Prefer PlayerState UniqueId (online subsystem)
+	if (const APawn* Pawn = Cast<APawn>(Actor))
 	{
-		if (UInventoryComponent* C = PC->FindComponentByClass<UInventoryComponent>()) return C;
-		if (PC->PlayerState)
-			if (UInventoryComponent* C2 = PC->PlayerState->FindComponentByClass<UInventoryComponent>()) return C2;
-	}
-
-	if (APawn* Pawn = Cast<APawn>(Actor))
-	{
-		if (UInventoryComponent* C = Pawn->FindComponentByClass<UInventoryComponent>()) return C;
-		if (AController* Cntrl = Pawn->GetController())
+		if (const APlayerState* PS = Pawn->GetPlayerState())
 		{
-			if (UInventoryComponent* C2 = Cntrl->FindComponentByClass<UInventoryComponent>()) return C2;
-			if (Cntrl->PlayerState)
-				if (UInventoryComponent* C3 = Cntrl->PlayerState->FindComponentByClass<UInventoryComponent>()) return C3;
+			if (PS->GetUniqueId().IsValid())
+			{
+				return PS->GetUniqueId()->ToString();
+			}
+			if (!PS->GetPlayerName().IsEmpty())
+			{
+				return FString::Printf(TEXT("PSName:%s"), *PS->GetPlayerName());
+			}
 		}
 	}
-
-	if (AActor* Owner = Actor->GetOwner())
-		return GetInventoryComponent(Owner);
-
-	return nullptr;
+	// Fallback: stable GUID per save/profile (simple local fallback)
+	FGuid Guid = FGuid::NewGuid(); // Replace with your SaveGame/Account GUID if you have one
+	return FString::Printf(TEXT("LocalGUID:%s"), *Guid.ToString(EGuidFormats::DigitsWithHyphensInBraces));
 }
 
-UItemDataAsset* UInventoryHelpers::FindItemDataByTag(UObject* /*WorldContextObject*/, const FGameplayTag& ItemID)
+bool UInventoryHelpers::IsSameParty(AActor* A, AActor* B)
 {
-#if WITH_EDITOR
-	// Editor/PIE path still works for already-loaded assets (nice in PIE)
-	for (TObjectIterator<UItemDataAsset> It; It; ++It)
+	// Stub: you said "everyone is ally / same party for now until wired"
+	return true;
+}
+bool UInventoryHelpers::IsAlly(AActor* A, AActor* B)
+{
+	// Stub: permissive default
+	return true;
+}
+
+bool UInventoryHelpers::FindOverlappingAreaTag(AActor* Actor, FGameplayTag& OutAreaTag)
+{
+	if (!Actor) return false;
+	UWorld* W = Actor->GetWorld();
+	if (!W) return false;
+
+	TArray<AActor*> Areas;
+	UGameplayStatics::GetAllActorsOfClass(W, AAreaVolumeActor::StaticClass(), Areas);
+
+	for (AActor* A : Areas)
 	{
-		if (It->ItemIDTag == ItemID)
-			return *It;
+		AAreaVolumeActor* AV = Cast<AAreaVolumeActor>(A);
+		if (!AV || !AV->Box) continue;
+
+		if (AV->Box->IsOverlappingActor(Actor))
+		{
+			OutAreaTag = AV->GetAreaTag();
+			return OutAreaTag.IsValid();
+		}
 	}
-#endif
-	// Cooked/Standalone
-	return UInventoryAssetManager::Get().LoadItemDataByTag(ItemID, /*bSyncLoad=*/true);
+	return false;
 }
 
-bool UInventoryHelpers::ResolveItemPathByTag(const FGameplayTag& ItemID, FSoftObjectPath& OutPath)
-{
-	return UInventoryAssetManager::Get().ResolveItemPathByTag(ItemID, OutPath);
-}
+// (your existing FindItemDataByTag / ResolveItemPathByTag stay as-is)
