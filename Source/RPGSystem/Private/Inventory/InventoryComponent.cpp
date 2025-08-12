@@ -1,6 +1,7 @@
 ﻿#include "Inventory/InventoryComponent.h"
 #include "Net/UnrealNetwork.h"
 #include "GameFramework/Actor.h"
+#include "Inventory/InventoryAccess.h"
 
 UInventoryComponent::UInventoryComponent()
 {
@@ -221,10 +222,98 @@ bool UInventoryComponent::ServerSplitStack_Validate(int32 SlotIndex, int32 Split
 bool UInventoryComponent::TrySplitStack(int32 SlotIndex, int32 SplitQuantity)
 {
     AActor* Owner = GetOwner();
-    if (Owner && Owner->HasAuthority()) return SplitStack(SlotIndex, SplitQuantity);
+    if (Owner && Owner->HasAuthority())
+    {
+        return SplitStack(SlotIndex, SplitQuantity);
+    }
     ServerSplitStack(SlotIndex, SplitQuantity);
     return false;
 }
+
+// --- Sort (Name) ---
+void UInventoryComponent::SortInventoryByName()
+{
+    Items.Sort([](const FInventoryItem& A, const FInventoryItem& B)
+    {
+        const UItemDataAsset* DA = A.ItemData.Get();
+        const UItemDataAsset* DB = B.ItemData.Get();
+
+        if (!A.IsValid() && !B.IsValid()) return false;
+        if (!A.IsValid()) return false; // empty last
+        if (!B.IsValid()) return true;
+
+        const FString NameA = DA ? DA->Name.ToString() : FString();
+        const FString NameB = DB ? DB->Name.ToString() : FString();
+        return NameA < NameB;
+    });
+    UpdateItemIndexes();
+    NotifyInventoryChanged();
+}
+void UInventoryComponent::ServerSortInventoryByName_Implementation() { SortInventoryByName(); }
+bool UInventoryComponent::ServerSortInventoryByName_Validate() { return true; }
+void UInventoryComponent::RequestSortInventoryByName()
+{
+    AActor* Owner = GetOwner();
+    if (Owner && Owner->HasAuthority()) SortInventoryByName();
+    else ServerSortInventoryByName();
+}
+
+// --- Sort (Rarity/Type/Category) ---
+void UInventoryComponent::SortInventoryByRarity()
+{
+    Items.Sort([](const FInventoryItem& A, const FInventoryItem& B)
+    {
+        const UItemDataAsset* DA = A.ItemData.Get();
+        const UItemDataAsset* DB = B.ItemData.Get();
+        if (!A.IsValid() && !B.IsValid()) return false;
+        if (!A.IsValid()) return false;
+        if (!B.IsValid()) return true;
+        return (DA ? DA->Rarity.ToString() : FString()) < (DB ? DB->Rarity.ToString() : FString());
+    });
+    UpdateItemIndexes();
+    NotifyInventoryChanged();
+}
+void UInventoryComponent::SortInventoryByType()
+{
+    Items.Sort([](const FInventoryItem& A, const FInventoryItem& B)
+    {
+        const UItemDataAsset* DA = A.ItemData.Get();
+        const UItemDataAsset* DB = B.ItemData.Get();
+        if (!A.IsValid() && !B.IsValid()) return false;
+        if (!A.IsValid()) return false;
+        if (!B.IsValid()) return true;
+        return (DA ? DA->ItemType.ToString() : FString()) < (DB ? DB->ItemType.ToString() : FString());
+    });
+    UpdateItemIndexes();
+    NotifyInventoryChanged();
+}
+void UInventoryComponent::SortInventoryByCategory()
+{
+    Items.Sort([](const FInventoryItem& A, const FInventoryItem& B)
+    {
+        const UItemDataAsset* DA = A.ItemData.Get();
+        const UItemDataAsset* DB = B.ItemData.Get();
+        if (!A.IsValid() && !B.IsValid()) return false;
+        if (!A.IsValid()) return false;
+        if (!B.IsValid()) return true;
+        return (DA ? DA->ItemCategory.ToString() : FString()) < (DB ? DB->ItemCategory.ToString() : FString());
+    });
+    UpdateItemIndexes();
+    NotifyInventoryChanged();
+}
+
+void UInventoryComponent::RequestSortInventoryByRarity()   { if (GetOwner() && GetOwner()->HasAuthority()) SortInventoryByRarity();   else ServerSortInventoryByRarity(); }
+void UInventoryComponent::RequestSortInventoryByType()     { if (GetOwner() && GetOwner()->HasAuthority()) SortInventoryByType();     else ServerSortInventoryByType(); }
+void UInventoryComponent::RequestSortInventoryByCategory() { if (GetOwner() && GetOwner()->HasAuthority()) SortInventoryByCategory(); else ServerSortInventoryByCategory(); }
+
+void UInventoryComponent::ServerSortInventoryByRarity_Implementation()   { SortInventoryByRarity(); }
+bool UInventoryComponent::ServerSortInventoryByRarity_Validate() { return true; }
+
+void UInventoryComponent::ServerSortInventoryByType_Implementation()     { SortInventoryByType(); }
+bool UInventoryComponent::ServerSortInventoryByType_Validate() { return true; }
+
+void UInventoryComponent::ServerSortInventoryByCategory_Implementation() { SortInventoryByCategory(); }
+bool UInventoryComponent::ServerSortInventoryByCategory_Validate() { return true; }
 
 // --- Queries ---
 bool UInventoryComponent::IsInventoryFull() const
@@ -297,6 +386,24 @@ FInventoryItem UInventoryComponent::GetItemByID(FGameplayTag ItemID) const
     return (Slot != INDEX_NONE) ? Items[Slot] : FInventoryItem();
 }
 
+int32 UInventoryComponent::GetNumOccupiedSlots() const
+{
+    int32 Count = 0;
+    for (const FInventoryItem& It : Items)
+        if (It.IsValid()) ++Count;
+    return Count;
+}
+
+int32 UInventoryComponent::GetNumItemsOfType(FGameplayTag ItemID) const
+{
+    int32 Count = 0;
+    for (const FInventoryItem& It : Items)
+        if (It.IsValid() && It.ItemData.IsValid())
+            if (It.ItemData.Get()->ItemIDTag == ItemID)
+                Count += It.Quantity;
+    return Count;
+}
+
 // --- UI helpers ---
 int32 UInventoryComponent::GetNumUISlots() const
 {
@@ -318,14 +425,8 @@ void UInventoryComponent::GetUISlotInfo(TArray<int32>& OutSlotIndices, TArray<UI
 }
 
 // --- Delegates / Notifications ---
-void UInventoryComponent::NotifySlotChanged(int32 SlotIndex)
-{
-    OnInventoryUpdated.Broadcast(SlotIndex);
-}
-void UInventoryComponent::NotifyInventoryChanged()
-{
-    OnInventoryChanged.Broadcast();
-}
+void UInventoryComponent::NotifySlotChanged(int32 SlotIndex) { OnInventoryUpdated.Broadcast(SlotIndex); }
+void UInventoryComponent::NotifyInventoryChanged() { OnInventoryChanged.Broadcast(); }
 void UInventoryComponent::UpdateItemIndexes()
 {
     for (int32 i=0;i<Items.Num();++i) Items[i].ItemIndex = i;
@@ -350,13 +451,13 @@ void UInventoryComponent::SetMaxSlots(int32 NewMaxSlots)
 }
 void UInventoryComponent::AdjustSlotCountIfNeeded()
 {
-    int32 TargetSlots = MaxSlots;
+    int32 Target = MaxSlots;
     if (!IsSlotLimited())
     {
-        if (Items.Num() > TargetSlots) TargetSlots = Items.Num() + 2;
-        else TargetSlots += 2;
+        if (Items.Num() > Target) Target = Items.Num() + 2;
+        else Target += 2;
     }
-    Items.SetNum(TargetSlots);
+    Items.SetNum(Target);
     UpdateItemIndexes();
 }
 
@@ -428,6 +529,25 @@ void UInventoryComponent::Server_TransferItem_Implementation(UInventoryComponent
 }
 bool UInventoryComponent::Server_TransferItem_Validate(UInventoryComponent* SourceInventory, int32 SourceIndex, UInventoryComponent* TargetInventory, int32 TargetIndex) { return true; }
 
+// --- Misc ---
+bool UInventoryComponent::SwapItems(int32 IndexA, int32 IndexB)
+{
+    if (!Items.IsValidIndex(IndexA) || !Items.IsValidIndex(IndexB) || IndexA == IndexB) return false;
+    Swap(Items[IndexA], Items[IndexB]);
+    UpdateItemIndexes();
+    NotifySlotChanged(IndexA);
+    NotifySlotChanged(IndexB);
+    NotifyInventoryChanged();
+    return true;
+}
+
+bool UInventoryComponent::CanAcceptItem(UItemDataAsset* ItemData) const
+{
+    if (!ItemData) return false;
+    if (AllowedItemIDs.Num() == 0) return true;
+    return AllowedItemIDs.Contains(ItemData->ItemIDTag);
+}
+
 // --- Filters ---
 TArray<FInventoryItem> UInventoryComponent::FilterItemsByRarity(FGameplayTag RarityTag) const
 {
@@ -484,4 +604,63 @@ TArray<FInventoryItem> UInventoryComponent::FilterItemsByTags(FGameplayTagContai
         if (bPass) Out.Add(It);
     }
     return Out;
+}
+
+static bool CanStoreItemHere(const FInventoryItem& Item, const UInventoryComponent* Target)
+{
+    if (!Item.bIsHeirloom) return true;
+    if (!Target) return false;
+    if (!Target->IsOwnerSafeContainer()) return false;
+    return Item.OwnerPlayerId.Equals(Target->InventoryOwnerId, ESearchCase::IgnoreCase);
+}
+
+static bool CanRemoveItemFromHere(const FInventoryItem& Item, const UInventoryComponent* Source, const UInventoryComponent* Dest)
+{
+    if (!Item.bIsHeirloom) return true;
+    // You can remove it only if it’s going to another owner-safe container owned by same player.
+    return Dest && CanStoreItemHere(Item, Dest);
+}
+
+static bool CanDestroy(const FInventoryItem& Item)
+{
+    return !Item.bIsHeirloom; // never destroy heirlooms via normal flows
+}
+// --- Ownership (CPP) ---
+void UInventoryComponent::SetInventoryOwnerId(const FString& NewOwnerId)
+{
+    // Blueprint-accessible wrapper defaults to locking
+    SetInventoryOwnerIdInternal(NewOwnerId, /*bLock=*/true);
+}
+
+void UInventoryComponent::SetInventoryOwnerIdInternal(const FString& NewOwnerId, bool bLock)
+{
+    InventoryOwnerId = NewOwnerId;
+    bOwnerLocked = bLock;
+}
+
+void UInventoryComponent::SetPrivacyTag(FGameplayTag NewPrivacy)
+{
+    if (AActor* Owner = GetOwner(); Owner && Owner->HasAuthority())
+    {
+        PrivacyTag = NewPrivacy;
+        OnRep_Privacy();
+    }
+}
+
+void UInventoryComponent::AddAllowedUserId(const FString& UserId)
+{
+    if (AActor* Owner = GetOwner(); Owner && Owner->HasAuthority())
+    {
+        AllowedUserIds.AddUnique(UserId);
+        OnRep_Owner();
+    }
+}
+
+void UInventoryComponent::RemoveAllowedUserId(const FString& UserId)
+{
+    if (AActor* Owner = GetOwner(); Owner && Owner->HasAuthority())
+    {
+        AllowedUserIds.Remove(UserId);
+        OnRep_Owner();
+    }
 }

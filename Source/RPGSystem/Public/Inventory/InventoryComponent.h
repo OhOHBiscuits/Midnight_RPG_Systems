@@ -17,6 +17,15 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnItemAdded, const FInventoryItem&
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnItemRemoved, const FInventoryItem&, Item);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnItemTransferSuccess, const FInventoryItem&, Item);
 
+UENUM(BlueprintType)
+enum class EInventoryAccessIntent : uint8
+{
+    View,
+    Add,       // deposit
+    Remove,    // withdraw
+    Manage     // move/sort/transfer/settings
+};
+
 UCLASS(Blueprintable, ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
 class RPGSYSTEM_API UInventoryComponent : public UActorComponent
 {
@@ -69,34 +78,60 @@ public:
     // Sort
     UFUNCTION(BlueprintCallable, Category="1_Inventory|Actions")
     void SortInventoryByName();
+
     UFUNCTION(Server, Reliable, WithValidation)
     void ServerSortInventoryByName();
+
     UFUNCTION(BlueprintCallable, Category="1_Inventory|Actions")
     void RequestSortInventoryByName();
 
     UFUNCTION(BlueprintCallable, Category="1_Inventory|Sort")
     void RequestSortInventoryByRarity();
+
     UFUNCTION(BlueprintCallable, Category="1_Inventory|Sort")
     void RequestSortInventoryByType();
+
     UFUNCTION(BlueprintCallable, Category="1_Inventory|Sort")
     void RequestSortInventoryByCategory();
+
     UFUNCTION(BlueprintCallable, Category="1_Inventory|Sort")
     void SortInventoryByRarity();
+
     UFUNCTION(BlueprintCallable, Category="1_Inventory|Sort")
     void SortInventoryByType();
+
     UFUNCTION(BlueprintCallable, Category="1_Inventory|Sort")
     void SortInventoryByCategory();
+
     UFUNCTION(Server, Reliable, WithValidation)
     void ServerSortInventoryByRarity();
+
     UFUNCTION(Server, Reliable, WithValidation)
     void ServerSortInventoryByType();
+
     UFUNCTION(Server, Reliable, WithValidation)
     void ServerSortInventoryByCategory();
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="1_Inventory|Type")
     FGameplayTag InventoryTypeTag;
 
-    // 2_Inventory|Queries
+    // --- Access control (header) ---
+    
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, ReplicatedUsing=OnRep_Privacy, Category="1_Inventory|Access")
+    FGameplayTag PrivacyTag; // e.g., Inventory.Privacy.Public / Team / OwnerOnly / Locked
+
+    UFUNCTION(BlueprintCallable, BlueprintPure, Category="1_Inventory|Access")
+    bool CanActorAccess(AActor* Actor, EInventoryAccessIntent Intent) const;
+
+    UFUNCTION()
+    void OnRep_Privacy();
+
+    UFUNCTION()
+    void OnRep_Owner(); // If this was declared, it must exist even if it just notifies UI
+
+
+    // 1_Inventory|Queries
     UFUNCTION(BlueprintCallable, BlueprintPure, Category="1_Inventory|Queries")
     virtual bool IsInventoryFull() const;
 
@@ -124,10 +159,10 @@ public:
     UFUNCTION(BlueprintCallable, BlueprintPure, Category="1_Inventory|Queries")
     const TArray<FInventoryItem>& GetAllItems() const { return Items; }
 
-    UFUNCTION(BlueprintCallable, Category="2_Inventory|Queries")
+    UFUNCTION(BlueprintCallable, Category="1_Inventory|Queries")
     virtual int32 GetNumOccupiedSlots() const;
 
-    UFUNCTION(BlueprintCallable, Category="2_Inventory|Queries")
+    UFUNCTION(BlueprintCallable, Category="1_Inventory|Queries")
     virtual int32 GetNumItemsOfType(FGameplayTag ItemID) const;
 
     // Events
@@ -155,7 +190,7 @@ public:
     UPROPERTY(BlueprintAssignable, Category="1_Inventory|Events")
     FOnItemTransferSuccess OnItemTransferSuccess;
 
-    // 4_Inventory|Settings
+    // 1_Inventory|Settings
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="1_Inventory|Settings")
     int32 MaxSlots = 20;
 
@@ -183,12 +218,16 @@ public:
     // Filters
     UFUNCTION(BlueprintCallable, BlueprintPure, Category="1_Inventory|Queries")
     TArray<FInventoryItem> FilterItemsByRarity(FGameplayTag RarityTag) const;
+
     UFUNCTION(BlueprintCallable, BlueprintPure, Category="1_Inventory|Queries")
     TArray<FInventoryItem> FilterItemsByCategory(FGameplayTag CategoryTag) const;
+
     UFUNCTION(BlueprintCallable, BlueprintPure, Category="1_Inventory|Queries")
     TArray<FInventoryItem> FilterItemsBySubCategory(FGameplayTag SubCategoryTag) const;
+
     UFUNCTION(BlueprintCallable, BlueprintPure, Category="1_Inventory|Queries")
     TArray<FInventoryItem> FilterItemsByType(FGameplayTag TypeTag) const;
+
     UFUNCTION(BlueprintCallable, BlueprintPure, Category="1_Inventory|Queries")
     TArray<FInventoryItem> FilterItemsByTags(FGameplayTagContainer Tags, bool bMatchAll=false) const;
 
@@ -208,17 +247,76 @@ public:
     UFUNCTION(BlueprintCallable, Category="1_Inventory")
     void GetUISlotInfo(TArray<int32>& OutSlotIndices, TArray<UItemDataAsset*>& OutItemData, TArray<int32>& OutQuantities) const;
 
-    // Limit helpers (Blueprint access)
     UFUNCTION(BlueprintCallable, BlueprintPure, Category="1_Inventory")
     bool IsSlotLimited() const;
+
     UFUNCTION(BlueprintCallable, BlueprintPure, Category="1_Inventory")
     bool IsWeightLimited() const;
+
     UFUNCTION(BlueprintCallable, BlueprintPure, Category="1_Inventory")
     bool IsVolumeLimited() const;
+
     UFUNCTION(BlueprintCallable, BlueprintPure, Category="1_Inventory")
     bool IsUnlimited() const;
 
     FORCEINLINE const TArray<FInventoryItem>& GetItems() const { return Items; }
+
+    // --- Ownership (Header) ---
+    UFUNCTION(BlueprintCallable, Category="1_Inventory|Ownership")
+    void SetInventoryOwnerId(const FString& NewOwnerId); // BP/one-arg entry
+
+    // Internal helper (no UFUNCTION, different name so no ambiguity)
+    void SetInventoryOwnerIdInternal(const FString& NewOwnerId, bool bLock);
+
+    // Data
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="1_Inventory|Ownership")
+    FString InventoryOwnerId;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="1_Inventory|Ownership")
+    bool bOwnerLocked = true;
+
+    // Optional convenience (inline is fine)
+    UFUNCTION(BlueprintCallable, BlueprintPure, Category="1_Inventory|Ownership")
+    bool IsOwnerSafeContainer() const { return bOwnerLocked; }
+   // --- Ownership & Privacy -----------------------------------------------------
+
+/** Lock toggled by owner/admin (e.g., while crafting or during a raid). */
+UPROPERTY(EditAnywhere, BlueprintReadWrite, ReplicatedUsing=OnRep_Privacy, Category="0_Inventory|Ownership")
+FGameplayTag PrivacyTag = FGameplayTag::RequestGameplayTag(FName("Inventory.Privacy.Public"));
+
+/** Optional allow-list of player IDs (string IDs) that can access when private. */
+UPROPERTY(EditAnywhere, BlueprintReadWrite, ReplicatedUsing=OnRep_Owner, Category="0_Inventory|Ownership")
+TArray<FString> AllowedUserIds;
+
+/** Optional “groups” the owner assigns (party/tribe/etc). You can keep these as
+    strings or gameplay tags depending on your wider systems. */
+UPROPERTY(EditAnywhere, BlueprintReadWrite, ReplicatedUsing=OnRep_Owner, Category="0_Inventory|Ownership")
+TArray<FString> AllowedGroupIds;
+
+/** If true, only owner/admin may change owner/privacy. */
+
+UFUNCTION(BlueprintCallable, BlueprintPure, Category="0_Inventory|Ownership")
+FString GetInventoryOwnerId() const { return InventoryOwnerId; }
+
+UFUNCTION(BlueprintCallable, Category="0_Inventory|Ownership")
+void SetPrivacyTag(FGameplayTag NewPrivacy);
+
+UFUNCTION(BlueprintCallable, BlueprintPure, Category="0_Inventory|Ownership")
+FGameplayTag GetPrivacyTag() const { return PrivacyTag; }
+
+UFUNCTION(BlueprintCallable, Category="0_Inventory|Ownership")
+void AddAllowedUserId(const FString& UserId);
+
+UFUNCTION(BlueprintCallable, Category="0_Inventory|Ownership")
+void RemoveAllowedUserId(const FString& UserId);
+
+// Core guard for UI/open/transfer/manage calls
+UFUNCTION(BlueprintCallable, BlueprintPure, Category="0_Inventory|Ownership")
+bool CanActorAccess(AActor* Querier, EInventoryAccessIntent Intent) const;
+
+// RepNotifies
+UFUNCTION() void OnRep_Owner();
+UFUNCTION() void OnRep_Privacy();
 
 protected:
     virtual void BeginPlay() override;
@@ -228,21 +326,20 @@ protected:
 
     UFUNCTION()
     void OnRep_InventoryItems();
-
     void NotifySlotChanged(int32 SlotIndex);
     void NotifyInventoryChanged();
     void UpdateItemIndexes();
     void AdjustSlotCountIfNeeded();
-
+    
 public:
     virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
     // RPCs
     UFUNCTION(Server, Reliable, WithValidation) void ServerAddItem(UItemDataAsset* ItemData, int32 Quantity);
-    UFUNCTION(Client, Reliable) void ClientAddItemResponse(bool bSuccess);
+    UFUNCTION(Client, Reliable)               void ClientAddItemResponse(bool bSuccess);
     UFUNCTION(Server, Reliable, WithValidation) void ServerRemoveItem(int32 SlotIndex, int32 Quantity);
     UFUNCTION(Server, Reliable, WithValidation) void ServerRemoveItemByID(FGameplayTag ItemID, int32 Quantity);
-    UFUNCTION(Client, Reliable) void ClientRemoveItemResponse(bool bSuccess);
+    UFUNCTION(Client, Reliable)               void ClientRemoveItemResponse(bool bSuccess);
     UFUNCTION(Server, Reliable, WithValidation) void ServerMoveItem(int32 FromIndex, int32 ToIndex);
     UFUNCTION(Server, Reliable, WithValidation) void ServerTransferItem(int32 FromIndex, UInventoryComponent* TargetInventory);
     UFUNCTION(Server, Reliable, WithValidation) void ServerPullItem(int32 FromIndex, UInventoryComponent* SourceInventory);
