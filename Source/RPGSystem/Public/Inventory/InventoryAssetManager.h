@@ -16,6 +16,8 @@ class RPGSYSTEM_API UInventoryAssetManager : public UAssetManager
 public:
 	static UInventoryAssetManager& Get();
 
+	static UInventoryAssetManager* GetOptional();
+
 	virtual void StartInitialLoading() override;
 
 	UFUNCTION(BlueprintCallable, Category="1_Inventory|Assets")

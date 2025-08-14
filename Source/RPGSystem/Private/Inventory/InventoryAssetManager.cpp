@@ -10,6 +10,14 @@ UInventoryAssetManager& UInventoryAssetManager::Get()
 	
 	return *CastChecked<UInventoryAssetManager>(&UAssetManager::Get());
 }
+UInventoryAssetManager* UInventoryAssetManager::GetOptional()
+{
+	if (UAssetManager* AM = UAssetManager::GetIfInitialized())
+	{
+		return Cast<UInventoryAssetManager>(AM); // may be nullptr if not configured
+	}
+	return nullptr;
+}
 
 void UInventoryAssetManager::StartInitialLoading()
 {

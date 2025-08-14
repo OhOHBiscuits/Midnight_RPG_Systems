@@ -180,12 +180,12 @@ APlayerController* UInventoryHelpers::GetNetOwningPlayerController(const UObject
 
 UItemDataAsset* UInventoryHelpers::FindItemDataByTag(UObject* /*WorldContextObject*/, FGameplayTag ItemIdTag)
 {
-	if (!ItemIdTag.IsValid())
+	if (UInventoryAssetManager* IAM = UInventoryAssetManager::GetOptional())
 	{
-		return nullptr;
+		return IAM->FindItemDataByTag(ItemIdTag);
 	}
-	UInventoryAssetManager& IAM = UInventoryAssetManager::Get();
-	return IAM.FindItemDataByTag(ItemIdTag);
+	UE_LOG(LogTemp, Warning, TEXT("InventoryAssetManager not configured; FindItemDataByTag fallback returned nullptr."));
+	return nullptr;
 }
 
 UUserWidget* UInventoryHelpers::CreateWidgetOnInteractor(AActor* Interactor, TSubclassOf<UUserWidget> WidgetClass, bool& bIsLocalPlayer)

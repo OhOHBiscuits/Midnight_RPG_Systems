@@ -1,97 +1,76 @@
-﻿#pragma once
+﻿// BaseWorldItemActor.h
+#pragma once
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
-#include "Components/StaticMeshComponent.h"
-#include "Inventory/ItemDataAsset.h"
-#include "Interfaces/InteractionInterface.h"
 #include "GameplayTagContainer.h"
+#include "Interfaces/InteractionInterface.h"
+#include "Inventory/ItemDataAsset.h"
 #include "BaseWorldItemActor.generated.h"
 
 class UStaticMeshComponent;
 class UUserWidget;
-class UItemDataAsset;
 
-/**
- * Common base for world items (pickup, storage, workstation).
- * Handles: replicated ItemData, auto-updating mesh in editor/PIE,
- * generic Interact flow (client->server), and UI display to owning client.
- */
-UCLASS(BlueprintType, Blueprintable)
-class RPGSYSTEM_API ABaseWorldItemActor : public AActor
+UCLASS(Blueprintable)
+class RPGSYSTEM_API ABaseWorldItemActor : public AActor, public IInteractionInterface
 {
 	GENERATED_BODY()
 
 public:
 	ABaseWorldItemActor();
 
-	// ---- Components ----
+	/** Static mesh shown in world */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="WorldItem")
 	UStaticMeshComponent* Mesh;
 
-	// ---- Data/Visuals ----
-	/** Item data that drives visuals (mesh), decay, etc. */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, ReplicatedUsing=OnRep_ItemData, Category="WorldItem|Data")
+	/** Source data for visuals/behavior */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, ReplicatedUsing=OnRep_ItemData, Category="WorldItem")
 	TSoftObjectPtr<UItemDataAsset> ItemData;
 
-	/** If true, this world actor leverages the data's EfficiencyRating */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Replicated, Category="WorldItem|Data")
-	bool bUseEfficiency = false;
-
-	/** Per-instance efficiency value (initialized from ItemData) */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Replicated, Category="WorldItem|Data")
-	float EfficiencyRating = 1.0f;
-
-	/** Default/fallback UI for this actor when interacted with */
+	/** Optional global UI to pop on interact (storage/workstations will override or provide their own) */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="WorldItem|UI")
 	TSubclassOf<UUserWidget> WidgetClass;
 
-	// ---- Interaction (Blueprint-native so BPs can call 'Interact') ----
-	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category="Interaction")
-	void Interact(AActor* Interactor);
-	virtual void Interact_Implementation(AActor* Interactor);
+	/** If true, EfficiencyRating matters for this actor type */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Replicated, Category="WorldItem")
+	bool bUseEfficiency = false;
 
-	/** Optional interaction type for UI prompts, etc. */
-	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category="Interaction")
-	FGameplayTag GetInteractionTypeTag() const;
-	virtual FGameplayTag GetInteractionTypeTag_Implementation() const
-	{
-		return FGameplayTag(); // default: None
-	}
+	/** Current efficiency (often copied from ItemData) */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Replicated, Category="WorldItem")
+	float EfficiencyRating = 1.f;
 
-	// ---- UI helper (call from server or client) ----
+	/** IInteractionInterface – implemented in C++ and callable from BP */
+	virtual void Interact_Implementation(AActor* Interactor) override;
+	virtual FGameplayTag GetInteractionTypeTag_Implementation() const override { return FGameplayTag(); }
+
+	/** Show a UI on the owning client (helper you can call from children) */
 	UFUNCTION(BlueprintCallable, Category="WorldItem|UI")
 	void ShowWorldItemUI(AActor* Interactor, TSubclassOf<UUserWidget> ClassToUse);
 
 protected:
-	// Server RPC that executes the actual interaction behavior.
-	UFUNCTION(Server, Reliable)
-	void Server_Interact(AActor* Interactor);
-	virtual void Server_Interact_Implementation(AActor* Interactor);
-
-	// Client RPC: actually spawns UI on owning local player.
-	UFUNCTION(Client, Reliable)
-	void Client_ShowWorldItemUI(AActor* Interactor, TSubclassOf<UUserWidget> ClassToUse);
-	virtual void Client_ShowWorldItemUI_Implementation(AActor* Interactor, TSubclassOf<UUserWidget> ClassToUse);
-
-	/** Override this on children to perform the real work on the server */
-	virtual void HandleInteract_Server(AActor* Interactor);
-
 	// Replication
-	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+	virtual void GetLifetimeReplicatedProps(
+	   TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
-	// Keep visuals in sync in-editor & at runtime
+	// Construction/Editor QoL – keep visuals in sync
 	virtual void OnConstruction(const FTransform& Transform) override;
-
 #if WITH_EDITOR
-	virtual void PostEditChangeProperty(struct FPropertyChangedEvent& PropertyChangedEvent) override;
+	virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
 #endif
-
 	UFUNCTION()
 	void OnRep_ItemData();
 
-	/** Apply ItemData-driven visuals (mesh, efficiency, etc.) */
+	/** Apply ItemData-driven visuals (mesh, etc) */
 	void ApplyItemDataVisuals();
 
-	
+	/** Client RPC to actually create the widget */
+	UFUNCTION(Client, Reliable)
+	void Client_ShowWorldItemUI(AActor* Interactor, TSubclassOf<UUserWidget> ClassToUse);
+
+	/** Server RPC entry for interactions */
+	UFUNCTION(Server, Reliable)
+	void Server_Interact(AActor* Interactor);
+
+	/** What children actually do on the server when interacted with */
+	virtual void HandleInteract_Server(AActor* Interactor) {}
 };

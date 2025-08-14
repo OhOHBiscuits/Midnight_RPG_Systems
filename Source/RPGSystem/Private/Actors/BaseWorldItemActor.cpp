@@ -1,9 +1,10 @@
-﻿#include "Actors/BaseWorldItemActor.h"
+﻿// BaseWorldItemActor.cpp
+#include "Actors/BaseWorldItemActor.h"
 #include "Inventory/ItemDataAsset.h"
 #include "Components/StaticMeshComponent.h"
-#include "Net/UnrealNetwork.h"
 #include "Blueprint/UserWidget.h"
 #include "Kismet/GameplayStatics.h"
+#include "Net/UnrealNetwork.h"
 
 ABaseWorldItemActor::ABaseWorldItemActor()
 {
@@ -15,26 +16,27 @@ ABaseWorldItemActor::ABaseWorldItemActor()
 	Mesh->SetIsReplicated(true);
 }
 
-void ABaseWorldItemActor::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+void ABaseWorldItemActor::GetLifetimeReplicatedProps(
+	TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+
 	DOREPLIFETIME(ABaseWorldItemActor, ItemData);
 	DOREPLIFETIME(ABaseWorldItemActor, bUseEfficiency);
 	DOREPLIFETIME(ABaseWorldItemActor, EfficiencyRating);
 }
 
-void ABaseWorldItemActor::OnConstruction(const FTransform& Transform)
+void ABaseWorldItemActor::OnConstruction(const FTransform& Xform)
 {
-	Super::OnConstruction(Transform);
+	Super::OnConstruction(Xform);
 	ApplyItemDataVisuals();
 }
 
 #if WITH_EDITOR
-void ABaseWorldItemActor::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)
+void ABaseWorldItemActor::PostEditChangeProperty(FPropertyChangedEvent& Event)
 {
-	Super::PostEditChangeProperty(PropertyChangedEvent);
-	if (PropertyChangedEvent.Property &&
-		PropertyChangedEvent.Property->GetFName() == GET_MEMBER_NAME_CHECKED(ABaseWorldItemActor, ItemData))
+	Super::PostEditChangeProperty(Event);
+	if (Event.Property && Event.Property->GetFName() == GET_MEMBER_NAME_CHECKED(ABaseWorldItemActor, ItemData))
 	{
 		ApplyItemDataVisuals();
 	}
@@ -67,17 +69,14 @@ void ABaseWorldItemActor::ApplyItemDataVisuals()
 			Mesh->SetStaticMesh(nullptr);
 		}
 
-		// Pull efficiency from data if desired
-		if (bUseEfficiency)
-		{
-			EfficiencyRating = Data->EfficiencyRating;
-		}
+		// Optionally mirror a default efficiency from the data
+		EfficiencyRating = Data->EfficiencyRating;
 	}
 }
 
 void ABaseWorldItemActor::Interact_Implementation(AActor* Interactor)
 {
-	// Client calls Interact -> let server do the authoritative part.
+	// Always route to the authoritative server
 	if (HasAuthority())
 	{
 		HandleInteract_Server(Interactor);
@@ -93,18 +92,12 @@ void ABaseWorldItemActor::Server_Interact_Implementation(AActor* Interactor)
 	HandleInteract_Server(Interactor);
 }
 
-void ABaseWorldItemActor::HandleInteract_Server(AActor* /*Interactor*/)
-{
-	// Base does nothing; children implement
-}
-
 void ABaseWorldItemActor::Client_ShowWorldItemUI_Implementation(AActor* Interactor, TSubclassOf<UUserWidget> ClassToUse)
 {
 	if (!ClassToUse) return;
 
 	APlayerController* PC = nullptr;
 
-	// Prefer the interactor's player controller if it's a pawn
 	if (APawn* Pawn = Cast<APawn>(Interactor))
 	{
 		PC = Cast<APlayerController>(Pawn->GetController());
@@ -113,12 +106,7 @@ void ABaseWorldItemActor::Client_ShowWorldItemUI_Implementation(AActor* Interact
 	{
 		PC = Cast<APlayerController>(Interactor);
 	}
-
-	if (!PC)
-	{
-		// Fallback to first local
-		PC = UGameplayStatics::GetPlayerController(this, 0);
-	}
+	if (!PC) PC = UGameplayStatics::GetPlayerController(this, 0);
 
 	if (PC && PC->IsLocalController())
 	{
@@ -133,21 +121,24 @@ void ABaseWorldItemActor::ShowWorldItemUI(AActor* Interactor, TSubclassOf<UUserW
 {
 	if (!ClassToUse) return;
 
-	if (HasAuthority())
+	if (GetLocalRole() == ROLE_Authority)
 	{
-		// Route to the owning client.
-		AController* OwnerCtrl = nullptr;
-		if (APawn* Pawn = Cast<APawn>(Interactor)) OwnerCtrl = Pawn->GetController();
-		if (!OwnerCtrl) OwnerCtrl = Cast<AController>(Interactor);
-		if (OwnerCtrl)
+		// make RPC reach the right client
+		if (APawn* Pawn = Cast<APawn>(Interactor))
 		{
-			SetOwner(OwnerCtrl);
+			if (AController* C = Pawn->GetController())
+			{
+				SetOwner(C);
+			}
+		}
+		else if (AController* AsCtrl = Cast<AController>(Interactor))
+		{
+			SetOwner(AsCtrl);
 		}
 		Client_ShowWorldItemUI(Interactor, ClassToUse);
 	}
 	else
 	{
-		// Standalone / listen client path
 		Client_ShowWorldItemUI(Interactor, ClassToUse);
 	}
 }
