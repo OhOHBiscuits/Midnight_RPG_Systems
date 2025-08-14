@@ -1,33 +1,34 @@
 #include "Actors/FuelWorkstationActor.h"
 #include "Inventory/InventoryComponent.h"
 #include "FuelSystem/FuelComponent.h"
+#include "Blueprint/UserWidget.h"
 
 AFuelWorkstationActor::AFuelWorkstationActor()
 {
-	// Don't tick - we use timers only
-	PrimaryActorTick.bCanEverTick = false;
+	// Create components (both are UActorComponent, not scene components)
+	FuelInputInventory = CreateDefaultSubobject<UInventoryComponent>(TEXT("FuelInputInventory"));
+	OutputInventory    = CreateDefaultSubobject<UInventoryComponent>(TEXT("OutputInventory"));
+	FuelComponent      = CreateDefaultSubobject<UFuelComponent>(TEXT("FuelComponent"));
 
-	FuelInventory = CreateDefaultSubobject<UInventoryComponent>(TEXT("FuelInventory"));
-	ByproductInventory = CreateDefaultSubobject<UInventoryComponent>(TEXT("ByproductInventory"));
-	FuelComponent = CreateDefaultSubobject<UFuelComponent>(TEXT("FuelComponent"));
+	// Replication (optional but usually desired)
+	if (FuelInputInventory) FuelInputInventory->SetIsReplicated(true);
+	if (OutputInventory)    OutputInventory->SetIsReplicated(true);
+	if (FuelComponent)      FuelComponent->SetIsReplicated(true);
 
-	// Optionally: Set as root component if you want
-	RootComponent = CreateDefaultSubobject<USceneComponent>(TEXT("Root"));
+	// Workstations usually care about efficiency
+	bUseEfficiency = true;
 }
 
-void AFuelWorkstationActor::BeginPlay()
+void AFuelWorkstationActor::OpenWorkstationUIFor(AActor* Interactor)
 {
-	Super::BeginPlay();
+	// Optional: gate UI if there’s no fuel burning, or if some safety is needed.
+	// (Uncomment if desired)
+	// if (FuelComponent && !FuelComponent->IsBurning())
+	// {
+	//     // Could show a “no fuel” notification instead of opening the full UI.
+	//     return;
+	// }
 
-	// Ensure component pointers are valid
-	if (FuelComponent)
-	{
-		FuelComponent->FuelInventory = FuelInventory;
-		FuelComponent->ByproductInventory = ByproductInventory;
-	}
-}
-
-void AFuelWorkstationActor::OnCraftingActivated()
-{
-	// Optional hook - can be expanded for specific stations, crafting logic, etc
+	// Otherwise, call the parent to use the shared UI pipeline.
+	Super::OpenWorkstationUIFor(Interactor);
 }

@@ -1,3 +1,4 @@
 ﻿#include "Inventory/InventoryItem.h"
 #include "Inventory/ItemDataAsset.h"
-// Intentionally minimal; logic lives inline in the struct.
+
+// Intentionally empty: FInventoryItem helpers are inline in InventoryItem.h now.

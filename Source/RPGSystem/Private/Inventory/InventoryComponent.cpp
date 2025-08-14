@@ -1,523 +1,505 @@
-﻿#include "Inventory/InventoryComponent.h"
-#include "Inventory/ItemDataAsset.h"
-#include "Inventory/InventoryHelpers.h"
-#include "Net/UnrealNetwork.h"
-#include "GameFramework/Actor.h"
-#include "GameFramework/Controller.h"
-#include "GameFramework/PlayerState.h"
+﻿// InventoryComponent.cpp
 
-// ---------- Setup / Rep ----------
+#include "Inventory/InventoryComponent.h"
+#include "GameFramework/Controller.h"
+#include "GameFramework/Actor.h"
+#include "Inventory/ItemDataAsset.h"
+#include "GameFramework/Controller.h"
+#include "Engine/World.h"
+
+static FGameplayTag GT_Public()   { return FGameplayTag::RequestGameplayTag(TEXT("Inventory.Access.Public"),   false); }
+static FGameplayTag GT_ViewOnly() { return FGameplayTag::RequestGameplayTag(TEXT("Inventory.Access.ViewOnly"), false); }
+static FGameplayTag GT_Private()  { return FGameplayTag::RequestGameplayTag(TEXT("Inventory.Access.Private"),  false); }
 
 UInventoryComponent::UInventoryComponent()
 {
+	PrimaryComponentTick.bCanEverTick = false;
 	SetIsReplicatedByDefault(true);
-	Items.SetNum(MaxSlots);
 }
 
 void UInventoryComponent::BeginPlay()
 {
 	Super::BeginPlay();
-
-	// Default owner id if empty
-	if (Access.OwnerStableId.IsEmpty())
-	{
-		Access.OwnerStableId = UInventoryHelpers::GetStablePlayerId(GetOwner());
-	}
-
-	// Auto init from area unless designer set something explicit
-	AutoInitializeAccessFromArea(GetOwner());
+	AdjustSlotCountIfNeeded();
 }
 
-void UInventoryComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Out) const
+void UInventoryComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
-	Super::GetLifetimeReplicatedProps(Out);
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME(UInventoryComponent, Items);
-	DOREPLIFETIME(UInventoryComponent, Access);
+	DOREPLIFETIME(UInventoryComponent, AccessTag);
 }
-
-// ---------- Access ----------
-
-void UInventoryComponent::AutoInitializeAccessFromArea(AActor* ContextActor)
+void UInventoryComponent::OnRep_InventoryItems(){ NotifyInventoryChanged(); }
+void UInventoryComponent::OnRep_AccessTag(){}
+void UInventoryComponent::SetInventoryAccess(const FGameplayTag& NewAccessTag)
 {
-	if (!ContextActor) ContextActor = GetOwner();
-	FGameplayTag AreaTag;
-	if (UInventoryHelpers::FindOverlappingAreaTag(ContextActor, AreaTag))
-	{
-		const FGameplayTag BaseTag   = FGameplayTag::RequestGameplayTag(FName("Area.Base"), false);
-		const FGameplayTag PlayerTag = FGameplayTag::RequestGameplayTag(FName("Area.Player"), false);
-
-		if (AreaTag.IsValid() && AreaTag.MatchesTagExact(BaseTag))
-		{
-			Access.AccessMode = EInventoryAccessMode::Public;
-			Access.bAllowAlliesAndParty = true; // per spec
-		}
-		else if (AreaTag.IsValid() && AreaTag.MatchesTagExact(PlayerTag))
-		{
-			Access.AccessMode = EInventoryAccessMode::Private; // others view-only by default
-			Access.bOthersViewOnlyInPrivate = true;
-		}
-	}
-	// else leave as placed defaults
+	if (AActor* O = GetOwner()) if (O->HasAuthority()) { AccessTag = NewAccessTag; OnRep_AccessTag(); }
 }
-
-void UInventoryComponent::SetOwnerStableId(const FString& NewId)
-{
-	Access.OwnerStableId = NewId;
-}
-
-void UInventoryComponent::SetAccessMode(EInventoryAccessMode NewMode)
-{
-	Access.AccessMode = NewMode;
-}
-
-static FString GetStableIdForActor(AActor* A)
-{
-	return UInventoryHelpers::GetStablePlayerId(A);
-}
-
+bool UInventoryComponent::HasAccess_Public()   const { return AccessTag == GT_Public(); }
+bool UInventoryComponent::HasAccess_ViewOnly() const { return AccessTag == GT_ViewOnly(); }
+bool UInventoryComponent::HasAccess_Private()  const { return AccessTag == GT_Private(); }
+void UInventoryComponent::AutoInitializeAccessFromArea(AActor* /*ContextActor*/){}
 AController* UInventoryComponent::ResolveRequestorController(AActor* ExplicitRequestor) const
 {
-	if (AController* C = Cast<AController>(ExplicitRequestor)) return C;
-	if (APawn* P = Cast<APawn>(ExplicitRequestor)) return P->GetController();
-	if (APawn* OwnerPawn = Cast<APawn>(GetOwner())) return OwnerPawn->GetController();
+	if (ExplicitRequestor)
+	{
+		if (AController* C = Cast<AController>(ExplicitRequestor)) return C;
+		if (APawn* P = Cast<APawn>(ExplicitRequestor)) return P->GetController();
+		if (ExplicitRequestor->GetInstigatorController()) return ExplicitRequestor->GetInstigatorController();
+	}
+	if (AActor* O = GetOwner())
+	{
+		if (APawn* P = Cast<APawn>(O)) return P->GetController();
+		if (O->GetInstigatorController()) return O->GetInstigatorController();
+	}
 	return nullptr;
 }
-
 bool UInventoryComponent::CanView(AActor* Requestor) const
 {
-	// Owner always can view
-	if (Access.OwnerStableId == GetStableIdForActor(Requestor)) return true;
-
-	switch (Access.AccessMode)
+	if (HasAccess_Public() || HasAccess_ViewOnly()) return true;
+	if (HasAccess_Private())
 	{
-		case EInventoryAccessMode::Public:
-			if (Access.bAllowAlliesAndParty) return true; // stub: everyone is ally/party
-			return UInventoryHelpers::IsSameParty(GetOwner(), Requestor) || UInventoryHelpers::IsAlly(GetOwner(), Requestor);
-		case EInventoryAccessMode::ViewOnly:
-			return true;
-		case EInventoryAccessMode::Private:
-			return Access.bOthersViewOnlyInPrivate; // view-only if configured
+		const AController* Req = ResolveRequestorController(Requestor);
+		const AController* Own = ResolveRequestorController(const_cast<UInventoryComponent*>(this)->GetOwner());
+		return Req && Own && (Req == Own);
 	}
-	return false;
+	return true;
 }
-
-bool UInventoryComponent::HeirloomBypassAllowed(AActor* Requestor, const FInventoryItem* OptionalItem) const
-{
-	if (!Requestor) return false;
-	if (Access.OwnerStableId != GetStableIdForActor(Requestor)) return false; // only owner
-	if (!Access.HeirloomItemTag.IsValid()) return false;
-	if (!OptionalItem) return true; // used for actions that will check items later
-	// If item is provided, ensure it's heirloom
-	if (OptionalItem->ItemData.IsValid())
-	{
-		const UItemDataAsset* D = OptionalItem->ItemData.Get();
-		return D && (D->ItemType == Access.HeirloomItemTag || D->AllowedActions.Contains(Access.HeirloomItemTag));
-	}
-	return false;
-}
-
 bool UInventoryComponent::CanModify(AActor* Requestor) const
 {
-	// Owner can always modify
-	if (Access.OwnerStableId == GetStableIdForActor(Requestor)) return true;
-
-	switch (Access.AccessMode)
+	if (HasAccess_Public()) return true;
+	if (HasAccess_ViewOnly()) return false;
+	if (HasAccess_Private())
 	{
-		case EInventoryAccessMode::Public:
-			// Allies/party can modify in base public area
-			if (Access.bAllowAlliesAndParty) return true; // permissive by design for now
-			return UInventoryHelpers::IsSameParty(GetOwner(), Requestor);
-		case EInventoryAccessMode::ViewOnly:
-			return false;
-		case EInventoryAccessMode::Private:
-			// Normally no; except heirloom bypass for owner (handled per-action)
-			return false;
+		const AController* Req = ResolveRequestorController(Requestor);
+		const AController* Own = ResolveRequestorController(const_cast<UInventoryComponent*>(this)->GetOwner());
+		return Req && Own && (Req == Own);
 	}
+	return true;
+}
+void UInventoryComponent::NotifySlotChanged(int32 SlotIndex){ OnInventoryUpdated.Broadcast(SlotIndex); }
+void UInventoryComponent::NotifyInventoryChanged(){ OnInventoryChanged.Broadcast(); }
+void UInventoryComponent::UpdateItemIndexes()
+{
+	for (int32 i=0;i<Items.Num();++i){ Items[i].Index = i; }
+}
+void UInventoryComponent::AdjustSlotCountIfNeeded()
+{
+	MaxSlots = FMath::Max(0, MaxSlots);
+	if (Items.Num() != MaxSlots)
+	{
+		Items.SetNum(MaxSlots);
+		UpdateItemIndexes();
+	}
+}
+// Settings
+void UInventoryComponent::SetMaxCarryWeight(float NewMaxWeight){ MaxCarryWeight = FMath::Max(0.f, NewMaxWeight); }
+void UInventoryComponent::SetMaxCarryVolume(float NewMaxVolume){ MaxCarryVolume = FMath::Max(0.f, NewMaxVolume); }
+void UInventoryComponent::SetMaxSlots(int32 NewMaxSlots){ MaxSlots = FMath::Max(0, NewMaxSlots); AdjustSlotCountIfNeeded(); NotifyInventoryChanged(); }
+// Queries
+bool UInventoryComponent::IsInventoryFull() const{ return GetNumOccupiedSlots() >= MaxSlots; }
+float UInventoryComponent::GetCurrentWeight() const{ return 0.f; }
+float UInventoryComponent::GetCurrentVolume() const{ return 0.f; }
+FInventoryItem UInventoryComponent::GetItem(int32 SlotIndex) const
+{
+	return Items.IsValidIndex(SlotIndex) ? Items[SlotIndex] : FInventoryItem();
+}
+int32 UInventoryComponent::FindFreeSlot() const
+{
+	for (int32 i=0;i<Items.Num();++i) if (!Items[i].IsValid()) return i;
+	return INDEX_NONE;
+}
+int32 UInventoryComponent::FindStackableSlot(UItemDataAsset* ItemData) const
+{
+	if (!ItemData) return INDEX_NONE;
+	for (int32 i=0;i<Items.Num();++i)
+	{
+		const FInventoryItem& S = Items[i];
+		if (S.IsValid() && S.CanStackWith(ItemData)) return i;
+	}
+	return INDEX_NONE;
+}
+int32 UInventoryComponent::FindSlotWithItemID(FGameplayTag ItemID) const
+{
+	if (!ItemID.IsValid()) return INDEX_NONE;
+	for (int32 i=0;i<Items.Num();++i)
+	{
+		const FInventoryItem& S = Items[i];
+		if (!S.IsValid()) continue;
+		if (const UItemDataAsset* D = S.ItemData.Get()) if (D->ItemIDTag == ItemID) return i;
+	}
+	return INDEX_NONE;
+}
+FInventoryItem UInventoryComponent::GetItemByID(FGameplayTag ItemID) const
+{
+	const int32 Idx = FindSlotWithItemID(ItemID);
+	return Idx != INDEX_NONE ? Items[Idx] : FInventoryItem();
+}
+int32 UInventoryComponent::GetNumOccupiedSlots() const
+{
+	int32 C=0; for (const FInventoryItem& S: Items) if (S.IsValid()) ++C; return C;
+}
+int32 UInventoryComponent::GetNumItemsOfType(FGameplayTag ItemID) const
+{
+	if (!ItemID.IsValid()) return 0;
+	int32 T=0; for (const FInventoryItem& S: Items) if (S.IsValid()) if (const UItemDataAsset* D=S.ItemData.Get()) if (D->ItemIDTag==ItemID) T+=S.Quantity; return T;
+}
+int32 UInventoryComponent::GetNumUISlots() const{ return Items.Num(); }
+void UInventoryComponent::GetUISlotInfo(TArray<int32>& OutIdx, TArray<UItemDataAsset*>& OutData, TArray<int32>& OutQty) const
+{
+	OutIdx.Reset(); OutData.Reset(); OutQty.Reset();
+	for (int32 i=0;i<Items.Num();++i)
+	{
+		const FInventoryItem& S = Items[i];
+		if (!S.IsValid()) continue;
+		OutIdx.Add(i); OutData.Add(S.ItemData.Get()); OutQty.Add(S.Quantity);
+	}
+}
+// Filters
+TArray<FInventoryItem> UInventoryComponent::FilterItemsByRarity(FGameplayTag RarityTag) const
+{
+	TArray<FInventoryItem> Out; if (!RarityTag.IsValid()) return Out;
+	for (const FInventoryItem& S: Items) if (S.IsValid()) if (const UItemDataAsset* D=S.ItemData.Get()) if (D->Rarity==RarityTag) Out.Add(S);
+	return Out;
+}
+TArray<FInventoryItem> UInventoryComponent::FilterItemsByCategory(FGameplayTag CategoryTag) const
+{
+	TArray<FInventoryItem> Out; if (!CategoryTag.IsValid()) return Out;
+	for (const FInventoryItem& S: Items) if (S.IsValid()) if (const UItemDataAsset* D=S.ItemData.Get()) if (D->ItemCategory==CategoryTag) Out.Add(S);
+	return Out;
+}
+TArray<FInventoryItem> UInventoryComponent::FilterItemsBySubCategory(FGameplayTag SubCategoryTag) const
+{
+	TArray<FInventoryItem> Out; if (!SubCategoryTag.IsValid()) return Out;
+	for (const FInventoryItem& S: Items) if (S.IsValid()) if (const UItemDataAsset* D=S.ItemData.Get()) if (D->ItemSubCategory==SubCategoryTag) Out.Add(S);
+	return Out;
+}
+TArray<FInventoryItem> UInventoryComponent::FilterItemsByType(FGameplayTag TypeTag) const
+{
+	TArray<FInventoryItem> Out; if (!TypeTag.IsValid()) return Out;
+	for (const FInventoryItem& S: Items) if (S.IsValid()) if (const UItemDataAsset* D=S.ItemData.Get()) if (D->ItemType==TypeTag) Out.Add(S);
+	return Out;
+}
+TArray<FInventoryItem> UInventoryComponent::FilterItemsByTags(FGameplayTagContainer Tags, bool bMatchAll) const
+{
+	TArray<FInventoryItem> Out; if (Tags.IsEmpty()) return Out;
+	for (const FInventoryItem& S: Items)
+	{
+		if (!S.IsValid()) continue;
+		const UItemDataAsset* D = S.ItemData.Get(); if (!D) continue;
+		FGameplayTagContainer Owned; Owned.AddTag(D->ItemIDTag); Owned.AddTag(D->Rarity); Owned.AddTag(D->ItemCategory); Owned.AddTag(D->ItemSubCategory); Owned.AddTag(D->ItemType);
+		for (const FGameplayTag& T : D->AdditionalTags) Owned.AddTag(T);
+		const bool bOk = bMatchAll ? Owned.HasAll(Tags) : Owned.HasAny(Tags);
+		if (bOk) Out.Add(S);
+	}
+	return Out;
+}
+// Acceptance
+bool UInventoryComponent::CanAcceptItem(UItemDataAsset* ItemData) const
+{
+	if (!ItemData) return false;
+	if (AllowedItemIDs.Num()==0) return true;
+	for (const FGameplayTag& T: AllowedItemIDs) if (T.IsValid() && T==ItemData->ItemIDTag) return true;
 	return false;
 }
-
-// ---------- Actions (permission-aware) ----------
-
+// Core actions
 bool UInventoryComponent::AddItem(UItemDataAsset* ItemData, int32 Quantity, AActor* Requestor)
 {
-	if (!ItemData || Quantity <= 0) return false;
-	AController* Req = ResolveRequestorController(Requestor);
-	if (!CanModify(Req ? Req->GetPawn() : Requestor))
+	if (!ItemData || Quantity <= 0)
+		return false;
+
+	if (AActor* O = GetOwner())
 	{
-		// Heirloom bypass if in private and owner is doing this (only relevant when item is heirloom)
-		FInventoryItem Temp(ItemData, Quantity);
-		if (!(Access.AccessMode == EInventoryAccessMode::Private && HeirloomBypassAllowed(Req ? Req->GetPawn() : Requestor, &Temp)))
-			return false;
+		if (!O->HasAuthority())
+			return TryAddItem(ItemData, Quantity);
 	}
 
-	if (!CanAcceptItem(ItemData))   return false;
+	if (!CanModify(Requestor) || !CanAcceptItem(ItemData))
+		return false;
 
-	const int32 StackSlot = FindStackableSlot(ItemData);
-	const int32 FreeSlot  = (StackSlot == INDEX_NONE) ? FindFreeSlot() : StackSlot;
-	if (FreeSlot == INDEX_NONE) { OnInventoryFull.Broadcast(true); return false; }
+	AdjustSlotCountIfNeeded();
 
-	if (IsUnlimited())
+	int32 Stack = FindStackableSlot(ItemData);
+	if (Stack != INDEX_NONE)
 	{
-		if (Items[FreeSlot].IsValid()) Items[FreeSlot].Quantity += Quantity;
-		else Items[FreeSlot] = FInventoryItem(ItemData, Quantity, FreeSlot);
-
-		OnItemAdded.Broadcast(Items[FreeSlot], Quantity);
-		if (bAutoSort) RequestSortInventoryByName();
-		NotifySlotChanged(FreeSlot); NotifyInventoryChanged(); UpdateItemIndexes();
-		OnInventoryFull.Broadcast(false);
+		FInventoryItem& SlotItem = Items[Stack];
+		SlotItem.Quantity += Quantity;
+		NotifySlotChanged(Stack);
+		NotifyInventoryChanged();
 		return true;
 	}
 
-	// (weight/volume/slot checks unchanged)
-	float NewVolume=GetCurrentVolume(), NewWeight=GetCurrentWeight();
-	if (IsVolumeLimited()) { NewVolume += ItemData->Volume * Quantity; if (NewVolume > MaxCarryVolume) { OnInventoryFull.Broadcast(true); return false; } }
-	if (IsWeightLimited()) { NewWeight += ItemData->Weight * Quantity; if (NewWeight > MaxCarryWeight) { OnInventoryFull.Broadcast(true); return false; } }
+	int32 Free = FindFreeSlot();
+	if (Free == INDEX_NONE)
+		return false;
 
-	int32 AddQty = Quantity;
-	if (IsSlotLimited() && Items[FreeSlot].IsValid())
-	{
-		AddQty = FMath::Min(Quantity, ItemData->MaxStackSize - Items[FreeSlot].Quantity);
-		if (AddQty <= 0) { OnInventoryFull.Broadcast(true); return false; }
-	}
+	FInventoryItem NewI;
+	NewI.ItemData = ItemData;
+	NewI.Quantity = Quantity;
+	NewI.Index = Free;
 
-	if (Items[FreeSlot].IsValid()) Items[FreeSlot].Quantity += AddQty;
-	else Items[FreeSlot] = FInventoryItem(ItemData, AddQty, FreeSlot);
-
-	OnItemAdded.Broadcast(Items[FreeSlot], AddQty);
-	if (bAutoSort) RequestSortInventoryByName();
-	NotifySlotChanged(FreeSlot); NotifyInventoryChanged(); UpdateItemIndexes();
-	OnInventoryFull.Broadcast(IsInventoryFull());
+	Items[Free] = NewI;
+	NotifySlotChanged(Free);
+	NotifyInventoryChanged();
 	return true;
 }
-
 bool UInventoryComponent::RemoveItem(int32 SlotIndex, int32 Quantity, AActor* Requestor)
 {
-	if (!Items.IsValidIndex(SlotIndex) || Quantity <= 0) return false;
-	FInventoryItem& Item = Items[SlotIndex];
-	if (!Item.IsValid() || Item.Quantity < Quantity) return false;
+	if (Quantity<=0 || !Items.IsValidIndex(SlotIndex)) return false;
+	if (AActor* O=GetOwner()) if (!O->HasAuthority()) return TryRemoveItem(SlotIndex,Quantity);
+	if (!CanModify(Requestor)) return false;
 
-	AController* Req = ResolveRequestorController(Requestor);
-
-	// Private: allow heirloom withdraw by owner
-	const bool bIsHeirloom = HeirloomBypassAllowed(Req ? Req->GetPawn() : Requestor, &Item);
-	if (!CanModify(Req ? Req->GetPawn() : Requestor) && !bIsHeirloom)
-		return false;
-
-	OnItemRemoved.Broadcast(Item);
-	Item.Quantity -= Quantity;
-	if (Item.Quantity <= 0) Items[SlotIndex] = FInventoryItem();
-
-	if (bAutoSort) RequestSortInventoryByName();
-	NotifySlotChanged(SlotIndex); NotifyInventoryChanged(); UpdateItemIndexes();
-	return true;
+	FInventoryItem& S=Items[SlotIndex]; if (!S.IsValid()) return false;
+	S.Quantity-=Quantity; if (S.Quantity<=0) S=FInventoryItem();
+	NotifySlotChanged(SlotIndex); NotifyInventoryChanged(); return true;
 }
-
 bool UInventoryComponent::RemoveItemByID(FGameplayTag ItemID, int32 Quantity, AActor* Requestor)
 {
-	const int32 SlotIndex = FindSlotWithItemID(ItemID);
-	return RemoveItem(SlotIndex, Quantity, Requestor);
+	if (!ItemID.IsValid()||Quantity<=0) return false;
+	const int32 SlotIndex=FindSlotWithItemID(ItemID);
+	return RemoveItem(SlotIndex,Quantity,Requestor);
 }
-
 bool UInventoryComponent::MoveItem(int32 FromIndex, int32 ToIndex, AActor* Requestor)
 {
-	if (!Items.IsValidIndex(FromIndex) || !Items.IsValidIndex(ToIndex) || FromIndex == ToIndex) return false;
-	AController* Req = ResolveRequestorController(Requestor);
-	if (!CanModify(Req ? Req->GetPawn() : Requestor)) return false;
+	if (!Items.IsValidIndex(FromIndex)||!Items.IsValidIndex(ToIndex)||FromIndex==ToIndex) return false;
+	if (AActor* O=GetOwner()) if (!O->HasAuthority()) return TryMoveItem(FromIndex,ToIndex);
+	if (!CanModify(Requestor)) return false;
 
-	FInventoryItem& From = Items[FromIndex];
-	FInventoryItem& To   = Items[ToIndex];
-	if (!From.IsValid()) return false;
+	FInventoryItem& A=Items[FromIndex]; FInventoryItem& B=Items[ToIndex];
+	if (!A.IsValid()) return false;
 
-	if (To.IsValid() && From.ItemData == To.ItemData && From.IsStackable())
-	{
-		const int32 TransferQty = FMath::Min(From.Quantity, To.ItemData.Get()->MaxStackSize - To.Quantity);
-		if (TransferQty <= 0) return false;
-		To.Quantity += TransferQty;
-		From.Quantity -= TransferQty;
-		if (From.Quantity <= 0) From = FInventoryItem();
-	}
-	else
-	{
-		Swap(From, To);
-	}
+	if (B.IsValid() && A.CanStackWith(B.ItemData.Get())) { B.Quantity+=A.Quantity; A=FInventoryItem(); }
+	else { Swap(A,B); }
 
-	NotifySlotChanged(FromIndex); NotifySlotChanged(ToIndex); NotifyInventoryChanged(); UpdateItemIndexes();
-	return true;
+	NotifySlotChanged(FromIndex); NotifySlotChanged(ToIndex); NotifyInventoryChanged(); return true;
 }
-
+bool UInventoryComponent::SwapItems(int32 IndexA, int32 IndexB, AActor* Requestor){ return MoveItem(IndexA,IndexB,Requestor); }
 bool UInventoryComponent::TransferItemToInventory(int32 FromIndex, UInventoryComponent* TargetInventory, AActor* Requestor)
 {
-	if (!TargetInventory || !Items.IsValidIndex(FromIndex)) return false;
-	FInventoryItem& Item = Items[FromIndex];
-	if (!Item.IsValid()) return false;
+	if (!TargetInventory) return false;
+	if (AActor* O=GetOwner()) if (!O->HasAuthority()) return TryTransferItem(FromIndex,TargetInventory);
+	if (!CanModify(Requestor) || !Items.IsValidIndex(FromIndex)) return false;
 
-	AController* Req = ResolveRequestorController(Requestor);
+	FInventoryItem& S=Items[FromIndex]; if (!S.IsValid()) return false;
+	UItemDataAsset* D=S.ItemData.Get(); if (!TargetInventory->CanAcceptItem(D)) return false;
 
-	const bool bHeirloomBypass = HeirloomBypassAllowed(Req ? Req->GetPawn() : Requestor, &Item);
-	if (!CanModify(Req ? Req->GetPawn() : Requestor) && !bHeirloomBypass) return false;
-
-	UItemDataAsset* ItemData = Item.ItemData.Get();
-	const int32 Quantity = Item.Quantity;
-
-	// Target does its own permission check with same Requestor
-	if (TargetInventory->AddItem(ItemData, Quantity, Req ? Req->GetPawn() : Requestor))
+	if (int32 TStack=TargetInventory->FindStackableSlot(D); TStack!=INDEX_NONE)
 	{
-		Items[FromIndex] = FInventoryItem();
-		OnItemTransferSuccess.Broadcast(Item);
-		NotifySlotChanged(FromIndex); NotifyInventoryChanged(); UpdateItemIndexes();
-		TargetInventory->NotifyInventoryChanged();
-		return true;
+		auto TS=TargetInventory->GetItem(TStack); TS.Quantity+=S.Quantity; TargetInventory->Items[TStack]=TS; TargetInventory->NotifySlotChanged(TStack);
 	}
-	return false;
-}
-
-// ---------- Client convenience (RPC) ----------
-
-bool UInventoryComponent::TryAddItem(UItemDataAsset* ItemData, int32 Quantity)
-{
-	if (AActor* Owner = GetOwner())
-	{
-		if (Owner->HasAuthority()) return AddItem(ItemData, Quantity, Owner);
-		if (AController* C = Cast<AController>(Owner->GetInstigatorController()))
-			ServerAddItem(ItemData, Quantity, C);
-		else
-			ServerAddItem(ItemData, Quantity, nullptr);
-		return true;
-	}
-	return false;
-}
-
-bool UInventoryComponent::TryRemoveItem(int32 SlotIndex, int32 Quantity)
-{
-	if (AActor* Owner = GetOwner())
-	{
-		if (Owner->HasAuthority()) return RemoveItem(SlotIndex, Quantity, Owner);
-		if (AController* C = Cast<AController>(Owner->GetInstigatorController()))
-			ServerRemoveItem(SlotIndex, Quantity, C);
-		else
-			ServerRemoveItem(SlotIndex, Quantity, nullptr);
-		return false;
-	}
-	return false;
-}
-
-bool UInventoryComponent::TryMoveItem(int32 FromIndex, int32 ToIndex)
-{
-	if (AActor* Owner = GetOwner())
-	{
-		if (Owner->HasAuthority()) return MoveItem(FromIndex, ToIndex, Owner);
-		if (AController* C = Cast<AController>(Owner->GetInstigatorController()))
-			ServerMoveItem(FromIndex, ToIndex, C);
-		else
-			ServerMoveItem(FromIndex, ToIndex, nullptr);
-		return false;
-	}
-	return false;
-}
-
-bool UInventoryComponent::TryTransferItem(int32 FromIndex, UInventoryComponent* TargetInventory)
-{
-	if (AActor* Owner = GetOwner())
-	{
-		if (Owner->HasAuthority()) return TransferItemToInventory(FromIndex, TargetInventory, Owner);
-		if (AController* C = Cast<AController>(Owner->GetInstigatorController()))
-			ServerTransferItem(FromIndex, TargetInventory, C);
-		else
-			ServerTransferItem(FromIndex, TargetInventory, nullptr);
-		return false;
-	}
-	return false;
-}
-
-bool UInventoryComponent::RequestTransferItem(UInventoryComponent* SourceInventory, int32 SourceIndex, UInventoryComponent* TargetInventory, int32 TargetIndex)
-{
-	if (!SourceInventory || !TargetInventory) return false;
-	AActor* Owner = GetOwner();
-	if (Owner && Owner->HasAuthority())
-	{
-		const FInventoryItem Item = SourceInventory->GetItem(SourceIndex);
-		if (!Item.IsValid()) return false;
-		// Permission: we treat Owner as requestor
-		if (!TargetInventory->AddItem(Item.ItemData.Get(), Item.Quantity, Owner)) return false;
-		SourceInventory->RemoveItem(SourceIndex, Item.Quantity, Owner);
-		OnItemTransferSuccess.Broadcast(Item);
-		return true;
-	}
-	if (AController* C = Cast<AController>(Owner ? Owner->GetInstigatorController() : nullptr))
-		Server_TransferItem(SourceInventory, SourceIndex, TargetInventory, TargetIndex, C);
 	else
-		Server_TransferItem(SourceInventory, SourceIndex, TargetInventory, TargetIndex, nullptr);
-	return false;
+	{
+		int32 Free=TargetInventory->FindFreeSlot(); if (Free==INDEX_NONE) return false;
+		FInventoryItem NewI=S; NewI.Index=Free; TargetInventory->Items[Free]=NewI; TargetInventory->NotifySlotChanged(Free);
+	}
+
+	FInventoryItem Moved=S; S=FInventoryItem();
+	NotifySlotChanged(FromIndex); NotifyInventoryChanged(); TargetInventory->NotifyInventoryChanged(); OnItemTransferSuccess.Broadcast(Moved);
+	return true;
 }
 
-// ---------- Split / Sort (permission guarded where needed) ----------
-
+// Split & sort
 bool UInventoryComponent::SplitStack(int32 SlotIndex, int32 SplitQuantity, AActor* Requestor)
 {
-	if (!Items.IsValidIndex(SlotIndex) || SplitQuantity <= 0) return false;
-	if (!CanModify(Requestor ? Requestor : GetOwner())) return false;
+	if (!Items.IsValidIndex(SlotIndex)||SplitQuantity<=0) return false;
+	if (AActor* O=GetOwner()) if (!O->HasAuthority()) return TrySplitStack(SlotIndex,SplitQuantity);
+	if (!CanModify(Requestor)) return false;
 
-	FInventoryItem& Item = Items[SlotIndex];
-	if (!Item.IsValid() || Item.Quantity <= SplitQuantity) return false;
+	FInventoryItem& S=Items[SlotIndex]; if (!S.IsValid()||S.Quantity<=SplitQuantity) return false;
+	const int32 Free=FindFreeSlot(); if (Free==INDEX_NONE) return false;
 
-	const int32 FreeSlot = FindFreeSlot();
-	if (FreeSlot == INDEX_NONE) return false;
-
-	Item.Quantity -= SplitQuantity;
-	Items[FreeSlot] = FInventoryItem(Item.ItemData.Get(), SplitQuantity, FreeSlot);
-
-	if (bAutoSort) RequestSortInventoryByName();
-	NotifySlotChanged(SlotIndex); NotifySlotChanged(FreeSlot); NotifyInventoryChanged(); UpdateItemIndexes();
-	return true;
+	S.Quantity-=SplitQuantity;
+	FInventoryItem NewI; NewI.ItemData=S.ItemData; NewI.Quantity=SplitQuantity; NewI.Index=Free;
+	Items[Free]=NewI; NotifySlotChanged(SlotIndex); NotifySlotChanged(Free); NotifyInventoryChanged(); return true;
 }
-
-void UInventoryComponent::ServerSplitStack_Implementation(int32 SlotIndex, int32 SplitQuantity, AController* Requestor)
-{
-	SplitStack(SlotIndex, SplitQuantity, Requestor ? Requestor->GetPawn() : nullptr);
-}
-bool UInventoryComponent::ServerSplitStack_Validate(int32 SlotIndex, int32 SplitQuantity, AController* /*Requestor*/) { return SplitQuantity > 0 && SlotIndex >= 0; }
-
-bool UInventoryComponent::TrySplitStack(int32 SlotIndex, int32 SplitQuantity)
-{
-	AActor* Owner = GetOwner();
-	if (Owner && Owner->HasAuthority())
-	{
-		return SplitStack(SlotIndex, SplitQuantity, Owner);
-	}
-	if (AController* C = Cast<AController>(Owner ? Owner->GetInstigatorController() : nullptr))
-		ServerSplitStack(SlotIndex, SplitQuantity, C);
-	else
-		ServerSplitStack(SlotIndex, SplitQuantity, nullptr);
-	return false;
-}
-
-// Sort (same behavior; permission: only modifier may sort)
 void UInventoryComponent::SortInventoryByName()
 {
-	Items.Sort([](const FInventoryItem& A, const FInventoryItem& B)
-	{
-		const UItemDataAsset* DA = A.ItemData.Get();
-		const UItemDataAsset* DB = B.ItemData.Get();
-		if (!A.IsValid() && !B.IsValid()) return false;
-		if (!A.IsValid()) return false; // empty last
-		if (!B.IsValid()) return true;
-		const FString NameA = DA ? DA->Name.ToString() : FString();
-		const FString NameB = DB ? DB->Name.ToString() : FString();
-		return NameA < NameB;
+	Items.Sort([](const FInventoryItem& A,const FInventoryItem& B){
+		const UItemDataAsset* AD=A.ItemData.Get(); const UItemDataAsset* BD=B.ItemData.Get();
+		return (AD?AD->GetName():TEXT("")) < (BD?BD->GetName():TEXT(""));
 	});
-	UpdateItemIndexes();
-	NotifyInventoryChanged();
+	UpdateItemIndexes(); NotifyInventoryChanged();
 }
-void UInventoryComponent::ServerSortInventoryByName_Implementation(AController* Requestor)
+void UInventoryComponent::ServerSortInventoryByName_Implementation(AController*){ SortInventoryByName(); }
+bool UInventoryComponent::ServerSortInventoryByName_Validate(AController*){ return true; }
+void UInventoryComponent::RequestSortInventoryByName(){ if (AActor* O=GetOwner()) if (!O->HasAuthority()) ServerSortInventoryByName(ResolveRequestorController(O)); else SortInventoryByName(); }
+void UInventoryComponent::SortInventoryByRarity()
 {
-	if (CanModify(Requestor ? Requestor->GetPawn() : nullptr)) SortInventoryByName();
+	Items.Sort([](const FInventoryItem& A,const FInventoryItem& B){
+		const UItemDataAsset* AD=A.ItemData.Get(); const UItemDataAsset* BD=B.ItemData.Get();
+		const FString AR = AD ? AD->Rarity.ToString() : TEXT("");
+const FString BR = BD ? BD->Rarity.ToString() : TEXT("");
+return AR < BR;
+	});
+	UpdateItemIndexes(); NotifyInventoryChanged();
 }
-bool UInventoryComponent::ServerSortInventoryByName_Validate(AController* /*Requestor*/) { return true; }
-void UInventoryComponent::RequestSortInventoryByName()
-{
-	AActor* Owner = GetOwner();
-	if (Owner && Owner->HasAuthority()) SortInventoryByName();
-	else if (AController* C = Cast<AController>(Owner ? Owner->GetInstigatorController() : nullptr))
-		ServerSortInventoryByName(C);
-	else
-		ServerSortInventoryByName(nullptr);
-}
-
-// (Rarity/Type/Category) same pattern
-void UInventoryComponent::SortInventoryByRarity()  { /* same as before */ Items.Sort([](const FInventoryItem& A, const FInventoryItem& B){ /* ... */ const UItemDataAsset* DA=A.ItemData.Get(); const UItemDataAsset* DB=B.ItemData.Get(); if(!A.IsValid()&& !B.IsValid())return false; if(!A.IsValid())return false; if(!B.IsValid())return true; return (DA?DA->Rarity.ToString():FString()) < (DB?DB->Rarity.ToString():FString());}); UpdateItemIndexes(); NotifyInventoryChanged(); }
-void UInventoryComponent::SortInventoryByType()    { /* same as before */ Items.Sort([](const FInventoryItem& A, const FInventoryItem& B){ const UItemDataAsset* DA=A.ItemData.Get(); const UItemDataAsset* DB=B.ItemData.Get(); if(!A.IsValid()&& !B.IsValid())return false; if(!A.IsValid())return false; if(!B.IsValid())return true; return (DA?DA->ItemType.ToString():FString()) < (DB?DB->ItemType.ToString():FString());}); UpdateItemIndexes(); NotifyInventoryChanged(); }
-void UInventoryComponent::SortInventoryByCategory(){ /* same as before */ Items.Sort([](const FInventoryItem& A, const FInventoryItem& B){ const UItemDataAsset* DA=A.ItemData.Get(); const UItemDataAsset* DB=B.ItemData.Get(); if(!A.IsValid()&& !B.IsValid())return false; if(!A.IsValid())return false; if(!B.IsValid())return true; return (DA?DA->ItemCategory.ToString():FString()) < (DB?DB->ItemCategory.ToString():FString());}); UpdateItemIndexes(); NotifyInventoryChanged(); }
-
-void UInventoryComponent::ServerSortInventoryByRarity_Implementation(AController* Requestor){ if (CanModify(Requestor?Requestor->GetPawn():nullptr)) SortInventoryByRarity(); }
+void UInventoryComponent::ServerSortInventoryByRarity_Implementation(AController*){ SortInventoryByRarity(); }
 bool UInventoryComponent::ServerSortInventoryByRarity_Validate(AController*){ return true; }
-void UInventoryComponent::ServerSortInventoryByType_Implementation(AController* Requestor){ if (CanModify(Requestor?Requestor->GetPawn():nullptr)) SortInventoryByType(); }
-bool UInventoryComponent::ServerSortInventoryByType_Validate(AController*){ return true; }
-void UInventoryComponent::ServerSortInventoryByCategory_Implementation(AController* Requestor){ if (CanModify(Requestor?Requestor->GetPawn():nullptr)) SortInventoryByCategory(); }
-bool UInventoryComponent::ServerSortInventoryByCategory_Validate(AController*){ return true; }
-
-void UInventoryComponent::RequestSortInventoryByRarity(){ AActor* Owner = GetOwner(); if (Owner && Owner->HasAuthority()) SortInventoryByRarity(); else if (AController* C = Cast<AController>(Owner ? Owner->GetInstigatorController() : nullptr)) ServerSortInventoryByRarity(C); else ServerSortInventoryByRarity(nullptr); }
-void UInventoryComponent::RequestSortInventoryByType(){   AActor* Owner = GetOwner(); if (Owner && Owner->HasAuthority()) SortInventoryByType();   else if (AController* C = Cast<AController>(Owner ? Owner->GetInstigatorController() : nullptr)) ServerSortInventoryByType(C);   else ServerSortInventoryByType(nullptr); }
-void UInventoryComponent::RequestSortInventoryByCategory(){AActor* Owner = GetOwner(); if (Owner && Owner->HasAuthority()) SortInventoryByCategory(); else if (AController* C = Cast<AController>(Owner ? Owner->GetInstigatorController() : nullptr)) ServerSortInventoryByCategory(C); else ServerSortInventoryByCategory(nullptr); }
-
-// ---------- Queries / Filters / Misc (unchanged bodies) ----------
-/* Keep your existing implementations for:
-   IsInventoryFull, GetCurrentWeight, GetCurrentVolume, GetItem, FindFreeSlot, FindStackableSlot,
-   FindSlotWithItemID, GetItemByID, GetNumOccupiedSlots, GetNumItemsOfType,
-   GetNumUISlots, GetUISlotInfo, NotifySlotChanged, NotifyInventoryChanged, UpdateItemIndexes,
-   SetMaxCarryWeight, SetMaxCarryVolume, SetMaxSlots, AdjustSlotCountIfNeeded, OnRep_InventoryItems,
-   Filters, CanAcceptItem, SwapItems (now permission checked below)
-*/
-
-bool UInventoryComponent::SwapItems(int32 IndexA, int32 IndexB, AActor* Requestor)
+void UInventoryComponent::RequestSortInventoryByRarity(){ if (AActor* O=GetOwner()) if (!O->HasAuthority()) ServerSortInventoryByRarity(ResolveRequestorController(O)); else SortInventoryByRarity(); }
+//Sorts
+void UInventoryComponent::SortInventoryByType()
 {
-	if (!CanModify(Requestor ? Requestor : GetOwner())) return false;
-	if (!Items.IsValidIndex(IndexA) || !Items.IsValidIndex(IndexB) || IndexA == IndexB) return false;
-	Swap(Items[IndexA], Items[IndexB]);
-	UpdateItemIndexes();
-	NotifySlotChanged(IndexA);
-	NotifySlotChanged(IndexB);
-	NotifyInventoryChanged();
+	Items.Sort([](const FInventoryItem& A,const FInventoryItem& B){
+		const UItemDataAsset* AD=A.ItemData.Get(); const UItemDataAsset* BD=B.ItemData.Get();
+		return (AD?AD->ItemType.ToString():TEXT("")) < (BD?BD->ItemType.ToString():TEXT(""));
+	});
+	UpdateItemIndexes(); NotifyInventoryChanged();
+}
+void UInventoryComponent::ServerSortInventoryByType_Implementation(AController*){ SortInventoryByType(); }
+bool UInventoryComponent::ServerSortInventoryByType_Validate(AController*){ return true; }
+void UInventoryComponent::RequestSortInventoryByType(){ if (AActor* O=GetOwner()) if (!O->HasAuthority()) ServerSortInventoryByType(ResolveRequestorController(O)); else SortInventoryByType(); }
+void UInventoryComponent::SortInventoryByCategory()
+{
+	Items.Sort([](const FInventoryItem& A,const FInventoryItem& B){
+		const UItemDataAsset* AD=A.ItemData.Get(); const UItemDataAsset* BD=B.ItemData.Get();
+		return (AD?AD->ItemCategory.ToString():TEXT("")) < (BD?BD->ItemCategory.ToString():TEXT(""));
+	});
+	UpdateItemIndexes(); NotifyInventoryChanged();
+}
+void UInventoryComponent::ServerSortInventoryByCategory_Implementation(AController*){ SortInventoryByCategory(); }
+bool UInventoryComponent::ServerSortInventoryByCategory_Validate(AController*){ return true; }
+void UInventoryComponent::RequestSortInventoryByCategory(){ if (AActor* O=GetOwner()) if (!O->HasAuthority()) ServerSortInventoryByCategory(ResolveRequestorController(O)); else SortInventoryByCategory(); }
+// Client wrappers
+bool UInventoryComponent::TryAddItem(UItemDataAsset* ItemData,int32 Quantity)
+{
+	if (!ItemData||Quantity<=0) return false;
+	if (AActor* O=GetOwner())
+	{
+		if (O->HasAuthority()) return AddItem(ItemData,Quantity,O);
+		ServerAddItem(ItemData,Quantity,ResolveRequestorController(O)); return true;
+	}
+	return false;
+}
+bool UInventoryComponent::TryRemoveItem(int32 SlotIndex,int32 Quantity)
+{
+	if (AActor* O=GetOwner())
+	{
+		if (O->HasAuthority()) return RemoveItem(SlotIndex,Quantity,O);
+		ServerRemoveItem(SlotIndex,Quantity,ResolveRequestorController(O)); return true;
+	}
+	return false;
+}
+bool UInventoryComponent::TryMoveItem(int32 FromIndex,int32 ToIndex)
+{
+	if (AActor* O=GetOwner())
+	{
+		if (O->HasAuthority()) return MoveItem(FromIndex,ToIndex,O);
+		ServerMoveItem(FromIndex,ToIndex,ResolveRequestorController(O)); return true;
+	}
+	return false;
+}
+bool UInventoryComponent::TryTransferItem(int32 FromIndex,UInventoryComponent* TargetInventory)
+{
+	if (!TargetInventory) return false;
+	if (AActor* O=GetOwner())
+	{
+		if (O->HasAuthority()) return TransferItemToInventory(FromIndex,TargetInventory,O);
+		ServerTransferItem(FromIndex,TargetInventory,ResolveRequestorController(O)); return true;
+	}
+	return false;
+}
+bool UInventoryComponent::TrySplitStack(int32 SlotIndex,int32 SplitQuantity)
+{
+	if (AActor* O=GetOwner())
+	{
+		if (O->HasAuthority()) return SplitStack(SlotIndex,SplitQuantity,O);
+		ServerSplitStack(SlotIndex,SplitQuantity,ResolveRequestorController(O)); return true;
+	}
+	return false;
+}
+bool UInventoryComponent::RequestTransferItem(UInventoryComponent* Source,int32 SourceIdx,UInventoryComponent* Target,int32 TargetIdx)
+{
+	if (!Source||!Target) return false;
+	if (AActor* O=GetOwner())
+	{
+		if (O->HasAuthority())
+		{
+			if (!Source->Items.IsValidIndex(SourceIdx)) return false;
+			FInventoryItem It=Source->Items[SourceIdx]; if (!It.IsValid()) return false;
+			if (!Target->CanAcceptItem(It.ItemData.Get())) return false;
+
+			if (TargetIdx>=0 && Target->Items.IsValidIndex(TargetIdx) && !Target->Items[TargetIdx].IsValid())
+			{ Target->Items[TargetIdx]=It; Target->Items[TargetIdx].Index=TargetIdx; }
+			else
+			{ int32 Free=Target->FindFreeSlot(); if (Free==INDEX_NONE) return false; Target->Items[Free]=It; Target->Items[Free].Index=Free; }
+
+			Source->Items[SourceIdx]=FInventoryItem(); Source->NotifySlotChanged(SourceIdx);
+			Source->NotifyInventoryChanged(); Target->NotifyInventoryChanged(); return true;
+		}
+		else
+		{
+			Server_TransferItem(Source,SourceIdx,Target,TargetIdx,ResolveRequestorController(O)); return true;
+		}
+	}
+	return false;
+}
+// RPCs
+void UInventoryComponent::ServerAddItem_Implementation(UItemDataAsset* ItemData,int32 Quantity,AController* Requestor){ AddItem(ItemData,Quantity,Requestor); }
+bool UInventoryComponent::ServerAddItem_Validate(UItemDataAsset* ItemData,int32 Quantity,AController*){ return ItemData!=nullptr && Quantity>0; }
+void UInventoryComponent::ClientAddItemResponse_Implementation(bool){}
+void UInventoryComponent::ServerRemoveItem_Implementation(int32 SlotIndex,int32 Quantity,AController* Requestor){ RemoveItem(SlotIndex,Quantity,Requestor); }
+bool UInventoryComponent::ServerRemoveItem_Validate(int32 SlotIndex,int32 Quantity,AController*){ return SlotIndex>=0 && Quantity>0; }
+void UInventoryComponent::ServerRemoveItemByID_Implementation(FGameplayTag ItemID,int32 Quantity,AController* Requestor){ RemoveItemByID(ItemID,Quantity,Requestor); }
+bool UInventoryComponent::ServerRemoveItemByID_Validate(FGameplayTag ItemID,int32 Quantity,AController*){ return ItemID.IsValid() && Quantity>0; }
+void UInventoryComponent::ServerMoveItem_Implementation(int32 FromIndex,int32 ToIndex,AController* Requestor){ MoveItem(FromIndex,ToIndex,Requestor); }
+bool UInventoryComponent::ServerMoveItem_Validate(int32 FromIndex,int32 ToIndex,AController*){ return FromIndex>=0 && ToIndex>=0 && FromIndex!=ToIndex; }
+void UInventoryComponent::ServerTransferItem_Implementation(int32 FromIndex,UInventoryComponent* Target,AController* Requestor){ TransferItemToInventory(FromIndex,Target,Requestor); }
+bool UInventoryComponent::ServerTransferItem_Validate(int32 FromIndex,UInventoryComponent* Target,AController*){ return FromIndex>=0 && Target!=nullptr; }
+void UInventoryComponent::ServerPullItem_Implementation(int32 FromIndex,UInventoryComponent* Source,AController* Requestor){ if (Source) Source->TransferItemToInventory(FromIndex,this,Requestor); }
+bool UInventoryComponent::ServerPullItem_Validate(int32 FromIndex,UInventoryComponent* Source,AController*){ return FromIndex>=0 && Source!=nullptr; }
+void UInventoryComponent::Server_TransferItem_Implementation(UInventoryComponent* Source,int32 SourceIdx,UInventoryComponent* Target,int32 TargetIdx,AController*)
+{
+	if (!Source||!Target) return; if (!Source->Items.IsValidIndex(SourceIdx)) return;
+	FInventoryItem It=Source->Items[SourceIdx]; if (!It.IsValid()) return; if (!Target->CanAcceptItem(It.ItemData.Get())) return;
+
+	if (TargetIdx>=0 && Target->Items.IsValidIndex(TargetIdx) && !Target->Items[TargetIdx].IsValid())
+	{ Target->Items[TargetIdx]=It; Target->Items[TargetIdx].Index=TargetIdx; }
+	else
+	{ int32 Free=Target->FindFreeSlot(); if (Free==INDEX_NONE) return; Target->Items[Free]=It; Target->Items[Free].Index=Free; }
+
+	Source->Items[SourceIdx]=FInventoryItem(); Source->NotifySlotChanged(SourceIdx);
+	Source->NotifyInventoryChanged(); Target->NotifyInventoryChanged();
+}
+bool UInventoryComponent::Server_TransferItem_Validate(UInventoryComponent* Source,int32 SourceIdx,UInventoryComponent* Target,int32 /*TargetIdx*/,AController*){ return Source!=nullptr && Target!=nullptr && SourceIdx>=0; }
+
+bool UInventoryComponent::ServerSplitStack_Validate(int FromIndex, int SplitAmount, AController* By)
+{
+	// You can harden this as needed
 	return true;
 }
 
-// ---------- RPCs (carry requestor) ----------
-
-void UInventoryComponent::ServerAddItem_Implementation(UItemDataAsset* ItemData, int32 Quantity, AController* Requestor)
+void UInventoryComponent::ServerSplitStack_Implementation(int FromIndex, int SplitAmount, AController* By)
 {
-	const bool bSuccess = AddItem(ItemData, Quantity, Requestor ? Requestor->GetPawn() : nullptr);
-	ClientAddItemResponse(bSuccess);
+	const AActor* Owner = GetOwner();
+	if (!ensureAlways(Owner && Owner->GetLocalRole() == ROLE_Authority)) return;
+	if (!Items.IsValidIndex(FromIndex)) return;
+
+	FInventoryItem& Source = Items[FromIndex];
+	if (!Source.IsValid()) return;
+	if (SplitAmount <= 0 || SplitAmount >= Source.Quantity) return;
+
+	// Find or make an empty slot
+	int32 TargetIndex = INDEX_NONE;
+	for (int32 i = 0; i < Items.Num(); ++i)
+	{
+		if (!Items[i].IsValid())
+		{
+			TargetIndex = i;
+			break;
+		}
+	}
+	if (TargetIndex == INDEX_NONE)
+	{
+		TargetIndex = Items.AddDefaulted(1);
+	}
+
+	// Create the new stack
+	FInventoryItem NewStack;
+	NewStack.ItemData = Source.ItemData;
+	NewStack.Quantity = SplitAmount;
+	NewStack.Index = TargetIndex;
+
+	Source.Quantity -= SplitAmount;
+	Items[TargetIndex] = NewStack;
+	
 }
-bool UInventoryComponent::ServerAddItem_Validate(UItemDataAsset* /*ItemData*/, int32 /*Quantity*/, AController* /*Requestor*/) { return true; }
-
-void UInventoryComponent::ClientAddItemResponse_Implementation(bool /*bSuccess*/) {}
-
-void UInventoryComponent::ServerRemoveItem_Implementation(int32 SlotIndex, int32 Quantity, AController* Requestor)
-{
-	RemoveItem(SlotIndex, Quantity, Requestor ? Requestor->GetPawn() : nullptr);
-}
-bool UInventoryComponent::ServerRemoveItem_Validate(int32 /*SlotIndex*/, int32 /*Quantity*/, AController* /*Requestor*/) { return true; }
-
-void UInventoryComponent::ServerRemoveItemByID_Implementation(FGameplayTag ItemID, int32 Quantity, AController* Requestor)
-{
-	RemoveItemByID(ItemID, Quantity, Requestor ? Requestor->GetPawn() : nullptr);
-}
-bool UInventoryComponent::ServerRemoveItemByID_Validate(FGameplayTag /*ItemID*/, int32 /*Quantity*/, AController* /*Requestor*/) { return true; }
-
-void UInventoryComponent::ClientRemoveItemResponse_Implementation(bool /*bSuccess*/) {}
-
-void UInventoryComponent::ServerMoveItem_Implementation(int32 FromIndex, int32 ToIndex, AController* Requestor)
-{
-	MoveItem(FromIndex, ToIndex, Requestor ? Requestor->GetPawn() : nullptr);
-}
-bool UInventoryComponent::ServerMoveItem_Validate(int32 /*FromIndex*/, int32 /*ToIndex*/, AController* /*Requestor*/) { return true; }
-
-void UInventoryComponent::ServerTransferItem_Implementation(int32 FromIndex, UInventoryComponent* TargetInventory, AController* Requestor)
-{
-	TransferItemToInventory(FromIndex, TargetInventory, Requestor ? Requestor->GetPawn() : nullptr);
-}
-bool UInventoryComponent::ServerTransferItem_Validate(int32 /*FromIndex*/, UInventoryComponent* /*TargetInventory*/, AController* /*Requestor*/) { return true; }
-
-void UInventoryComponent::ServerPullItem_Implementation(int32 FromIndex, UInventoryComponent* SourceInventory, AController* Requestor)
-{
-	if (!SourceInventory || SourceInventory == this) return;
-	const FInventoryItem FromSlot = SourceInventory->GetItem(FromIndex);
-	if (!FromSlot.IsValid()) return;
-
-	UItemDataAsset* Asset = FromSlot.ItemData.Get();
-	const int32 Quantity = FromSlot.Quantity;
-
-	if (Asset && AddItem(Asset, Quantity, Requestor ? Requestor->GetPawn() : nullptr))
-		SourceInventory->RemoveItem(FromIndex, Quantity, Requestor ? Requestor->GetPawn() : nullptr);
-}
-bool UInventoryComponent::ServerPullItem_Validate(int32 /*FromIndex*/, UInventoryComponent* /*SourceInventory*/, AController* /*Requestor*/) { return true; }
-
-void UInventoryComponent::Server_TransferItem_Implementation(UInventoryComponent* SourceInventory, int32 SourceIndex, UInventoryComponent* TargetInventory, int32 /*TargetIndex*/, AController* Requestor)
-{
-	if (!SourceInventory || !TargetInventory) return;
-	const FInventoryItem Item = SourceInventory->GetItem(SourceIndex);
-	if (!Item.IsValid()) return;
-
-	if (TargetInventory->AddItem(Item.ItemData.Get(), Item.Quantity, Requestor ? Requestor->GetPawn() : nullptr))
-		SourceInventory->RemoveItem(SourceIndex, Item.Quantity, Requestor ? Requestor->GetPawn() : nullptr);
-}
-bool UInventoryComponent::Server_TransferItem_Validate(UInventoryComponent* /*SourceInventory*/, int32 /*SourceIndex*/, UInventoryComponent* /*TargetInventory*/, int32 /*TargetIndex*/, AController* /*Requestor*/) { return true; }

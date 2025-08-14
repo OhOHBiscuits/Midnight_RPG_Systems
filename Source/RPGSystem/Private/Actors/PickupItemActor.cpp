@@ -1,135 +1,135 @@
 ﻿#include "Actors/PickupItemActor.h"
-#include "Inventory/InventoryHelpers.h"
-#include "Inventory/InventoryComponent.h"
+#include "Actors/BaseWorldItemActor.h"
 #include "Inventory/ItemDataAsset.h"
+#include "Inventory/InventoryComponent.h"
+#include "Inventory/InventoryHelpers.h"
 #include "Net/UnrealNetwork.h"
 #include "TimerManager.h"
-#include "Kismet/GameplayStatics.h"
+#include "Engine/World.h"
 #include "Blueprint/UserWidget.h"
 
 APickupItemActor::APickupItemActor()
 {
-    PrimaryActorTick.bCanEverTick = false;
-    bReplicates = true;
-}
-
-void APickupItemActor::BeginPlay()
-{
-    Super::BeginPlay();
-
-    // Decay only runs on the server
-    if (HasAuthority() && bEnableDecay && ItemData && ItemData->bCanDecay)
-    {
-        TotalDecayTime = ItemData->GetTotalDecaySeconds();
-        DecayTimeRemaining = TotalDecayTime;
-
-        StartDecayTimer();
-    }
-}
-
-void APickupItemActor::StartDecayTimer()
-{
-    if (TotalDecayTime > 0.f)
-    {
-        GetWorld()->GetTimerManager().SetTimer(
-            DecayTimerHandle,
-            this,
-            &APickupItemActor::DecayTimerTick,
-            1.0f,
-            true
-        );
-    }
-}
-
-void APickupItemActor::DecayTimerTick()
-{
-    // Server only
-    if (!HasAuthority()) return;
-
-    if (DecayTimeRemaining > 0.f)
-    {
-        DecayTimeRemaining -= 1.0f;
-        // (Optional: Send progress to UI, will replicate to all clients)
-    }
-    else
-    {
-        GetWorld()->GetTimerManager().ClearTimer(DecayTimerHandle);
-        HandleDecayComplete();
-    }
-}
-
-void APickupItemActor::HandleDecayComplete()
-{
-    if (!HasAuthority()) return;
-
-    // If you use DecaysIntoActorClass for world decay:
-    if (ItemData && ItemData->DecaysIntoActorClass.ToSoftObjectPath().IsValid())
-    {
-        UClass* DecayedClass = ItemData->DecaysIntoActorClass.LoadSynchronous();
-        if (DecayedClass)
-        {
-            FActorSpawnParameters SpawnParams;
-            SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
-            SpawnParams.Owner = this;
-            SpawnParams.Instigator = GetInstigator();
-
-            AActor* NewActor = GetWorld()->SpawnActor<AActor>(DecayedClass, GetActorLocation(), GetActorRotation(), SpawnParams);
-
-            if (APickupItemActor* NewPickup = Cast<APickupItemActor>(NewActor))
-            {
-                // If you also want to set the decayed item asset on the new pickup:
-                if (ItemData->DecaysInto.ToSoftObjectPath().IsValid())
-                {
-                    UItemDataAsset* DecayedItemAsset = ItemData->DecaysInto.LoadSynchronous();
-                    if (DecayedItemAsset)
-                    {
-                        NewPickup->ItemData = DecayedItemAsset;
-                    }
-                }
-                NewPickup->Quantity = Quantity;
-                // Optional: stop further decay, or leave true if you want multi-step decay chains
-                NewPickup->bEnableDecay = false;
-            }
-        }
-    }
-
-    OnPickupDecayed.Broadcast();
-    Destroy(); // server destroys; replicas vanish for clients
-}
-
-
-
-void APickupItemActor::OnRep_DecayState()
-{
-    if (DecayState == EPickupDecayState::Decayed)
-    {
-        // Play mesh swap, rot VFX, etc in Blueprint or C++
-        // (Optional: do nothing if item is immediately destroyed on server)
-    }
-}
-
-void APickupItemActor::Interact_Implementation(AActor* Interactor)
-{
-    Super::Interact_Implementation(Interactor);
-    if (!HasAuthority())
-        return;
-
-    if (!ItemData || Quantity <= 0 || !Interactor) return;
-
-    UInventoryComponent* Inv = UInventoryHelpers::GetInventoryComponent(Interactor);
-    if (Inv && Inv->TryAddItem(ItemData, Quantity))
-    {
-        Destroy();
-    }
-    else
-    {
-        TriggerWorldItemUI(Interactor);
-    }
+	PrimaryActorTick.bCanEverTick = false;
+	bReplicates = true;
 }
 
 void APickupItemActor::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
-    Super::GetLifetimeReplicatedProps(OutLifetimeProps);
-    DOREPLIFETIME(APickupItemActor, DecayTimeRemaining);
-    DOREPLIFETIME(APickupItemActor, DecayState);
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+	DOREPLIFETIME(APickupItemActor, DecayTimeRemaining);
+	DOREPLIFETIME(APickupItemActor, DecayState);
+}
+
+void APickupItemActor::BeginPlay()
+{
+	Super::BeginPlay();
+
+	if (HasAuthority() && bEnableDecay && !ItemData.IsNull())
+	{
+		if (UItemDataAsset* Data = ItemData.LoadSynchronous())
+		{
+			if (Data->bCanDecay)
+			{
+				TotalDecayTime = Data->GetTotalDecaySeconds();
+				DecayTimeRemaining = TotalDecayTime;
+				StartDecayTimer();
+			}
+		}
+	}
+}
+
+void APickupItemActor::StartDecayTimer()
+{
+	if (!HasAuthority() || TotalDecayTime <= 0.f) return;
+
+	GetWorldTimerManager().SetTimer(
+		DecayTimerHandle,
+		this,
+		&APickupItemActor::DecayTimerTick,
+		1.0f,
+		true
+	);
+}
+
+void APickupItemActor::DecayTimerTick()
+{
+	if (!HasAuthority()) return;
+
+	if (DecayTimeRemaining > 0.f)
+	{
+		DecayTimeRemaining -= 1.f;
+	}
+	else
+	{
+		HandleDecayComplete();
+	}
+}
+
+void APickupItemActor::HandleDecayComplete()
+{
+	if (!HasAuthority()) return;
+
+	GetWorldTimerManager().ClearTimer(DecayTimerHandle);
+	DecayState = EPickupDecayState::Decayed;
+
+	// Transform into decayed actor/pickup if specified
+	if (UItemDataAsset* Data = ItemData.LoadSynchronous())
+	{
+		if (Data->DecaysIntoActorClass.ToSoftObjectPath().IsValid())
+		{
+			if (UClass* DecayedClass = Data->DecaysIntoActorClass.LoadSynchronous())
+			{
+				FActorSpawnParameters Params;
+				Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
+				Params.Owner = this;
+				Params.Instigator = GetInstigator();
+				if (AActor* NewActor = GetWorld()->SpawnActor<AActor>(DecayedClass, GetActorLocation(), GetActorRotation(), Params))
+				{
+					if (APickupItemActor* NewPickup = Cast<APickupItemActor>(NewActor))
+					{
+						if (Data->DecaysInto.ToSoftObjectPath().IsValid())
+						{
+							if (UItemDataAsset* NewData = Data->DecaysInto.LoadSynchronous())
+							{
+								NewPickup->ItemData = NewData;
+							}
+						}
+						NewPickup->Quantity = Quantity;
+						NewPickup->bEnableDecay = false; // prevent infinite loops
+					}
+				}
+			}
+		}
+	}
+
+	OnPickupDecayed.Broadcast();
+	Destroy();
+}
+
+void APickupItemActor::OnRep_DecayState()
+{
+	// VFX/SFX hook
+}
+
+void APickupItemActor::HandleInteract_Server(AActor* Interactor)
+{
+	if (ItemData.IsNull() || Quantity <= 0) return;
+
+	UInventoryComponent* Inv = UInventoryHelpers::GetInventoryComponent(Interactor);
+	if (!Inv) return;
+
+	if (UItemDataAsset* Data = ItemData.LoadSynchronous())
+	{
+		if (Inv->TryAddItem(Data, Quantity))
+		{
+			ShowWorldItemUI(Interactor, PickupToastWidgetClass ? PickupToastWidgetClass : WidgetClass);
+			Destroy();
+		}
+		else
+		{
+			// failed to add — could also show a "inventory full" toast
+			ShowWorldItemUI(Interactor, PickupToastWidgetClass ? PickupToastWidgetClass : WidgetClass);
+		}
+	}
 }

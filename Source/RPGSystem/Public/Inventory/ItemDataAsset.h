@@ -170,6 +170,9 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Tags")
 	TArray<FGameplayTag> AllowedActions;
 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Tags")
+	TArray<FGameplayTag> AdditionalTags;
+
 	// --- Misc ---
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="ItemData")
 	float EfficiencyRating = 1.0f;

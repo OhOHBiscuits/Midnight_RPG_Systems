@@ -2,86 +2,96 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
-#include "GameplayTagContainer.h"
-#include "Interfaces/InteractionInterface.h"
+#include "Components/StaticMeshComponent.h"
 #include "Inventory/ItemDataAsset.h"
+#include "Interfaces/InteractionInterface.h"
+#include "GameplayTagContainer.h"
 #include "BaseWorldItemActor.generated.h"
 
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnEfficiencyChanged, float, NewEfficiency);
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnWorldItemInteracted, AActor*, Interactor);
+class UStaticMeshComponent;
+class UUserWidget;
+class UItemDataAsset;
 
-UCLASS()
-class RPGSYSTEM_API ABaseWorldItemActor : public AActor, public IInteractionInterface
+/**
+ * Common base for world items (pickup, storage, workstation).
+ * Handles: replicated ItemData, auto-updating mesh in editor/PIE,
+ * generic Interact flow (client->server), and UI display to owning client.
+ */
+UCLASS(BlueprintType, Blueprintable)
+class RPGSYSTEM_API ABaseWorldItemActor : public AActor
 {
-    GENERATED_BODY()
+	GENERATED_BODY()
+
 public:
-    ABaseWorldItemActor();
+	ABaseWorldItemActor();
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="WorldItem")
-    UItemDataAsset* ItemData;
+	// ---- Components ----
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="WorldItem")
+	UStaticMeshComponent* Mesh;
 
-    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="WorldItem")
-    UStaticMeshComponent* MeshComp;
+	// ---- Data/Visuals ----
+	/** Item data that drives visuals (mesh), decay, etc. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, ReplicatedUsing=OnRep_ItemData, Category="WorldItem|Data")
+	TSoftObjectPtr<UItemDataAsset> ItemData;
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="UI")
-    TSubclassOf<UUserWidget> WidgetClass;
+	/** If true, this world actor leverages the data's EfficiencyRating */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Replicated, Category="WorldItem|Data")
+	bool bUseEfficiency = false;
 
-    //  Efficiency system toggle
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="WorldItem")
-    bool bUseEfficiency = false; // Only true for stations/storage, not pickups
+	/** Per-instance efficiency value (initialized from ItemData) */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Replicated, Category="WorldItem|Data")
+	float EfficiencyRating = 1.0f;
 
-    // Efficiency value (only used if bUseEfficiency true)
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, ReplicatedUsing=OnRep_EfficiencyRating, Category="WorldItem")
-    float EfficiencyRating = 1.0f;
-    
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Interaction")
-    FGameplayTag InteractionTypeTag;
-    UFUNCTION()
-    virtual void OnRep_EfficiencyRating();
+	/** Default/fallback UI for this actor when interacted with */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="WorldItem|UI")
+	TSubclassOf<UUserWidget> WidgetClass;
 
-    UPROPERTY(BlueprintAssignable, Category="Events")
-    FOnEfficiencyChanged OnEfficiencyChanged;
+	// ---- Interaction (Blueprint-native so BPs can call 'Interact') ----
+	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category="Interaction")
+	void Interact(AActor* Interactor);
+	virtual void Interact_Implementation(AActor* Interactor);
 
-    UPROPERTY(BlueprintAssignable, Category="Events")
-    FOnWorldItemInteracted OnWorldItemInteracted;
-    
-    // Apply efficiency to a resource cost/value
-    UFUNCTION(BlueprintCallable, Category="WorldItem")
-    float ApplyEfficiencyToCost(float BaseCost) const
-    {
-        if (!bUseEfficiency || EfficiencyRating <= 0.f)
-            return BaseCost;
-        return BaseCost / FMath::Max(EfficiencyRating, 0.01f);
-    }
+	/** Optional interaction type for UI prompts, etc. */
+	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category="Interaction")
+	FGameplayTag GetInteractionTypeTag() const;
+	virtual FGameplayTag GetInteractionTypeTag_Implementation() const
+	{
+		return FGameplayTag(); // default: None
+	}
 
-    UFUNCTION(BlueprintNativeEvent, Category="WorldItem")
-    void SetMeshFromData();
-    virtual void SetMeshFromData_Implementation();
+	// ---- UI helper (call from server or client) ----
+	UFUNCTION(BlueprintCallable, Category="WorldItem|UI")
+	void ShowWorldItemUI(AActor* Interactor, TSubclassOf<UUserWidget> ClassToUse);
 
-    UFUNCTION(BlueprintCallable, Category="WorldItem")
-    virtual void InitFromItemData(UItemDataAsset* NewItemData);
+protected:
+	// Server RPC that executes the actual interaction behavior.
+	UFUNCTION(Server, Reliable)
+	void Server_Interact(AActor* Interactor);
+	virtual void Server_Interact_Implementation(AActor* Interactor);
 
-    virtual void OnConstruction(const FTransform& Transform) override;
+	// Client RPC: actually spawns UI on owning local player.
+	UFUNCTION(Client, Reliable)
+	void Client_ShowWorldItemUI(AActor* Interactor, TSubclassOf<UUserWidget> ClassToUse);
+	virtual void Client_ShowWorldItemUI_Implementation(AActor* Interactor, TSubclassOf<UUserWidget> ClassToUse);
 
-    virtual void Interact_Implementation(AActor* Interactor) override;
+	/** Override this on children to perform the real work on the server */
+	virtual void HandleInteract_Server(AActor* Interactor);
 
-    UFUNCTION(Server, Reliable, WithValidation)
-    void ServerInteract(AActor* Interactor);
+	// Replication
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
-    UFUNCTION(BlueprintNativeEvent, Category="WorldItem")
-    void OnFocused();
-    UFUNCTION(BlueprintNativeEvent, Category="WorldItem")
-    void OnUnfocused();
-    UFUNCTION(BlueprintCallable, Category="WorldItem|UI")
-    virtual void TriggerWorldItemUI(AActor* Interactor);
-    
-UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category="Interaction")
-    FGameplayTag GetInteractionTypeTag() const;
-    
-    UFUNCTION(Client, Reliable)
-    void Client_TriggerWorldItemUI(AActor* Interactor);
-    virtual void GetLifetimeReplicatedProps(TArray< FLifetimeProperty >& OutLifetimeProps) const override;
+	// Keep visuals in sync in-editor & at runtime
+	virtual void OnConstruction(const FTransform& Transform) override;
 
-    
+#if WITH_EDITOR
+	virtual void PostEditChangeProperty(struct FPropertyChangedEvent& PropertyChangedEvent) override;
+#endif
 
+	UFUNCTION()
+	void OnRep_ItemData();
+
+	/** Apply ItemData-driven visuals (mesh, efficiency, etc.) */
+	void ApplyItemDataVisuals();
+
+	
 };

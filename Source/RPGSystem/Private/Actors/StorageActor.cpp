@@ -1,33 +1,28 @@
 ﻿#include "Actors/StorageActor.h"
 #include "Inventory/InventoryComponent.h"
+#include "Blueprint/UserWidget.h"
 
 AStorageActor::AStorageActor()
 {
-	InventoryComp = CreateDefaultSubobject<UInventoryComponent>(TEXT("Inventory"));
-	bUseEfficiency = false; // storage typically not using efficiency
+	bUseEfficiency = true; // storage can leverage efficiency if desired
+
+	InventoryComp = CreateDefaultSubobject<UInventoryComponent>(TEXT("InventoryComp"));
+	InventoryComp->SetIsReplicated(true);
 }
 
 void AStorageActor::BeginPlay()
 {
 	Super::BeginPlay();
-	if (InventoryComp)
-	{
-		// Pull defaults from area at start
-		InventoryComp->AutoInitializeAccessFromArea(this);
-		// Set owner id if empty (when placed by a player this can be set at build time too)
-		if (InventoryComp->Access.OwnerStableId.IsEmpty())
-		{
-			InventoryComp->Access.OwnerStableId = UInventoryHelpers::GetStablePlayerId(this);
-		}
-	}
+	// Any init that depends on ItemData could go here
 }
 
-void AStorageActor::Interact_Implementation(Actor* Interactor)
+void AStorageActor::OpenStorageUIFor(AActor* Interactor)
 {
-	Super::Interact_Implementation(Interactor);
-	// Example: trigger UI based on view permission
-	if (InventoryComp && InventoryComp->CanView(Interactor))
-	{
-		TriggerWorldItemUI(Interactor);
-	}
+	TSubclassOf<UUserWidget> ClassToUse = StorageWidgetClass ? StorageWidgetClass : WidgetClass;
+	ShowWorldItemUI(Interactor, ClassToUse);
+}
+
+void AStorageActor::HandleInteract_Server(AActor* Interactor)
+{
+	OpenStorageUIFor(Interactor);
 }

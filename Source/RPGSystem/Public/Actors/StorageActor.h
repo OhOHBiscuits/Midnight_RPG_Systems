@@ -2,9 +2,10 @@
 
 #include "CoreMinimal.h"
 #include "Actors/BaseWorldItemActor.h"
-#include "Inventory/InventoryHelpers.h"
-#include "Inventory/InventoryComponent.h"
 #include "StorageActor.generated.h"
+
+class UInventoryComponent;
+class UUserWidget;
 
 UCLASS()
 class RPGSYSTEM_API AStorageActor : public ABaseWorldItemActor
@@ -13,11 +14,19 @@ class RPGSYSTEM_API AStorageActor : public ABaseWorldItemActor
 public:
 	AStorageActor();
 
+	/** Storage inventory component */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Storage")
 	UInventoryComponent* InventoryComp;
 
-	virtual void Interact_Implementation(AActor* Interactor) override;
+	/** UI to open when interacting (fallback to WidgetClass if null) */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Storage|UI")
+	TSubclassOf<UUserWidget> StorageWidgetClass;
+
+	/** Blueprint helper if you want to trigger UI from BP */
+	UFUNCTION(BlueprintCallable, Category="Storage|UI")
+	void OpenStorageUIFor(AActor* Interactor);
 
 protected:
 	virtual void BeginPlay() override;
+	virtual void HandleInteract_Server(AActor* Interactor) override;
 };

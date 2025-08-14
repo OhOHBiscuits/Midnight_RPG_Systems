@@ -6,12 +6,12 @@
 #include "InteractionInterface.generated.h"
 
 UINTERFACE(BlueprintType)
-class UInteractionInterface : public UInterface
+class RPGSYSTEM_API UInteractionInterface : public UInterface
 {
 	GENERATED_BODY()
 };
 
-class IInteractionInterface
+class RPGSYSTEM_API IInteractionInterface
 {
 	GENERATED_BODY()
 public:

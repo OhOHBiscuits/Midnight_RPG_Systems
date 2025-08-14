@@ -54,7 +54,7 @@ void UFuelComponent::ResumeBurn()
 bool UFuelComponent::HasFuel() const
 {
 	if (!FuelInventory) return false;
-	const TArray<FInventoryItem>& Items = FuelInventory->GetItems();
+	const TArray<FInventoryItem>& Items = FuelInventory->GetItem();
 	for (const FInventoryItem& Item : Items)
 	{
 		if (Item.IsValid())
@@ -76,7 +76,7 @@ void UFuelComponent::TryStartNextFuel()
 {
 	if (!HasAuth() || !FuelInventory) return;
 
-	const TArray<FInventoryItem>& Items = FuelInventory->GetItems();
+	const TArray<FInventoryItem>& Items = FuelInventory->GetItem();
 	for (int32 i = 0; i < Items.Num(); ++i)
 	{
 		const FInventoryItem& FuelItem = Items[i];
@@ -143,7 +143,7 @@ void UFuelComponent::BurnFuelOnce()
 {
 	if (!HasAuth() || !FuelInventory) return;
 
-	const TArray<FInventoryItem>& Items = FuelInventory->GetItems();
+	const TArray<FInventoryItem>& Items = FuelInventory->GetItem();
 	for (int32 i = 0; i < Items.Num(); ++i)
 	{
 		const FInventoryItem& FuelItem = Items[i];

@@ -2,10 +2,17 @@
 
 #include "CoreMinimal.h"
 #include "Actors/WorkstationActor.h"
-#include "Inventory/InventoryComponent.h"
-#include "FuelSystem/FuelComponent.h"
 #include "FuelWorkstationActor.generated.h"
 
+class UInventoryComponent;
+class UFuelComponent;
+
+/**
+ * A workstation that consumes fuel:
+ * - Has a fuel input inventory
+ * - Has an output/byproduct inventory
+ * - Uses a FuelComponent to burn & generate byproducts
+ */
 UCLASS()
 class RPGSYSTEM_API AFuelWorkstationActor : public AWorkstationActor
 {
@@ -14,37 +21,22 @@ class RPGSYSTEM_API AFuelWorkstationActor : public AWorkstationActor
 public:
 	AFuelWorkstationActor();
 
-	// Input/output inventories, exposed for editing & UI
+protected:
+	/** Inventory where fuel items are inserted. */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Fuel")
-	UInventoryComponent* FuelInventory;
+	UInventoryComponent* FuelInputInventory;
 
+	/** Byproducts (e.g., ash/charcoal) collected here. */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Fuel")
-	UInventoryComponent* ByproductInventory;
+	UInventoryComponent* OutputInventory;
 
+	/** Responsible for consuming fuel & ticking burn. */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Fuel")
 	UFuelComponent* FuelComponent;
 
-	// --- Blueprint convenience: accessors ---
-	UFUNCTION(BlueprintCallable, Category="Fuel")
-	FORCEINLINE UFuelComponent* GetFuelComponent() const { return FuelComponent; }
+	// AWorkstationActor
+	virtual void OpenWorkstationUIFor(AActor* Interactor) override;
 
-	UFUNCTION(BlueprintCallable, Category="Fuel")
-	FORCEINLINE UInventoryComponent* GetFuelInventory() const { return FuelInventory; }
-
-	UFUNCTION(BlueprintCallable, Category="Fuel")
-	FORCEINLINE UInventoryComponent* GetByproductInventory() const { return ByproductInventory; }
-
-	// Helper: quick start/stop burning
-	UFUNCTION(BlueprintCallable, Category="Fuel")
-	void StartBurn() { if (FuelComponent) FuelComponent->StartBurn(); }
-
-	UFUNCTION(BlueprintCallable, Category="Fuel")
-	void StopBurn() { if (FuelComponent) FuelComponent->StopBurn(); }
-
-	// --- Expansion: Add crafting/other hooks here ---
-	UFUNCTION(BlueprintCallable, Category="Fuel")
-	void OnCraftingActivated();
-
-protected:
-	virtual void BeginPlay() override;
+	// You can also override HandleInteract_Server if you want custom behavior before/after UI
+	// virtual void HandleInteract_Server(AActor* Interactor) override;
 };

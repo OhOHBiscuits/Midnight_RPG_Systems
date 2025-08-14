@@ -4,6 +4,9 @@
 #include "Actors/BaseWorldItemActor.h"
 #include "PickupItemActor.generated.h"
 
+class UItemDataAsset;
+class UUserWidget;
+
 UENUM(BlueprintType)
 enum class EPickupDecayState : uint8
 {
@@ -23,38 +26,40 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Pickup")
 	int32 Quantity = 1;
 
-	virtual void Interact_Implementation(AActor* Interactor) override;
+	// Optional small toast shown to the picker
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Pickup|UI")
+	TSubclassOf<UUserWidget> PickupToastWidgetClass;
 
-	// ---- Decay Additions ----
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Pickup")
+	// Decay
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Pickup|Decay")
 	bool bEnableDecay = true;
 
-	// Replicated for UI/clients (progress bar etc)
-	UPROPERTY(Replicated, VisibleAnywhere, BlueprintReadOnly, Category="Pickup")
+	UPROPERTY(Replicated, VisibleAnywhere, BlueprintReadOnly, Category="Pickup|Decay")
 	float DecayTimeRemaining = -1.f;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Pickup")
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Pickup|Decay")
 	float TotalDecayTime = -1.f;
 
-	FTimerHandle DecayTimerHandle;
-
-	// For multiplayer: replicated decay state for mesh swap/VFX
-	UPROPERTY(ReplicatedUsing=OnRep_DecayState, VisibleAnywhere, BlueprintReadOnly, Category="Pickup")
+	UPROPERTY(ReplicatedUsing=OnRep_DecayState, VisibleAnywhere, BlueprintReadOnly, Category="Pickup|Decay")
 	EPickupDecayState DecayState = EPickupDecayState::Fresh;
 
-	// Called when the item decays completely (for BP UI/VFX)
-	UPROPERTY(BlueprintAssignable, Category="Pickup")
+	UPROPERTY(BlueprintAssignable, Category="Pickup|Decay")
 	FOnPickupDecayed OnPickupDecayed;
 
 protected:
 	virtual void BeginPlay() override;
+	virtual void HandleInteract_Server(AActor* Interactor) override;
+
+	// Decay helpers
 	void StartDecayTimer();
 	void DecayTimerTick();
 	void HandleDecayComplete();
 
-	// RepNotify handler
 	UFUNCTION()
 	void OnRep_DecayState();
 
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+
+private:
+	FTimerHandle DecayTimerHandle;
 };
