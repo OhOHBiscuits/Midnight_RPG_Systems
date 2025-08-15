@@ -3,13 +3,10 @@
 #include "Inventory/ItemDataAsset.h"
 #include "Inventory/InventoryHelpers.h"
 #include "TimerManager.h"
-#include "Net/UnrealNetwork.h"
 
 UFuelComponent::UFuelComponent()
 {
 	PrimaryComponentTick.bCanEverTick = false;
-	// Make the component itself replicate (it’s still the owning actor that carries it across the network)
-	SetIsReplicatedByDefault(true);
 }
 
 void UFuelComponent::BeginPlay()
@@ -26,144 +23,99 @@ void UFuelComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	Super::EndPlay(EndPlayReason);
 }
 
-/* ------------ Replication ------------ */
-
-void UFuelComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
-{
-	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
-	DOREPLIFETIME(UFuelComponent, TotalBurnTime);
-	DOREPLIFETIME(UFuelComponent, RemainingBurnTime);
-	DOREPLIFETIME(UFuelComponent, bIsBurning);
-}
-
-void UFuelComponent::OnRep_FuelState()
-{
-	// Keep UI in sync on clients
-	OnFuelBurnProgress.Broadcast(RemainingBurnTime);
-	if (bIsBurning) OnBurnStarted.Broadcast(); else OnBurnStopped.Broadcast();
-}
-
-/* ------------ Public API (one-call from server or client) ------------ */
-
 void UFuelComponent::StartBurn()
 {
-	if (HasAuth())  StartBurn_ServerImpl();
-	else            Server_StartBurn();
-}
-
-void UFuelComponent::StopBurn()
-{
-	if (HasAuth())  StopBurn_ServerImpl();
-	else            Server_StopBurn();
-}
-
-void UFuelComponent::PauseBurn()
-{
-	if (HasAuth())  PauseBurn_ServerImpl();
-	else            Server_PauseBurn();
-}
-
-void UFuelComponent::ResumeBurn()
-{
-	if (HasAuth())  ResumeBurn_ServerImpl();
-	else            Server_ResumeBurn();
-}
-
-/* ------------ Client->Server RPCs ------------ */
-
-void UFuelComponent::Server_StartBurn_Implementation()  { StartBurn_ServerImpl(); }
-void UFuelComponent::Server_StopBurn_Implementation()   { StopBurn_ServerImpl(); }
-void UFuelComponent::Server_PauseBurn_Implementation()  { PauseBurn_ServerImpl(); }
-void UFuelComponent::Server_ResumeBurn_Implementation() { ResumeBurn_ServerImpl(); }
-
-/* ------------ Server implementations ------------ */
-
-void UFuelComponent::StartBurn_ServerImpl()
-{
-	if (bIsBurning || !FuelInventory) return;
+	if (!HasAuth() || bIsBurning || !FuelInventory) return;
 	if (!HasFuel()) return;
 
 	bIsBurning = true;
 	TryStartNextFuel();
 	OnBurnStarted.Broadcast();
-	NotifyFuelStateChanged();
 }
 
-void UFuelComponent::StopBurn_ServerImpl()
+void UFuelComponent::StopBurn()
 {
-	bIsBurning = false;
+	if (!HasAuth()) return;
+
 	if (UWorld* W = GetWorld())
 	{
 		W->GetTimerManager().ClearTimer(BurnFuelTimer);
 	}
+	bIsBurning = false;
 	OnBurnStopped.Broadcast();
 	NotifyFuelStateChanged();
 }
 
-void UFuelComponent::PauseBurn_ServerImpl()
+void UFuelComponent::PauseBurn()
 {
+	if (!HasAuth()) return;
 	if (UWorld* W = GetWorld())
 	{
 		W->GetTimerManager().PauseTimer(BurnFuelTimer);
 	}
 }
 
-void UFuelComponent::ResumeBurn_ServerImpl()
+void UFuelComponent::ResumeBurn()
 {
+	if (!HasAuth()) return;
 	if (UWorld* W = GetWorld())
 	{
 		W->GetTimerManager().UnPauseTimer(BurnFuelTimer);
 	}
 }
 
-/* ------------ Core logic (server) ------------ */
-
 bool UFuelComponent::HasFuel() const
 {
 	if (!FuelInventory) return false;
-	const TArray<FInventoryItem>& Items = FuelInventory->GetItem();
-	for (const FInventoryItem& Item : Items)
+	for (const auto& Slot : FuelInventory->GetItems())
 	{
-		if (Item.IsValid())
-			return true;
+		if (Slot.IsValid()) return true;
 	}
 	return false;
 }
 
+// Key fix: only keep burning if we have fuel AND (either we're not auto-idle-gating OR crafting is active)
 bool UFuelComponent::ShouldKeepBurning() const
 {
-	return bAutoStopBurnWhenIdle ? IsCraftingActive() : HasFuel();
+	const bool bHasFuel = HasFuel();
+	const bool bActiveOk = (!bAutoStopBurnWhenIdle) || IsCraftingActive();
+	return bHasFuel && bActiveOk;
 }
 
 void UFuelComponent::TryStartNextFuel()
 {
 	if (!HasAuth() || !FuelInventory) return;
 
-	const TArray<FInventoryItem>& Items = FuelInventory->GetItem();
+	const TArray<FInventoryItem>& Items = FuelInventory->GetItems();
 	for (int32 i = 0; i < Items.Num(); ++i)
 	{
 		const FInventoryItem& FuelItem = Items[i];
-		if (FuelItem.IsValid())
-		{
-			if (UItemDataAsset* BurnedFuel = FuelItem.ResolveItemData())
-			{
-				const float FuelBurnTime = BurnedFuel->GetTotalBurnSeconds();
-				TotalBurnTime      = FuelBurnTime / FMath::Max(0.01f, BurnSpeedMultiplier);
-				RemainingBurnTime  = TotalBurnTime;
+		if (!FuelItem.IsValid()) continue;
 
-				if (UWorld* W = GetWorld())
-				{
-					W->GetTimerManager().SetTimer(BurnFuelTimer, this, &UFuelComponent::BurnTimerTick, 1.0f, true);
-				}
-				NotifyFuelStateChanged();
-				return;
+		if (UItemDataAsset* BurnedFuel = FuelItem.ResolveItemData())
+		{
+			const float FuelBurnTime = BurnedFuel->GetTotalBurnSeconds();
+			TotalBurnTime     = FuelBurnTime / FMath::Max(0.01f, BurnSpeedMultiplier);
+			RemainingBurnTime = TotalBurnTime;
+
+			if (UWorld* W = GetWorld())
+			{
+				W->GetTimerManager().SetTimer(BurnFuelTimer, this, &UFuelComponent::BurnTimerTick, 1.0f, true);
 			}
+			NotifyFuelStateChanged();
+			return;
 		}
 	}
 
+	// No next fuel found — ensure a clean stop
 	TotalBurnTime = 0.0f;
 	RemainingBurnTime = 0.0f;
-	NotifyFuelStateChanged();
+
+	if (UWorld* W = GetWorld())
+	{
+		W->GetTimerManager().ClearTimer(BurnFuelTimer);
+	}
+	DoAutoStop(); // sets bIsBurning=false, broadcasts OnBurnStopped
 }
 
 void UFuelComponent::BurnTimerTick()
@@ -189,6 +141,7 @@ void UFuelComponent::BurnTimerTick()
 			{
 				W->GetTimerManager().ClearTimer(BurnFuelTimer);
 			}
+
 			BurnFuelOnce();
 			OnFuelDepleted.Broadcast();
 
@@ -198,19 +151,18 @@ void UFuelComponent::BurnTimerTick()
 			}
 			else
 			{
-				bIsBurning = false;
-				NotifyFuelStateChanged();
+				DoAutoStop();
 			}
 		}
 	}
 	else
 	{
+		// Safety path if tick fires with zero remaining
 		if (UWorld* W = GetWorld())
 		{
 			W->GetTimerManager().ClearTimer(BurnFuelTimer);
 		}
-		bIsBurning = false;
-		NotifyFuelStateChanged();
+		DoAutoStop();
 	}
 }
 
@@ -218,41 +170,52 @@ void UFuelComponent::BurnFuelOnce()
 {
 	if (!HasAuth() || !FuelInventory) return;
 
-	const TArray<FInventoryItem>& Items = FuelInventory->GetItem();
+	const TArray<FInventoryItem>& Items = FuelInventory->GetItems();
 	for (int32 i = 0; i < Items.Num(); ++i)
 	{
 		const FInventoryItem& FuelItem = Items[i];
-		if (FuelItem.IsValid())
+		if (!FuelItem.IsValid()) continue;
+
+		UItemDataAsset* BurnedFuel = FuelItem.ResolveItemData();
+		if (FuelInventory->TryRemoveItem(i, 1))
 		{
-			UItemDataAsset* BurnedFuel = FuelItem.ResolveItemData();
-			if (FuelInventory->TryRemoveItem(i, 1))
+			if (ByproductInventory && BurnedFuel)
 			{
-				if (ByproductInventory && BurnedFuel)
+				for (const auto& By : BurnedFuel->FuelByproducts)
 				{
-					for (const FFuelByproduct& By : BurnedFuel->FuelByproducts)
+					if (By.ByproductItemID.IsValid() && By.Amount > 0)
 					{
-						if (By.ByproductItemID.IsValid() && By.Amount > 0)
+						if (UItemDataAsset* ByAsset = UInventoryHelpers::FindItemDataByTag(this, By.ByproductItemID))
 						{
-							if (UItemDataAsset* ByAsset = UInventoryHelpers::FindItemDataByTag(this, By.ByproductItemID))
-							{
-								ByproductInventory->TryAddItem(ByAsset, By.Amount);
-							}
+							ByproductInventory->TryAddItem(ByAsset, By.Amount);
 						}
 					}
 				}
-				LastBurnTime = GetWorld()->GetTimeSeconds();
 			}
-			break;
+			LastBurnTime = GetWorld()->GetTimeSeconds();
 		}
+		break;
 	}
 }
 
 void UFuelComponent::NotifyFuelStateChanged()
 {
-	// Reserved for UI hooks or GAS gameplay cues
+	// Reserved for UI/GAS hooks
 }
 
 void UFuelComponent::OnCraftingActivated()
 {
 	// Expansion point
+}
+
+void UFuelComponent::DoAutoStop()
+{
+	if (!bIsBurning) // prevent double-broadcast if multiple paths hit
+	{
+		TotalBurnTime = 0.0f;
+		RemainingBurnTime = 0.0f;
+		OnBurnStopped.Broadcast();
+	}
+	bIsBurning = false;
+	NotifyFuelStateChanged();
 }

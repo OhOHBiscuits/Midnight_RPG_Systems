@@ -7,12 +7,6 @@
 class UInventoryComponent;
 class UFuelComponent;
 
-/**
- * A workstation that consumes fuel:
- * - Has a fuel input inventory
- * - Has an output/byproduct inventory
- * - Uses a FuelComponent to burn & generate byproducts
- */
 UCLASS()
 class RPGSYSTEM_API AFuelWorkstationActor : public AWorkstationActor
 {
@@ -21,30 +15,37 @@ class RPGSYSTEM_API AFuelWorkstationActor : public AWorkstationActor
 public:
 	AFuelWorkstationActor();
 
-protected:
-	/** Inventory where fuel items are inserted. */
+	// Components (replicated)
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Fuel")
 	UInventoryComponent* FuelInputInventory;
 
-	/** Byproducts (e.g., ash/charcoal) collected here. */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Fuel")
 	UInventoryComponent* OutputInventory;
 
-	/** Responsible for consuming fuel & ticking burn. */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Fuel")
 	UFuelComponent* FuelComponent;
 
-	UFUNCTION(CallInEditor, BlueprintCallable, Category="Fuel")
-	void SetupFuelLinks();
-	
+	// Simple server-auth controls
+	UFUNCTION(BlueprintCallable, Category="1_Inventory-Fuel")
+	void StartBurn();
 
-	// AWorkstationActor
+	UFUNCTION(BlueprintCallable, Category="1_Inventory-Fuel")
+	void StopBurn();
+
+	// NOTE: Base class already declares this as a UFUNCTION. Do NOT redeclare UFUNCTION here.
 	virtual void OpenWorkstationUIFor(AActor* Interactor) override;
+	// If your base is BlueprintNativeEvent instead, switch to:
+	// virtual void OpenWorkstationUIFor_Implementation(AActor* Interactor) override;
 
+	// Optional hook you can call from UI or logic
+	UFUNCTION(BlueprintCallable, Category="1_Inventory-Fuel")
+	void OnCraftingActivated();
+
+protected:
 	virtual void OnConstruction(const FTransform& Transform) override;
 	virtual void PostInitializeComponents() override;
 	virtual void BeginPlay() override;
 
-	// You can also override HandleInteract_Server if you want custom behavior before/after UI
-	// virtual void HandleInteract_Server(AActor* Interactor) override;
+private:
+	void SetupFuelLinks();
 };
