@@ -34,8 +34,16 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Fuel")
 	UFuelComponent* FuelComponent;
 
+	UFUNCTION(CallInEditor, BlueprintCallable, Category="Fuel")
+	void SetupFuelLinks();
+	
+
 	// AWorkstationActor
 	virtual void OpenWorkstationUIFor(AActor* Interactor) override;
+
+	virtual void OnConstruction(const FTransform& Transform) override;
+	virtual void PostInitializeComponents() override;
+	virtual void BeginPlay() override;
 
 	// You can also override HandleInteract_Server if you want custom behavior before/after UI
 	// virtual void HandleInteract_Server(AActor* Interactor) override;

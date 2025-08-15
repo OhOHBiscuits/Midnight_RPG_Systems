@@ -3,10 +3,13 @@
 #include "Inventory/ItemDataAsset.h"
 #include "Inventory/InventoryHelpers.h"
 #include "TimerManager.h"
+#include "Net/UnrealNetwork.h"
 
 UFuelComponent::UFuelComponent()
 {
 	PrimaryComponentTick.bCanEverTick = false;
+	// Make the component itself replicate (it’s still the owning actor that carries it across the network)
+	SetIsReplicatedByDefault(true);
 }
 
 void UFuelComponent::BeginPlay()
@@ -16,40 +19,104 @@ void UFuelComponent::BeginPlay()
 
 void UFuelComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
-	GetWorld()->GetTimerManager().ClearTimer(BurnFuelTimer);
+	if (UWorld* W = GetWorld())
+	{
+		W->GetTimerManager().ClearTimer(BurnFuelTimer);
+	}
 	Super::EndPlay(EndPlayReason);
 }
 
+/* ------------ Replication ------------ */
+
+void UFuelComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+	DOREPLIFETIME(UFuelComponent, TotalBurnTime);
+	DOREPLIFETIME(UFuelComponent, RemainingBurnTime);
+	DOREPLIFETIME(UFuelComponent, bIsBurning);
+}
+
+void UFuelComponent::OnRep_FuelState()
+{
+	// Keep UI in sync on clients
+	OnFuelBurnProgress.Broadcast(RemainingBurnTime);
+	if (bIsBurning) OnBurnStarted.Broadcast(); else OnBurnStopped.Broadcast();
+}
+
+/* ------------ Public API (one-call from server or client) ------------ */
+
 void UFuelComponent::StartBurn()
 {
-	if (!HasAuth() || bIsBurning || !FuelInventory) return;
+	if (HasAuth())  StartBurn_ServerImpl();
+	else            Server_StartBurn();
+}
+
+void UFuelComponent::StopBurn()
+{
+	if (HasAuth())  StopBurn_ServerImpl();
+	else            Server_StopBurn();
+}
+
+void UFuelComponent::PauseBurn()
+{
+	if (HasAuth())  PauseBurn_ServerImpl();
+	else            Server_PauseBurn();
+}
+
+void UFuelComponent::ResumeBurn()
+{
+	if (HasAuth())  ResumeBurn_ServerImpl();
+	else            Server_ResumeBurn();
+}
+
+/* ------------ Client->Server RPCs ------------ */
+
+void UFuelComponent::Server_StartBurn_Implementation()  { StartBurn_ServerImpl(); }
+void UFuelComponent::Server_StopBurn_Implementation()   { StopBurn_ServerImpl(); }
+void UFuelComponent::Server_PauseBurn_Implementation()  { PauseBurn_ServerImpl(); }
+void UFuelComponent::Server_ResumeBurn_Implementation() { ResumeBurn_ServerImpl(); }
+
+/* ------------ Server implementations ------------ */
+
+void UFuelComponent::StartBurn_ServerImpl()
+{
+	if (bIsBurning || !FuelInventory) return;
 	if (!HasFuel()) return;
 
 	bIsBurning = true;
 	TryStartNextFuel();
 	OnBurnStarted.Broadcast();
+	NotifyFuelStateChanged();
 }
 
-void UFuelComponent::StopBurn()
+void UFuelComponent::StopBurn_ServerImpl()
 {
-	if (!HasAuth()) return;
 	bIsBurning = false;
-	GetWorld()->GetTimerManager().ClearTimer(BurnFuelTimer);
+	if (UWorld* W = GetWorld())
+	{
+		W->GetTimerManager().ClearTimer(BurnFuelTimer);
+	}
 	OnBurnStopped.Broadcast();
 	NotifyFuelStateChanged();
 }
 
-void UFuelComponent::PauseBurn()
+void UFuelComponent::PauseBurn_ServerImpl()
 {
-	if (!HasAuth()) return;
-	GetWorld()->GetTimerManager().PauseTimer(BurnFuelTimer);
+	if (UWorld* W = GetWorld())
+	{
+		W->GetTimerManager().PauseTimer(BurnFuelTimer);
+	}
 }
 
-void UFuelComponent::ResumeBurn()
+void UFuelComponent::ResumeBurn_ServerImpl()
 {
-	if (!HasAuth()) return;
-	GetWorld()->GetTimerManager().UnPauseTimer(BurnFuelTimer);
+	if (UWorld* W = GetWorld())
+	{
+		W->GetTimerManager().UnPauseTimer(BurnFuelTimer);
+	}
 }
+
+/* ------------ Core logic (server) ------------ */
 
 bool UFuelComponent::HasFuel() const
 {
@@ -65,11 +132,7 @@ bool UFuelComponent::HasFuel() const
 
 bool UFuelComponent::ShouldKeepBurning() const
 {
-	if (bAutoStopBurnWhenIdle)
-	{
-		return IsCraftingActive();
-	}
-	return HasFuel();
+	return bAutoStopBurnWhenIdle ? IsCraftingActive() : HasFuel();
 }
 
 void UFuelComponent::TryStartNextFuel()
@@ -88,7 +151,10 @@ void UFuelComponent::TryStartNextFuel()
 				TotalBurnTime      = FuelBurnTime / FMath::Max(0.01f, BurnSpeedMultiplier);
 				RemainingBurnTime  = TotalBurnTime;
 
-				GetWorld()->GetTimerManager().SetTimer(BurnFuelTimer, this, &UFuelComponent::BurnTimerTick, 1.0f, true);
+				if (UWorld* W = GetWorld())
+				{
+					W->GetTimerManager().SetTimer(BurnFuelTimer, this, &UFuelComponent::BurnTimerTick, 1.0f, true);
+				}
 				NotifyFuelStateChanged();
 				return;
 			}
@@ -104,7 +170,10 @@ void UFuelComponent::BurnTimerTick()
 {
 	if (!HasAuth())
 	{
-		GetWorld()->GetTimerManager().ClearTimer(BurnFuelTimer);
+		if (UWorld* W = GetWorld())
+		{
+			W->GetTimerManager().ClearTimer(BurnFuelTimer);
+		}
 		return;
 	}
 
@@ -116,7 +185,10 @@ void UFuelComponent::BurnTimerTick()
 
 		if (RemainingBurnTime <= 0.0f)
 		{
-			GetWorld()->GetTimerManager().ClearTimer(BurnFuelTimer);
+			if (UWorld* W = GetWorld())
+			{
+				W->GetTimerManager().ClearTimer(BurnFuelTimer);
+			}
 			BurnFuelOnce();
 			OnFuelDepleted.Broadcast();
 
@@ -133,7 +205,10 @@ void UFuelComponent::BurnTimerTick()
 	}
 	else
 	{
-		GetWorld()->GetTimerManager().ClearTimer(BurnFuelTimer);
+		if (UWorld* W = GetWorld())
+		{
+			W->GetTimerManager().ClearTimer(BurnFuelTimer);
+		}
 		bIsBurning = false;
 		NotifyFuelStateChanged();
 	}
@@ -174,7 +249,7 @@ void UFuelComponent::BurnFuelOnce()
 
 void UFuelComponent::NotifyFuelStateChanged()
 {
-	// Reserved for UI hooks or GAS events
+	// Reserved for UI hooks or GAS gameplay cues
 }
 
 void UFuelComponent::OnCraftingActivated()

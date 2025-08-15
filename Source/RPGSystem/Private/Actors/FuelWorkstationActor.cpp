@@ -32,3 +32,30 @@ void AFuelWorkstationActor::OpenWorkstationUIFor(AActor* Interactor)
 	// Otherwise, call the parent to use the shared UI pipeline.
 	Super::OpenWorkstationUIFor(Interactor);
 }
+
+void AFuelWorkstationActor::SetupFuelLinks()
+{
+	if (FuelComponent)
+	{
+		FuelComponent->SetFuelInventory(FuelInputInventory);
+		FuelComponent->SetByproductInventory(OutputInventory);
+	}
+}
+
+void AFuelWorkstationActor::OnConstruction(const FTransform& Transform)
+{
+	Super::OnConstruction(Transform);
+	SetupFuelLinks();            // editor-time (also runs in PIE)
+}
+
+void AFuelWorkstationActor::PostInitializeComponents()
+{
+	Super::PostInitializeComponents();
+	SetupFuelLinks();            // runtime (both server & clients)
+}
+
+void AFuelWorkstationActor::BeginPlay()
+{
+	Super::BeginPlay();
+	SetupFuelLinks();            // extra safety
+}
