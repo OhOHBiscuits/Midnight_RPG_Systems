@@ -3,6 +3,7 @@
 #include "Inventory/ItemDataAsset.h"
 #include "Engine/AssetManager.h"
 #include "AssetRegistry/AssetRegistryModule.h"
+#include "AbilitySystemGlobals.h"
 #include "Engine/StreamableManager.h"
 
 UInventoryAssetManager& UInventoryAssetManager::Get()
@@ -23,6 +24,7 @@ void UInventoryAssetManager::StartInitialLoading()
 {
 	Super::StartInitialLoading();
 	BuildItemIndex();
+	UAbilitySystemGlobals::Get().InitGlobalData();
 }
 
 void UInventoryAssetManager::BuildItemIndex()
