@@ -1,0 +1,273 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <None Include="..\..\RPGSystem.uproject" />
+    <Filter Include="Source">
+      <UniqueIdentifier>{F31BBDD1-B3E8-3BCC-9652-680E16935819}</UniqueIdentifier>
+    </Filter>
+    <None Include="..\..\Source\RPGSystem.Target.cs">
+      <Filter>Source</Filter>
+    </None>
+    <None Include="..\..\Source\RPGSystemEditor.Target.cs">
+      <Filter>Source</Filter>
+    </None>
+    <None Include="..\..\.vsconfig" />
+    <None Include="..\..\OwnIcon_V2.png" />
+    <None Include="..\..\WinsomeGirl.png" />
+    <Filter Include="Config">
+      <UniqueIdentifier>{FA535FFB-25E1-3D20-B416-52F9BE21E06E}</UniqueIdentifier>
+    </Filter>
+    <None Include="..\..\Config\DefaultEditor.ini">
+      <Filter>Config</Filter>
+    </None>
+    <None Include="..\..\Config\DefaultEditorPerProjectUserSettings.ini">
+      <Filter>Config</Filter>
+    </None>
+    <None Include="..\..\Config\DefaultEngine.ini">
+      <Filter>Config</Filter>
+    </None>
+    <None Include="..\..\Config\DefaultGame.ini">
+      <Filter>Config</Filter>
+    </None>
+    <None Include="..\..\Config\DefaultGameplayTags.ini">
+      <Filter>Config</Filter>
+    </None>
+    <None Include="..\..\Config\DefaultInput.ini">
+      <Filter>Config</Filter>
+    </None>
+    <Filter Include="Plugins">
+      <UniqueIdentifier>{BB38096A-B391-30DC-A0D4-4F3EA6B44507}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Plugins\IconCreator">
+      <UniqueIdentifier>{F3562AFF-E198-3559-BC0C-3A43AAC60FE5}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Plugins\IconCreator\Source">
+      <UniqueIdentifier>{218B9AC6-97A8-3223-BBE2-E98B29AE5A85}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Plugins\IconCreator\Source\IconCreator">
+      <UniqueIdentifier>{23E51724-45A9-3343-93AB-E331CCB9F313}</UniqueIdentifier>
+    </Filter>
+    <None Include="..\..\Plugins\IconCreator\Source\IconCreator\IconCreator.Build.cs">
+      <Filter>Plugins\IconCreator\Source\IconCreator</Filter>
+    </None>
+    <Filter Include="Plugins\IconCreator\Source\IconCreator\Private">
+      <UniqueIdentifier>{C93547AC-F01C-3C07-BFBB-438274D457A1}</UniqueIdentifier>
+    </Filter>
+    <ClCompile Include="..\..\Plugins\IconCreator\Source\IconCreator\Private\ICEnums.cpp">
+      <Filter>Plugins\IconCreator\Source\IconCreator\Private</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Plugins\IconCreator\Source\IconCreator\Private\ICItemCreatorWidget.cpp">
+      <Filter>Plugins\IconCreator\Source\IconCreator\Private</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Plugins\IconCreator\Source\IconCreator\Private\IconCreator.cpp">
+      <Filter>Plugins\IconCreator\Source\IconCreator\Private</Filter>
+    </ClCompile>
+    <Filter Include="Plugins\IconCreator\Source\IconCreator\Public">
+      <UniqueIdentifier>{5FEEB90B-ACB8-39B1-A1C6-39BC9E502721}</UniqueIdentifier>
+    </Filter>
+    <ClInclude Include="..\..\Plugins\IconCreator\Source\IconCreator\Public\ICEnums.h">
+      <Filter>Plugins\IconCreator\Source\IconCreator\Public</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Plugins\IconCreator\Source\IconCreator\Public\ICItemCreatorWidget.h">
+      <Filter>Plugins\IconCreator\Source\IconCreator\Public</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Plugins\IconCreator\Source\IconCreator\Public\IconCreator.h">
+      <Filter>Plugins\IconCreator\Source\IconCreator\Public</Filter>
+    </ClInclude>
+    <None Include="..\..\Plugins\IconCreator\IconCreator.uplugin">
+      <Filter>Plugins\IconCreator</Filter>
+    </None>
+    <Filter Include="Plugins\IconCreator\Resources">
+      <UniqueIdentifier>{9489CC6A-F554-316D-AA93-65FD45B760A6}</UniqueIdentifier>
+    </Filter>
+    <None Include="..\..\Plugins\IconCreator\Resources\Icon128.png">
+      <Filter>Plugins\IconCreator\Resources</Filter>
+    </None>
+    <Filter Include="Source\RPGSystem">
+      <UniqueIdentifier>{364D9E12-5BE4-34C9-8BE3-605AD439EFF5}</UniqueIdentifier>
+    </Filter>
+    <None Include="..\..\Source\RPGSystem\RPGSystem.Build.cs">
+      <Filter>Source\RPGSystem</Filter>
+    </None>
+    <ClCompile Include="..\..\Source\RPGSystem\RPGSystem.cpp">
+      <Filter>Source\RPGSystem</Filter>
+    </ClCompile>
+    <ClInclude Include="..\..\Source\RPGSystem\RPGSystem.h">
+      <Filter>Source\RPGSystem</Filter>
+    </ClInclude>
+    <Filter Include="Source\RPGSystem\Private">
+      <UniqueIdentifier>{2FF76552-CDC3-37F7-B465-B17141A27E70}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source\RPGSystem\Private\Actors">
+      <UniqueIdentifier>{385AA83C-3E46-34BD-9B2C-77DB2DD001E2}</UniqueIdentifier>
+    </Filter>
+    <ClCompile Include="..\..\Source\RPGSystem\Private\Actors\AreaVolumeActor.cpp">
+      <Filter>Source\RPGSystem\Private\Actors</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\RPGSystem\Private\Actors\BaseWorldItemActor.cpp">
+      <Filter>Source\RPGSystem\Private\Actors</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\RPGSystem\Private\Actors\CampfireActor.cpp">
+      <Filter>Source\RPGSystem\Private\Actors</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\RPGSystem\Private\Actors\FuelWorkstationActor.cpp">
+      <Filter>Source\RPGSystem\Private\Actors</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\RPGSystem\Private\Actors\PickupItemActor.cpp">
+      <Filter>Source\RPGSystem\Private\Actors</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\RPGSystem\Private\Actors\StorageActor.cpp">
+      <Filter>Source\RPGSystem\Private\Actors</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\RPGSystem\Private\Actors\WorkstationActor.cpp">
+      <Filter>Source\RPGSystem\Private\Actors</Filter>
+    </ClCompile>
+    <Filter Include="Source\RPGSystem\Private\Crafting">
+      <UniqueIdentifier>{88280348-A95D-3C3A-91B0-2BE194C75074}</UniqueIdentifier>
+    </Filter>
+    <ClCompile Include="..\..\Source\RPGSystem\Private\Crafting\CraftingQueueComponent.cpp">
+      <Filter>Source\RPGSystem\Private\Crafting</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\RPGSystem\Private\Crafting\CraftingRecipeDataAsset.cpp">
+      <Filter>Source\RPGSystem\Private\Crafting</Filter>
+    </ClCompile>
+    <Filter Include="Source\RPGSystem\Private\DecaySystem">
+      <UniqueIdentifier>{42349FA1-5AC4-3B05-A5D7-6EE952AA04F1}</UniqueIdentifier>
+    </Filter>
+    <ClCompile Include="..\..\Source\RPGSystem\Private\DecaySystem\DecayComponent.cpp">
+      <Filter>Source\RPGSystem\Private\DecaySystem</Filter>
+    </ClCompile>
+    <Filter Include="Source\RPGSystem\Private\FuelSystem">
+      <UniqueIdentifier>{A34B957B-61AF-3B41-BED2-F216427B4D85}</UniqueIdentifier>
+    </Filter>
+    <ClCompile Include="..\..\Source\RPGSystem\Private\FuelSystem\FuelComponent.cpp">
+      <Filter>Source\RPGSystem\Private\FuelSystem</Filter>
+    </ClCompile>
+    <Filter Include="Source\RPGSystem\Private\Interfaces">
+      <UniqueIdentifier>{73EE105A-F299-3251-AD90-7B624ADB7DDD}</UniqueIdentifier>
+    </Filter>
+    <ClCompile Include="..\..\Source\RPGSystem\Private\Interfaces\InteractionInterface.cpp">
+      <Filter>Source\RPGSystem\Private\Interfaces</Filter>
+    </ClCompile>
+    <Filter Include="Source\RPGSystem\Private\Inventory">
+      <UniqueIdentifier>{16CFF35D-1FEE-3E97-8492-8048F682A26D}</UniqueIdentifier>
+    </Filter>
+    <ClCompile Include="..\..\Source\RPGSystem\Private\Inventory\InventoryAssetManager.cpp">
+      <Filter>Source\RPGSystem\Private\Inventory</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\RPGSystem\Private\Inventory\InventoryComponent.cpp">
+      <Filter>Source\RPGSystem\Private\Inventory</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\RPGSystem\Private\Inventory\InventoryHelpers.cpp">
+      <Filter>Source\RPGSystem\Private\Inventory</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\RPGSystem\Private\Inventory\InventoryItem.cpp">
+      <Filter>Source\RPGSystem\Private\Inventory</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\RPGSystem\Private\Inventory\ItemDataAsset.cpp">
+      <Filter>Source\RPGSystem\Private\Inventory</Filter>
+    </ClCompile>
+    <Filter Include="Source\RPGSystem\Private\Progression">
+      <UniqueIdentifier>{4534C57E-441B-3607-A1D4-F589B4E8582A}</UniqueIdentifier>
+    </Filter>
+    <ClCompile Include="..\..\Source\RPGSystem\Private\Progression\ExecCalc_AddSkillXP.cpp">
+      <Filter>Source\RPGSystem\Private\Progression</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\RPGSystem\Private\Progression\ProgressionBlueprintLibrary.cpp">
+      <Filter>Source\RPGSystem\Private\Progression</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\RPGSystem\Private\Progression\SkillProgressionData.cpp">
+      <Filter>Source\RPGSystem\Private\Progression</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\RPGSystem\Private\Progression\XPGrantBundle.cpp">
+      <Filter>Source\RPGSystem\Private\Progression</Filter>
+    </ClCompile>
+    <Filter Include="Source\RPGSystem\Public">
+      <UniqueIdentifier>{72AFB710-0C59-3767-A861-A9A44630F591}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source\RPGSystem\Public\Actors">
+      <UniqueIdentifier>{1B001223-6518-3554-A3F4-4D7A3B7BC6C7}</UniqueIdentifier>
+    </Filter>
+    <ClInclude Include="..\..\Source\RPGSystem\Public\Actors\AreaVolumeActor.h">
+      <Filter>Source\RPGSystem\Public\Actors</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\RPGSystem\Public\Actors\BaseWorldItemActor.h">
+      <Filter>Source\RPGSystem\Public\Actors</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\RPGSystem\Public\Actors\CampfireActor.h">
+      <Filter>Source\RPGSystem\Public\Actors</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\RPGSystem\Public\Actors\FuelWorkstationActor.h">
+      <Filter>Source\RPGSystem\Public\Actors</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\RPGSystem\Public\Actors\PickupItemActor.h">
+      <Filter>Source\RPGSystem\Public\Actors</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\RPGSystem\Public\Actors\StorageActor.h">
+      <Filter>Source\RPGSystem\Public\Actors</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\RPGSystem\Public\Actors\WorkstationActor.h">
+      <Filter>Source\RPGSystem\Public\Actors</Filter>
+    </ClInclude>
+    <Filter Include="Source\RPGSystem\Public\Crafting">
+      <UniqueIdentifier>{EC3C9335-1DFE-36F9-8F7A-C24653692B3D}</UniqueIdentifier>
+    </Filter>
+    <ClInclude Include="..\..\Source\RPGSystem\Public\Crafting\CraftingQueueComponent.h">
+      <Filter>Source\RPGSystem\Public\Crafting</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\RPGSystem\Public\Crafting\CraftingRecipeDataAsset.h">
+      <Filter>Source\RPGSystem\Public\Crafting</Filter>
+    </ClInclude>
+    <Filter Include="Source\RPGSystem\Public\DecaySystem">
+      <UniqueIdentifier>{05C3F99F-D9BC-38AB-83BA-AB1B61116078}</UniqueIdentifier>
+    </Filter>
+    <ClInclude Include="..\..\Source\RPGSystem\Public\DecaySystem\DecayComponent.h">
+      <Filter>Source\RPGSystem\Public\DecaySystem</Filter>
+    </ClInclude>
+    <Filter Include="Source\RPGSystem\Public\FuelSystem">
+      <UniqueIdentifier>{6211DA44-B824-39AB-9B9E-970C33ECFA79}</UniqueIdentifier>
+    </Filter>
+    <ClInclude Include="..\..\Source\RPGSystem\Public\FuelSystem\FuelComponent.h">
+      <Filter>Source\RPGSystem\Public\FuelSystem</Filter>
+    </ClInclude>
+    <Filter Include="Source\RPGSystem\Public\Interfaces">
+      <UniqueIdentifier>{AD6C4ECA-D2BB-3746-9142-063D58BD753A}</UniqueIdentifier>
+    </Filter>
+    <ClInclude Include="..\..\Source\RPGSystem\Public\Interfaces\InteractionInterface.h">
+      <Filter>Source\RPGSystem\Public\Interfaces</Filter>
+    </ClInclude>
+    <Filter Include="Source\RPGSystem\Public\Inventory">
+      <UniqueIdentifier>{AACC8D47-4B4F-35C2-B87B-2201633FFFD8}</UniqueIdentifier>
+    </Filter>
+    <ClInclude Include="..\..\Source\RPGSystem\Public\Inventory\InventoryAssetManager.h">
+      <Filter>Source\RPGSystem\Public\Inventory</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\RPGSystem\Public\Inventory\InventoryComponent.h">
+      <Filter>Source\RPGSystem\Public\Inventory</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\RPGSystem\Public\Inventory\InventoryHelpers.h">
+      <Filter>Source\RPGSystem\Public\Inventory</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\RPGSystem\Public\Inventory\InventoryItem.h">
+      <Filter>Source\RPGSystem\Public\Inventory</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\RPGSystem\Public\Inventory\ItemDataAsset.h">
+      <Filter>Source\RPGSystem\Public\Inventory</Filter>
+    </ClInclude>
+    <Filter Include="Source\RPGSystem\Public\Progression">
+      <UniqueIdentifier>{C7C8984D-6E33-3B38-BF01-5A2EA3C718A0}</UniqueIdentifier>
+    </Filter>
+    <ClInclude Include="..\..\Source\RPGSystem\Public\Progression\ExecCalc_AddSkillXP.h">
+      <Filter>Source\RPGSystem\Public\Progression</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\RPGSystem\Public\Progression\ProgressionBlueprintLibrary.h">
+      <Filter>Source\RPGSystem\Public\Progression</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\RPGSystem\Public\Progression\SkillProgressionData.h">
+      <Filter>Source\RPGSystem\Public\Progression</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\RPGSystem\Public\Progression\XPGrantBundle.h">
+      <Filter>Source\RPGSystem\Public\Progression</Filter>
+    </ClInclude>
+  </ItemGroup>
+</Project>
