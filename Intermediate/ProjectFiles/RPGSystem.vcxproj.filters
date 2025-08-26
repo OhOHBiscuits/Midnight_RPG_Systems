@@ -170,10 +170,28 @@
     <Filter Include="Source\RPGSystem\Private\Progression">
       <UniqueIdentifier>{4534C57E-441B-3607-A1D4-F589B4E8582A}</UniqueIdentifier>
     </Filter>
+    <ClCompile Include="..\..\Source\RPGSystem\Private\Progression\AbilityModProfile.cpp">
+      <Filter>Source\RPGSystem\Private\Progression</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\RPGSystem\Private\Progression\CheckDefinition.cpp">
+      <Filter>Source\RPGSystem\Private\Progression</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Source\RPGSystem\Private\Progression\ExecCalc_AddSkillXP.cpp">
       <Filter>Source\RPGSystem\Private\Progression</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Source\RPGSystem\Private\Progression\ProficiencyProfile.cpp">
+      <Filter>Source\RPGSystem\Private\Progression</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Source\RPGSystem\Private\Progression\ProgressionBlueprintLibrary.cpp">
+      <Filter>Source\RPGSystem\Private\Progression</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\RPGSystem\Private\Progression\ProgressionTags.cpp">
+      <Filter>Source\RPGSystem\Private\Progression</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\RPGSystem\Private\Progression\SkillCheckBlueprintLibrary.cpp">
+      <Filter>Source\RPGSystem\Private\Progression</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\RPGSystem\Private\Progression\SkillCheckTypes.cpp">
       <Filter>Source\RPGSystem\Private\Progression</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Source\RPGSystem\Private\Progression\SkillProgressionData.cpp">
@@ -257,10 +275,28 @@
     <Filter Include="Source\RPGSystem\Public\Progression">
       <UniqueIdentifier>{C7C8984D-6E33-3B38-BF01-5A2EA3C718A0}</UniqueIdentifier>
     </Filter>
+    <ClInclude Include="..\..\Source\RPGSystem\Public\Progression\AbilityModProfile.h">
+      <Filter>Source\RPGSystem\Public\Progression</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\RPGSystem\Public\Progression\CheckDefinition.h">
+      <Filter>Source\RPGSystem\Public\Progression</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Source\RPGSystem\Public\Progression\ExecCalc_AddSkillXP.h">
       <Filter>Source\RPGSystem\Public\Progression</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Source\RPGSystem\Public\Progression\ProficiencyProfile.h">
+      <Filter>Source\RPGSystem\Public\Progression</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Source\RPGSystem\Public\Progression\ProgressionBlueprintLibrary.h">
+      <Filter>Source\RPGSystem\Public\Progression</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\RPGSystem\Public\Progression\ProgressionTags.h">
+      <Filter>Source\RPGSystem\Public\Progression</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\RPGSystem\Public\Progression\SkillCheckBlueprintLibrary.h">
+      <Filter>Source\RPGSystem\Public\Progression</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\RPGSystem\Public\Progression\SkillCheckTypes.h">
       <Filter>Source\RPGSystem\Public\Progression</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Source\RPGSystem\Public\Progression\SkillProgressionData.h">
