@@ -1,34 +1,22 @@
 #include "Progression/ExecCalc_AddSkillXP.h"
 #include "Progression/SkillProgressionData.h"
+#include "Progression/ProgressionTags.h"   // <-- native tags
 #include "AbilitySystemComponent.h"
 #include "GameplayTagContainer.h"
 
-namespace
-{
-	static FGameplayTag TAG_XP       = FGameplayTag::RequestGameplayTag(FName("Data.XP"));
-	static FGameplayTag TAG_XP_INC   = FGameplayTag::RequestGameplayTag(FName("Data.XP.Increment"));
-	static FGameplayTag TAG_XP_CARRY = FGameplayTag::RequestGameplayTag(FName("Data.XP.CarryRemainder"));
-}
-
-UExecCalc_AddSkillXP::UExecCalc_AddSkillXP()
-{
-	// No static captures here: attributes are provided per-application via the Skill data.
-}
+UExecCalc_AddSkillXP::UExecCalc_AddSkillXP() {}
 
 void UExecCalc_AddSkillXP::Execute_Implementation(const FGameplayEffectCustomExecutionParameters& Params,
                                                   FGameplayEffectCustomExecutionOutput& Out) const
 {
 	const FGameplayEffectSpec& Spec = Params.GetOwningSpec();
 
-	// Required XP gain
-	const float XPGain = Spec.GetSetByCallerMagnitude(TAG_XP, false);
+	const float XPGain   = Spec.GetSetByCallerMagnitude(TAG_Data_XP, false);
 	if (XPGain <= 0.f) return;
 
-	// Optional overrides
-	const float SBC_Inc   = Spec.GetSetByCallerMagnitude(TAG_XP_INC, false);
-	const float SBC_Carry = Spec.GetSetByCallerMagnitude(TAG_XP_CARRY, false);
+	const float SBC_Inc  = Spec.GetSetByCallerMagnitude(TAG_Data_XP_Increment, false);
+	const float SBC_Carry= Spec.GetSetByCallerMagnitude(TAG_Data_XP_CarryRemainder, false);
 
-	// Skill definition is passed as SourceObject in the GE context
 	const UObject* SourceObj = Spec.GetContext().GetSourceObject();
 	const USkillProgressionData* Skill = Cast<USkillProgressionData>(SourceObj);
 	if (!Skill || !Skill->XPAttribute.IsValid() || !Skill->LevelAttribute.IsValid() || !Skill->XPToNextAttribute.IsValid())
@@ -44,16 +32,13 @@ void UExecCalc_AddSkillXP::Execute_Implementation(const FGameplayEffectCustomExe
 	UAbilitySystemComponent* TargetASC = Params.GetTargetAbilitySystemComponent();
 	if (!TargetASC) return;
 
-	// Read current values (UE 5.6: returns value directly)
 	float CurrXP     = TargetASC->GetNumericAttribute(Skill->XPAttribute);
 	float CurrLevel  = TargetASC->GetNumericAttribute(Skill->LevelAttribute);
 	float CurrThresh = TargetASC->GetNumericAttribute(Skill->XPToNextAttribute);
 	if (CurrThresh <= 0.f) CurrThresh = IncrementPerLevel;
 
-	// Keep originals to compute additive deltas
 	const float OrigXP = CurrXP, OrigLevel = CurrLevel, OrigThresh = CurrThresh;
 
-	// Apply XP
 	if (bCarryRemainder)
 	{
 		float Pool = CurrXP + XPGain;
@@ -70,7 +55,7 @@ void UExecCalc_AddSkillXP::Execute_Implementation(const FGameplayEffectCustomExe
 		if (CurrXP + XPGain >= CurrThresh)
 		{
 			CurrLevel += 1.f;
-			CurrXP      = 0.f;              // reset on level-up (your design)
+			CurrXP      = 0.f;
 			CurrThresh += IncrementPerLevel;
 		}
 		else
@@ -79,7 +64,6 @@ void UExecCalc_AddSkillXP::Execute_Implementation(const FGameplayEffectCustomExe
 		}
 	}
 
-	// Emit additive modifiers
 	const float dXP     = CurrXP    - OrigXP;
 	const float dLevel  = CurrLevel - OrigLevel;
 	const float dThresh = CurrThresh- OrigThresh;
