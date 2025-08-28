@@ -2,12 +2,21 @@
 
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
-#include "GameplayTagContainer.h"
+#include "CraftingStationComponent.h"
 #include "CraftingQueueComponent.generated.h"
 
 class UCraftingRecipeDataAsset;
-class UAbilitySystemComponent;
-struct FGameplayEventData; // fwd declare OK for pointers
+class UCraftingStationComponent;
+
+UENUM(BlueprintType)
+enum class ECraftQueueState : uint8
+{
+	Pending,
+	InProgress,
+	Done,
+	Failed,
+	Canceled
+};
 
 USTRUCT(BlueprintType)
 struct FCraftQueueEntry
@@ -15,83 +24,111 @@ struct FCraftQueueEntry
 	GENERATED_BODY()
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="1_Crafting-Queue")
-	FGameplayTag RecipeIDTag;
+	FGuid EntryId;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="1_Crafting-Queue", meta=(ClampMin="1"))
-	int32 Quantity = 1;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="1_Crafting-Queue")
+	TWeakObjectPtr<AActor> Submitter;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="1_Crafting-Queue")
+	FCraftingRequest Request;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="1_Crafting-Queue")
+	ECraftQueueState State = ECraftQueueState::Pending;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="1_Crafting-Queue")
-	FGuid JobId;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="1_Crafting-Queue", meta=(Categories="Craft.Job"))
-	FGameplayTag StateTag;
+	float TimeSubmitted = 0.f;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="1_Crafting-Queue")
-	float ETASeconds = 0.f;
+	float TimeStarted = 0.f;
 };
 
-DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnCraftQueueChanged);
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnCraftQueueJobEvent, const FGuid&, JobId, const FGameplayTag&, RecipeID);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnQueueChanged, const TArray<FCraftQueueEntry>&, Queue);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnQueueEntryStarted, const FCraftQueueEntry&, Entry);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnQueueEntryCompleted, const FCraftQueueEntry&, Entry, bool, bSuccess);
 
-/** Server-authoritative craft queue */
-UCLASS(ClassGroup=(Crafting), meta=(BlueprintSpawnableComponent))
+UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
 class RPGSYSTEM_API UCraftingQueueComponent : public UActorComponent
 {
 	GENERATED_BODY()
 
 public:
 	UCraftingQueueComponent();
-	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="1_Crafting-Queue|Config")
-	bool bAutoStart = true;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="1_Crafting-Queue")
+	TObjectPtr<UCraftingStationComponent> Station = nullptr;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="1_Crafting-Queue|Config", meta=(ClampMin="1", ClampMax="4"))
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="1_Crafting-Queue", meta=(ClampMin="1", ClampMax="4"))
 	int32 MaxConcurrent = 1;
 
-	UPROPERTY(ReplicatedUsing=OnRep_Queue, VisibleAnywhere, BlueprintReadOnly, Category="1_Crafting-Queue|State")
-	TArray<FCraftQueueEntry> Queue;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="1_Crafting-Queue")
+	bool bAutoStart = true;
 
-	UPROPERTY(BlueprintAssignable, Category="1_Crafting-Queue|Events")
-	FOnCraftQueueChanged OnQueueChanged;
+	UFUNCTION(BlueprintCallable, Category="1_Crafting-Queue", meta=(DefaultToSelf="Submitter"))
+	FGuid EnqueueFor(AActor* Submitter, const FCraftingRequest& Request);
 
-	UPROPERTY(BlueprintAssignable, Category="1_Crafting-Queue|Events")
-	FOnCraftQueueJobEvent OnJobStarted;
+	UFUNCTION(BlueprintCallable, Category="1_Crafting-Queue", meta=(DefaultToSelf="Submitter"))
+	int32 EnqueueBatchFor(AActor* Submitter, const TArray<FCraftingRequest>& Requests);
 
-	UPROPERTY(BlueprintAssignable, Category="1_Crafting-Queue|Events")
-	FOnCraftQueueJobEvent OnJobFinished;
+	UFUNCTION(BlueprintCallable, Category="1_Crafting-Queue")
+	FGuid Enqueue(const FCraftingRequest& Request);
 
-	// Server-only
-	UFUNCTION(BlueprintCallable, Category="1_Crafting-Queue|Actions")
-	bool EnqueueRecipe(UCraftingRecipeDataAsset* Recipe, int32 Quantity, AActor* Workstation);
+	UFUNCTION(BlueprintCallable, Category="1_Crafting-Queue")
+	int32 EnqueueBatch(const TArray<FCraftingRequest>& Requests);
 
-	UFUNCTION(BlueprintCallable, Category="1_Crafting-Queue|Actions")
-	bool EnqueueByTag(FGameplayTag RecipeIDTag, int32 Quantity, AActor* Workstation);
+	UFUNCTION(BlueprintCallable, Category="1_Crafting-Queue", meta=(DefaultToSelf="Submitter"))
+	int32 EnqueueRecipeFor(AActor* Submitter, UCraftingRecipeDataAsset* Recipe, int32 Quantity = 1);
 
-	UFUNCTION(BlueprintCallable, Category="1_Crafting-Queue|Actions")
-	bool CancelAtIndex(int32 Index);
+	UFUNCTION(BlueprintCallable, Category="1_Crafting-Queue", meta=(DefaultToSelf="Submitter"))
+	int32 EnqueueRecipeBatchFor(AActor* Submitter, const TArray<UCraftingRecipeDataAsset*>& Recipes);
 
-	UFUNCTION(BlueprintCallable, Category="1_Crafting-Queue|Actions")
-	void ClearQueued();
+	UFUNCTION(BlueprintCallable, Category="1_Crafting-Queue")
+	bool RemovePending(const FGuid& EntryId);
 
-	UFUNCTION(BlueprintCallable, Category="1_Crafting-Queue|Actions")
+	UFUNCTION(BlueprintCallable, Category="1_Crafting-Queue")
+	void ClearPending();
+
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category="1_Crafting-Queue")
+	const TArray<FCraftQueueEntry>& GetQueue() const { return Queue; }
+
+	UFUNCTION(BlueprintCallable, Category="1_Crafting-Queue")
 	void StartProcessing();
+
+	UFUNCTION(BlueprintCallable, Category="1_Crafting-Queue")
+	void StopProcessing();
+
+	UPROPERTY(BlueprintAssignable, Category="1_Crafting-Queue")
+	FOnQueueChanged OnQueueChanged;
+
+	UPROPERTY(BlueprintAssignable, Category="1_Crafting-Queue")
+	FOnQueueEntryStarted OnEntryStarted;
+
+	UPROPERTY(BlueprintAssignable, Category="1_Crafting-Queue")
+	FOnQueueEntryCompleted OnEntryCompleted;
 
 protected:
 	virtual void BeginPlay() override;
-	UFUNCTION() void OnRep_Queue();
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 private:
-	struct FServerJob { TWeakObjectPtr<UCraftingRecipeDataAsset> Recipe; TWeakObjectPtr<AActor> Workstation; };
-	TMap<FGuid, FServerJob> ServerJobs; // server-only
-	TSet<FGuid> InFlight;               // server-only
-	TWeakObjectPtr<UAbilitySystemComponent> CachedASC;
+	UPROPERTY(Replicated)
+	TArray<FCraftQueueEntry> Queue;
 
-	void TryStartNext();
-	bool CanStartMore() const;
-	void StartJob(FCraftQueueEntry& Entry, const FServerJob& ServerJob);
+	UPROPERTY(Replicated)
+	bool bProcessing = false;
 
-	void BindASCEvents();
-	void OnCraftStartedEvent(const FGameplayEventData* EventData);
-	void OnCraftCompletedEvent(const FGameplayEventData* EventData);
+	UPROPERTY(Replicated)
+	FGuid ActiveEntryId;
+
+	UFUNCTION()
+	void HandleStationStarted(const FCraftingRequest& Request, float FinalTime, const FSkillCheckResult& Check);
+
+	UFUNCTION()
+	void HandleStationCompleted(const FCraftingRequest& Request, const FSkillCheckResult& Check, bool bSuccess);
+
+	void ResolveStation();
+	void KickIfPossible();
+	int32 FindIndexById(const FGuid& Id) const;
+	int32 FindNextPending() const;
+
+	static FCraftingRequest BuildRequestFromRecipe(AActor* Submitter, UCraftingRecipeDataAsset* Recipe);
 };

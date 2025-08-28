@@ -131,6 +131,9 @@
     <ClCompile Include="..\..\Source\RPGSystem\Private\Crafting\CraftingRecipeDataAsset.cpp">
       <Filter>Source\RPGSystem\Private\Crafting</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Source\RPGSystem\Private\Crafting\CraftingStationComponent.cpp">
+      <Filter>Source\RPGSystem\Private\Crafting</Filter>
+    </ClCompile>
     <Filter Include="Source\RPGSystem\Private\DecaySystem">
       <UniqueIdentifier>{42349FA1-5AC4-3B05-A5D7-6EE952AA04F1}</UniqueIdentifier>
     </Filter>
@@ -234,6 +237,9 @@
       <Filter>Source\RPGSystem\Public\Crafting</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Source\RPGSystem\Public\Crafting\CraftingRecipeDataAsset.h">
+      <Filter>Source\RPGSystem\Public\Crafting</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\RPGSystem\Public\Crafting\CraftingStationComponent.h">
       <Filter>Source\RPGSystem\Public\Crafting</Filter>
     </ClInclude>
     <Filter Include="Source\RPGSystem\Public\DecaySystem">

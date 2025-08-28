@@ -1,19 +1,14 @@
 #include "Crafting/CraftingQueueComponent.h"
+#include "Crafting/CraftingStationComponent.h"
 #include "Crafting/CraftingRecipeDataAsset.h"
 
-#include "AbilitySystemComponent.h"
-#include "AbilitySystemBlueprintLibrary.h"
-#include "Abilities/GameplayAbilityTypes.h"   // FGameplayEventData
+#include "Inventory/ItemDataAsset.h"           // <-- needed for UItemDataAsset::StaticClass()
 #include "Net/UnrealNetwork.h"
 
-static FGameplayTag TAG_Event_Craft_Start     = FGameplayTag::RequestGameplayTag(FName("Event.Craft.Start"));
-static FGameplayTag TAG_Event_Craft_Started   = FGameplayTag::RequestGameplayTag(FName("Event.Craft.Started"));
-static FGameplayTag TAG_Event_Craft_Completed = FGameplayTag::RequestGameplayTag(FName("Event.Craft.Completed"));
-static FGameplayTag TAG_State_Queued          = FGameplayTag::RequestGameplayTag(FName("Craft.Job.Queued"));
-static FGameplayTag TAG_State_InProgress      = FGameplayTag::RequestGameplayTag(FName("Craft.Job.InProgress"));
-static FGameplayTag TAG_State_Completed       = FGameplayTag::RequestGameplayTag(FName("Craft.Job.Completed"));
-static FGameplayTag TAG_State_Failed          = FGameplayTag::RequestGameplayTag(FName("Craft.Job.Failed"));
-static FGameplayTag TAG_State_Cancelled       = FGameplayTag::RequestGameplayTag(FName("Craft.Job.Cancelled"));
+// reflection helpers
+#include "UObject/Class.h"
+#include "UObject/UnrealType.h"
+#include "UObject/Script.h"
 
 UCraftingQueueComponent::UCraftingQueueComponent()
 {
@@ -24,195 +19,335 @@ UCraftingQueueComponent::UCraftingQueueComponent()
 void UCraftingQueueComponent::BeginPlay()
 {
 	Super::BeginPlay();
-	BindASCEvents();
+	ResolveStation();
+
+	if (Station)
+	{
+		Station->OnCraftStarted.AddDynamic(this, &UCraftingQueueComponent::HandleStationStarted);
+		Station->OnCraftCompleted.AddDynamic(this, &UCraftingQueueComponent::HandleStationCompleted);
+	}
 }
 
 void UCraftingQueueComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME(UCraftingQueueComponent, Queue);
+	DOREPLIFETIME(UCraftingQueueComponent, bProcessing);
+	DOREPLIFETIME(UCraftingQueueComponent, ActiveEntryId);
 }
 
-void UCraftingQueueComponent::OnRep_Queue()
+void UCraftingQueueComponent::ResolveStation()
 {
-	OnQueueChanged.Broadcast();
-}
-
-bool UCraftingQueueComponent::EnqueueRecipe(UCraftingRecipeDataAsset* Recipe, int32 Quantity, AActor* Workstation)
-{
-	if (GetOwnerRole() != ROLE_Authority || !Recipe || Quantity < 1) return false;
-
-	FCraftQueueEntry Entry;
-	Entry.RecipeIDTag = Recipe->RecipeIDTag;
-	Entry.Quantity    = Quantity;
-	Entry.JobId       = FGuid::NewGuid();
-	Entry.StateTag    = TAG_State_Queued;
-	Entry.ETASeconds  = Recipe->BaseTimeSeconds * Quantity;
-
-	Queue.Add(Entry);
-	FServerJob& SJ = ServerJobs.Add(Entry.JobId);
-	SJ.Recipe      = Recipe;
-	SJ.Workstation = Workstation;
-
-	OnQueueChanged.Broadcast();
-	if (bAutoStart) StartProcessing();
-	return true;
-}
-
-bool UCraftingQueueComponent::EnqueueByTag(FGameplayTag RecipeIDTag, int32 Quantity, AActor* Workstation)
-{
-	if (GetOwnerRole() != ROLE_Authority || !RecipeIDTag.IsValid() || Quantity < 1) return false;
-
-	FCraftQueueEntry Entry;
-	Entry.RecipeIDTag = RecipeIDTag;
-	Entry.Quantity    = Quantity;
-	Entry.JobId       = FGuid::NewGuid();
-	Entry.StateTag    = TAG_State_Queued;
-	Entry.ETASeconds  = 0.f;
-
-	Queue.Add(Entry);
-	FServerJob& SJ = ServerJobs.Add(Entry.JobId);
-	SJ.Recipe      = nullptr; // resolve later if you add a recipe asset manager
-	SJ.Workstation = Workstation;
-
-	OnQueueChanged.Broadcast();
-	if (bAutoStart) StartProcessing();
-	return true;
-}
-
-bool UCraftingQueueComponent::CancelAtIndex(int32 Index)
-{
-	if (GetOwnerRole() != ROLE_Authority) return false;
-	if (!Queue.IsValidIndex(Index)) return false;
-
-	FCraftQueueEntry& E = Queue[Index];
-	if (E.StateTag == TAG_State_InProgress) return false;
-
-	E.StateTag = TAG_State_Cancelled;
-	ServerJobs.Remove(E.JobId);
-	Queue.RemoveAt(Index);
-	OnQueueChanged.Broadcast();
-	return true;
-}
-
-void UCraftingQueueComponent::ClearQueued()
-{
-	if (GetOwnerRole() != ROLE_Authority) return;
-	for (int32 i = Queue.Num() - 1; i >= 0; --i)
+	if (!Station)
 	{
-		if (Queue[i].StateTag == TAG_State_Queued)
+		if (AActor* Owner = GetOwner())
 		{
-			ServerJobs.Remove(Queue[i].JobId);
-			Queue.RemoveAt(i);
+			Station = Owner->FindComponentByClass<UCraftingStationComponent>();
 		}
 	}
-	OnQueueChanged.Broadcast();
+}
+
+FGuid UCraftingQueueComponent::EnqueueFor(AActor* Submitter, const FCraftingRequest& Request)
+{
+	if (!GetOwner() || !GetOwner()->HasAuthority()) return FGuid();
+
+	FCraftQueueEntry E;
+	E.EntryId = FGuid::NewGuid();
+	E.Submitter = Submitter;
+	E.Request = Request;
+	if (!E.Request.XPRecipient.IsValid() && Submitter)
+	{
+		E.Request.XPRecipient = Submitter;
+	}
+	E.State = ECraftQueueState::Pending;
+	E.TimeSubmitted = GetWorld()->GetTimeSeconds();
+
+	Queue.Add(E);
+	OnQueueChanged.Broadcast(Queue);
+
+	if (bAutoStart) StartProcessing();
+	return E.EntryId;
+}
+
+int32 UCraftingQueueComponent::EnqueueBatchFor(AActor* Submitter, const TArray<FCraftingRequest>& Requests)
+{
+	int32 Count = 0;
+	for (const FCraftingRequest& R : Requests)
+	{
+		if (EnqueueFor(Submitter, R).IsValid()) ++Count;
+	}
+	return Count;
+}
+
+FGuid UCraftingQueueComponent::Enqueue(const FCraftingRequest& Request)
+{
+	return EnqueueFor(GetOwner(), Request);
+}
+
+int32 UCraftingQueueComponent::EnqueueBatch(const TArray<FCraftingRequest>& Requests)
+{
+	return EnqueueBatchFor(GetOwner(), Requests);
+}
+
+int32 UCraftingQueueComponent::EnqueueRecipeFor(AActor* Submitter, UCraftingRecipeDataAsset* Recipe, int32 Quantity)
+{
+	if (!Recipe || Quantity <= 0) return 0;
+	int32 Count = 0;
+	for (int32 i=0; i<Quantity; ++i)
+	{
+		const FCraftingRequest Req = BuildRequestFromRecipe(Submitter, Recipe);
+		if (EnqueueFor(Submitter, Req).IsValid()) ++Count;
+	}
+	return Count;
+}
+
+int32 UCraftingQueueComponent::EnqueueRecipeBatchFor(AActor* Submitter, const TArray<UCraftingRecipeDataAsset*>& Recipes)
+{
+	int32 Count = 0;
+	for (UCraftingRecipeDataAsset* R : Recipes)
+	{
+		if (!R) continue;
+		const FCraftingRequest Req = BuildRequestFromRecipe(Submitter, R);
+		if (EnqueueFor(Submitter, Req).IsValid()) ++Count;
+	}
+	return Count;
+}
+
+bool UCraftingQueueComponent::RemovePending(const FGuid& EntryId)
+{
+	if (!GetOwner() || !GetOwner()->HasAuthority()) return false;
+
+	const int32 Index = FindIndexById(EntryId);
+	if (Index == INDEX_NONE) return false;
+
+	if (Queue[Index].State == ECraftQueueState::Pending)
+	{
+		Queue.RemoveAt(Index);
+		OnQueueChanged.Broadcast(Queue);
+		return true;
+	}
+	return false;
+}
+
+void UCraftingQueueComponent::ClearPending()
+{
+	if (!GetOwner() || !GetOwner()->HasAuthority()) return;
+
+	for (int32 i=Queue.Num()-1; i>=0; --i)
+	{
+		if (Queue[i].State == ECraftQueueState::Pending)
+			Queue.RemoveAt(i);
+	}
+	OnQueueChanged.Broadcast(Queue);
 }
 
 void UCraftingQueueComponent::StartProcessing()
 {
-	if (GetOwnerRole() != ROLE_Authority) return;
-	TryStartNext();
+	if (!GetOwner() || !GetOwner()->HasAuthority()) return;
+	ResolveStation();
+	if (!Station) return;
+
+	bProcessing = true;
+	KickIfPossible();
 }
 
-bool UCraftingQueueComponent::CanStartMore() const
+void UCraftingQueueComponent::StopProcessing()
 {
-	return InFlight.Num() < FMath::Max(1, MaxConcurrent);
+	if (!GetOwner() || !GetOwner()->HasAuthority()) return;
+	bProcessing = false;
 }
 
-void UCraftingQueueComponent::TryStartNext()
+int32 UCraftingQueueComponent::FindIndexById(const FGuid& Id) const
 {
-	if (!CanStartMore()) return;
-
-	for (FCraftQueueEntry& E : Queue)
+	for (int32 i=0; i<Queue.Num(); ++i)
 	{
-		if (E.StateTag == TAG_State_Queued)
+		if (Queue[i].EntryId == Id) return i;
+	}
+	return INDEX_NONE;
+}
+
+int32 UCraftingQueueComponent::FindNextPending() const
+{
+	for (int32 i=0; i<Queue.Num(); ++i)
+	{
+		if (Queue[i].State == ECraftQueueState::Pending) return i;
+	}
+	return INDEX_NONE;
+}
+
+void UCraftingQueueComponent::KickIfPossible()
+{
+	if (!bProcessing || !Station) return;
+	if (Station->bIsCrafting) return;
+
+	const int32 NextIdx = FindNextPending();
+	if (NextIdx == INDEX_NONE) return;
+
+	FCraftQueueEntry& E = Queue[NextIdx];
+
+	const bool bStarted = Station->StartCraft(E.Submitter.Get(), E.Request);
+	if (!bStarted)
+	{
+		E.State = ECraftQueueState::Failed;
+		OnQueueChanged.Broadcast(Queue);
+		OnEntryCompleted.Broadcast(E, /*bSuccess*/false);
+		KickIfPossible();
+		return;
+	}
+
+	E.State = ECraftQueueState::InProgress;
+	E.TimeStarted = GetWorld()->GetTimeSeconds();
+	ActiveEntryId = E.EntryId;
+
+	OnQueueChanged.Broadcast(Queue);
+}
+
+void UCraftingQueueComponent::HandleStationStarted(const FCraftingRequest& /*Request*/, float /*FinalTime*/, const FSkillCheckResult& /*Check*/)
+{
+	const int32 Idx = FindIndexById(ActiveEntryId);
+	if (Idx != INDEX_NONE)
+	{
+		OnEntryStarted.Broadcast(Queue[Idx]);
+	}
+}
+
+void UCraftingQueueComponent::HandleStationCompleted(const FCraftingRequest& /*Request*/, const FSkillCheckResult& /*Check*/, bool bSuccess)
+{
+	const int32 Idx = FindIndexById(ActiveEntryId);
+	if (Idx != INDEX_NONE)
+	{
+		Queue[Idx].State = bSuccess ? ECraftQueueState::Done : ECraftQueueState::Failed;
+		OnQueueChanged.Broadcast(Queue);
+		OnEntryCompleted.Broadcast(Queue[Idx], bSuccess);
+	}
+
+	ActiveEntryId.Invalidate();
+	KickIfPossible();
+}
+
+// =================== reflection helpers ===================
+
+static FArrayProperty* FindArrayProp(UClass* Cls, const TCHAR* Name)
+{
+	return FindFProperty<FArrayProperty>(Cls, FName(Name));
+}
+
+template<typename T>
+static T* FindObjectField(UStruct* S, void* Container, std::initializer_list<const TCHAR*> Names)
+{
+	for (const TCHAR* N : Names)
+	{
+		if (FObjectProperty* P = FindFProperty<FObjectProperty>(S, FName(N)))
 		{
-			if (const FServerJob* SJ = ServerJobs.Find(E.JobId))
+			if (P->PropertyClass->IsChildOf(T::StaticClass()))
 			{
-				StartJob(E, *SJ);
-				if (!CanStartMore()) break;
+				return *P->ContainerPtrToValuePtr<T*>(Container);
+			}
+		}
+	}
+	return nullptr;
+}
+
+static int32 FindIntField(UStruct* S, void* Container, std::initializer_list<const TCHAR*> Names, int32 Default=1)
+{
+	for (const TCHAR* N : Names)
+	{
+		if (FIntProperty* P = FindFProperty<FIntProperty>(S, FName(N)))
+		{
+			return P->GetPropertyValue_InContainer(Container);
+		}
+	}
+	return Default;
+}
+
+static FGameplayTag FindTagField(UStruct* S, void* Container, std::initializer_list<const TCHAR*> Names)
+{
+	for (const TCHAR* N : Names)
+	{
+		if (FStructProperty* P = FindFProperty<FStructProperty>(S, FName(N)))
+		{
+			if (P->Struct == TBaseStructure<FGameplayTag>::Get())
+			{
+				return *P->ContainerPtrToValuePtr<FGameplayTag>(Container);
+			}
+		}
+	}
+	return FGameplayTag();
+}
+
+static float TryGetFloatProp(UObject* Obj, std::initializer_list<const TCHAR*> Names, float DefaultVal)
+{
+	UClass* Cls = Obj->GetClass();
+	for (const TCHAR* N : Names)
+	{
+		if (FFloatProperty* P = FindFProperty<FFloatProperty>(Cls, FName(N)))
+		{
+			return P->GetPropertyValue_InContainer(Obj);
+		}
+	}
+	return DefaultVal;
+}
+
+static void CopyInputsFromRecipe(UCraftingRecipeDataAsset* Recipe, TArray<FCraftItemCost>& OutInputs)
+{
+	if (!Recipe) return;
+	if (FArrayProperty* Arr = FindArrayProp(Recipe->GetClass(), TEXT("Inputs")))
+	{
+		if (FStructProperty* Inner = CastField<FStructProperty>(Arr->Inner))
+		{
+			FScriptArrayHelper Helper(Arr, Arr->ContainerPtrToValuePtr<void>(Recipe));
+			for (int32 i=0; i<Helper.Num(); ++i)
+			{
+				void* Elem = Helper.GetRawPtr(i);
+				FGameplayTag Tag = FindTagField(Inner->Struct, Elem, {TEXT("ItemID"), TEXT("ItemTag"), TEXT("ID")});
+				int32 Qty = FindIntField(Inner->Struct, Elem, {TEXT("Quantity"), TEXT("Qty"), TEXT("Count"), TEXT("Amount")}, 1);
+
+				FCraftItemCost Cost;
+				Cost.ItemID = Tag;
+				Cost.Quantity = FMath::Max(1, Qty);
+				OutInputs.Add(Cost);
 			}
 		}
 	}
 }
 
-void UCraftingQueueComponent::StartJob(FCraftQueueEntry& Entry, const FServerJob& SJ)
+static void CopyOutputsFromRecipe(UCraftingRecipeDataAsset* Recipe, TArray<FCraftItemOutput>& OutOutputs)
 {
-	UCraftingRecipeDataAsset* Recipe = SJ.Recipe.Get();
-	if (!Recipe) return; // keep simple for MVP
-
-	Entry.StateTag = TAG_State_InProgress;
-	InFlight.Add(Entry.JobId);
-
-	OnJobStarted.Broadcast(Entry.JobId, Entry.RecipeIDTag);
-	OnQueueChanged.Broadcast();
-
-	FGameplayEventData Data;
-	Data.EventTag        = TAG_Event_Craft_Start;
-	Data.OptionalObject  = Recipe;
-	Data.OptionalObject2 = SJ.Workstation.Get();
-	Data.EventMagnitude  = Entry.Quantity;
-
-	UAbilitySystemBlueprintLibrary::SendGameplayEventToActor(GetOwner(), Data.EventTag, Data);
-}
-
-void UCraftingQueueComponent::BindASCEvents()
-{
-	if (CachedASC.IsValid()) return;
-	if (AActor* Owner = GetOwner())
+	if (!Recipe) return;
+	if (FArrayProperty* Arr = FindArrayProp(Recipe->GetClass(), TEXT("Outputs")))
 	{
-		if (UAbilitySystemComponent* ASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(Owner))
+		if (FStructProperty* Inner = CastField<FStructProperty>(Arr->Inner))
 		{
-			CachedASC = ASC;
-			ASC->GenericGameplayEventCallbacks.FindOrAdd(TAG_Event_Craft_Started)
-				.AddUObject(this, &UCraftingQueueComponent::OnCraftStartedEvent);
-			ASC->GenericGameplayEventCallbacks.FindOrAdd(TAG_Event_Craft_Completed)
-				.AddUObject(this, &UCraftingQueueComponent::OnCraftCompletedEvent);
+			FScriptArrayHelper Helper(Arr, Arr->ContainerPtrToValuePtr<void>(Recipe));
+			for (int32 i=0; i<Helper.Num(); ++i)
+			{
+				void* Elem = Helper.GetRawPtr(i);
+				UItemDataAsset* Item = FindObjectField<UItemDataAsset>(Inner->Struct, Elem, {TEXT("Item"), TEXT("ItemAsset"), TEXT("ItemData")});
+				int32 Qty = FindIntField(Inner->Struct, Elem, {TEXT("Quantity"), TEXT("Qty"), TEXT("Count"), TEXT("Amount")}, 1);
+
+				if (Item)
+				{
+					FCraftItemOutput Out;
+					Out.Item = Item;
+					Out.Quantity = FMath::Max(1, Qty);
+					OutOutputs.Add(Out);
+				}
+			}
 		}
 	}
 }
 
-void UCraftingQueueComponent::OnCraftStartedEvent(const FGameplayEventData* /*EventData*/)
+// ==========================================================
+
+FCraftingRequest UCraftingQueueComponent::BuildRequestFromRecipe(AActor* Submitter, UCraftingRecipeDataAsset* Recipe)
 {
-	// Optional: update ETAs when GA sends predicted duration.
-}
+	FCraftingRequest Req;
 
-void UCraftingQueueComponent::OnCraftCompletedEvent(const FGameplayEventData* EventData)
-{
-	if (GetOwnerRole() != ROLE_Authority || !EventData) return;
+	CopyInputsFromRecipe(Recipe, Req.Inputs);
+	CopyOutputsFromRecipe(Recipe, Req.Outputs);
 
-	// We stored the recipe tag in TargetTags when the GA completed.
-	FGameplayTag RecipeID;
-	for (auto It = EventData->TargetTags.CreateConstIterator(); It; ++It)
-	{
-		const FGameplayTag T = *It;
-		if (!T.MatchesTag(TAG_Event_Craft_Completed) && !T.MatchesTag(TAG_Event_Craft_Started))
-		{
-			RecipeID = T; break;
-		}
-	}
+	Req.BaseTimeSeconds = TryGetFloatProp(Recipe, {TEXT("BaseTimeSeconds"), TEXT("CraftTime"), TEXT("TimeToCraft")}, 1.0f);
 
-	int32 Found = INDEX_NONE;
-	for (int32 i = 0; i < Queue.Num(); ++i)
-	{
-		if (Queue[i].StateTag == TAG_State_InProgress &&
-			(!RecipeID.IsValid() || Queue[i].RecipeIDTag == RecipeID))
-		{
-			Found = i; break;
-		}
-	}
-	if (Found == INDEX_NONE) return;
-
-	FCraftQueueEntry E = Queue[Found];
-	InFlight.Remove(E.JobId);
-	E.StateTag = TAG_State_Completed;
-
-	OnJobFinished.Broadcast(E.JobId, E.RecipeIDTag);
-
-	ServerJobs.Remove(E.JobId);
-	Queue.RemoveAt(Found);
-	OnQueueChanged.Broadcast();
-
-	TryStartNext();
+	Req.XPRecipient = Submitter;
+	return Req;
 }
