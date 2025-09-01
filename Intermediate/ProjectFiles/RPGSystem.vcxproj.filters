@@ -98,6 +98,12 @@
     <Filter Include="Source\RPGSystem\Private">
       <UniqueIdentifier>{2FF76552-CDC3-37F7-B465-B17141A27E70}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source\RPGSystem\Private\Abilities">
+      <UniqueIdentifier>{2D81BC29-783C-3AB2-8833-6EEAF68B3ADC}</UniqueIdentifier>
+    </Filter>
+    <ClCompile Include="..\..\Source\RPGSystem\Private\Abilities\GA_Craft_Generic.cpp">
+      <Filter>Source\RPGSystem\Private\Abilities</Filter>
+    </ClCompile>
     <Filter Include="Source\RPGSystem\Private\Actors">
       <UniqueIdentifier>{385AA83C-3E46-34BD-9B2C-77DB2DD001E2}</UniqueIdentifier>
     </Filter>
@@ -125,9 +131,6 @@
     <Filter Include="Source\RPGSystem\Private\Crafting">
       <UniqueIdentifier>{88280348-A95D-3C3A-91B0-2BE194C75074}</UniqueIdentifier>
     </Filter>
-    <ClCompile Include="..\..\Source\RPGSystem\Private\Crafting\CraftingQueueComponent.cpp">
-      <Filter>Source\RPGSystem\Private\Crafting</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\Source\RPGSystem\Private\Crafting\CraftingRecipeDataAsset.cpp">
       <Filter>Source\RPGSystem\Private\Crafting</Filter>
     </ClCompile>
@@ -206,6 +209,12 @@
     <Filter Include="Source\RPGSystem\Public">
       <UniqueIdentifier>{72AFB710-0C59-3767-A861-A9A44630F591}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source\RPGSystem\Public\Abilities">
+      <UniqueIdentifier>{68F66077-0912-3A61-B75D-101C0E099EA4}</UniqueIdentifier>
+    </Filter>
+    <ClInclude Include="..\..\Source\RPGSystem\Public\Abilities\GA_Craft_Generic.h">
+      <Filter>Source\RPGSystem\Public\Abilities</Filter>
+    </ClInclude>
     <Filter Include="Source\RPGSystem\Public\Actors">
       <UniqueIdentifier>{1B001223-6518-3554-A3F4-4D7A3B7BC6C7}</UniqueIdentifier>
     </Filter>
@@ -233,13 +242,13 @@
     <Filter Include="Source\RPGSystem\Public\Crafting">
       <UniqueIdentifier>{EC3C9335-1DFE-36F9-8F7A-C24653692B3D}</UniqueIdentifier>
     </Filter>
-    <ClInclude Include="..\..\Source\RPGSystem\Public\Crafting\CraftingQueueComponent.h">
-      <Filter>Source\RPGSystem\Public\Crafting</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\Source\RPGSystem\Public\Crafting\CraftingRecipeDataAsset.h">
       <Filter>Source\RPGSystem\Public\Crafting</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Source\RPGSystem\Public\Crafting\CraftingStationComponent.h">
+      <Filter>Source\RPGSystem\Public\Crafting</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\RPGSystem\Public\Crafting\CraftingTypes.h">
       <Filter>Source\RPGSystem\Public\Crafting</Filter>
     </ClInclude>
     <Filter Include="Source\RPGSystem\Public\DecaySystem">

@@ -718,6 +718,10 @@
       <ForcedIncludeFiles>$(ClCompile_ForcedIncludeFiles_1)</ForcedIncludeFiles>
     </ClCompile>
     <ClInclude Include="..\..\Source\RPGSystem\RPGSystem.h"/>
+    <ClCompile Include="..\..\Source\RPGSystem\Private\Abilities\GA_Craft_Generic.cpp">
+      <AdditionalIncludeDirectories>$(ClCompile_AdditionalIncludeDirectories_1)</AdditionalIncludeDirectories>
+      <ForcedIncludeFiles>$(ClCompile_ForcedIncludeFiles_1)</ForcedIncludeFiles>
+    </ClCompile>
     <ClCompile Include="..\..\Source\RPGSystem\Private\Actors\AreaVolumeActor.cpp">
       <AdditionalIncludeDirectories>$(ClCompile_AdditionalIncludeDirectories_1)</AdditionalIncludeDirectories>
       <ForcedIncludeFiles>$(ClCompile_ForcedIncludeFiles_1)</ForcedIncludeFiles>
@@ -743,10 +747,6 @@
       <ForcedIncludeFiles>$(ClCompile_ForcedIncludeFiles_1)</ForcedIncludeFiles>
     </ClCompile>
     <ClCompile Include="..\..\Source\RPGSystem\Private\Actors\WorkstationActor.cpp">
-      <AdditionalIncludeDirectories>$(ClCompile_AdditionalIncludeDirectories_1)</AdditionalIncludeDirectories>
-      <ForcedIncludeFiles>$(ClCompile_ForcedIncludeFiles_1)</ForcedIncludeFiles>
-    </ClCompile>
-    <ClCompile Include="..\..\Source\RPGSystem\Private\Crafting\CraftingQueueComponent.cpp">
       <AdditionalIncludeDirectories>$(ClCompile_AdditionalIncludeDirectories_1)</AdditionalIncludeDirectories>
       <ForcedIncludeFiles>$(ClCompile_ForcedIncludeFiles_1)</ForcedIncludeFiles>
     </ClCompile>
@@ -830,6 +830,7 @@
       <AdditionalIncludeDirectories>$(ClCompile_AdditionalIncludeDirectories_1)</AdditionalIncludeDirectories>
       <ForcedIncludeFiles>$(ClCompile_ForcedIncludeFiles_1)</ForcedIncludeFiles>
     </ClCompile>
+    <ClInclude Include="..\..\Source\RPGSystem\Public\Abilities\GA_Craft_Generic.h"/>
     <ClInclude Include="..\..\Source\RPGSystem\Public\Actors\AreaVolumeActor.h"/>
     <ClInclude Include="..\..\Source\RPGSystem\Public\Actors\BaseWorldItemActor.h"/>
     <ClInclude Include="..\..\Source\RPGSystem\Public\Actors\CampfireActor.h"/>
@@ -837,9 +838,9 @@
     <ClInclude Include="..\..\Source\RPGSystem\Public\Actors\PickupItemActor.h"/>
     <ClInclude Include="..\..\Source\RPGSystem\Public\Actors\StorageActor.h"/>
     <ClInclude Include="..\..\Source\RPGSystem\Public\Actors\WorkstationActor.h"/>
-    <ClInclude Include="..\..\Source\RPGSystem\Public\Crafting\CraftingQueueComponent.h"/>
     <ClInclude Include="..\..\Source\RPGSystem\Public\Crafting\CraftingRecipeDataAsset.h"/>
     <ClInclude Include="..\..\Source\RPGSystem\Public\Crafting\CraftingStationComponent.h"/>
+    <ClInclude Include="..\..\Source\RPGSystem\Public\Crafting\CraftingTypes.h"/>
     <ClInclude Include="..\..\Source\RPGSystem\Public\DecaySystem\DecayComponent.h"/>
     <ClInclude Include="..\..\Source\RPGSystem\Public\FuelSystem\FuelComponent.h"/>
     <ClInclude Include="..\..\Source\RPGSystem\Public\Interfaces\InteractionInterface.h"/>

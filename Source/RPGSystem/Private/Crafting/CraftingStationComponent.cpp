@@ -1,29 +1,12 @@
 #include "Crafting/CraftingStationComponent.h"
 #include "Crafting/CraftingRecipeDataAsset.h"
-
-#include "Inventory/InventoryComponent.h"
-#include "Inventory/InventoryHelpers.h"
-#include "Inventory/ItemDataAsset.h"
-
-#include "Progression/SkillCheckBlueprintLibrary.h"
-#include "Progression/ProgressionBlueprintLibrary.h"
-
-#include "AbilitySystemBlueprintLibrary.h"
-#include "AbilitySystemComponent.h"
-
 #include "TimerManager.h"
 #include "Engine/World.h"
-
-// If you plan to replicate this component or its state later:
-// #include "Net/UnrealNetwork.h"
+#include "GameFramework/Actor.h"
 
 UCraftingStationComponent::UCraftingStationComponent()
 {
 	PrimaryComponentTick.bCanEverTick = false;
-	SetIsReplicatedByDefault(true);
-
-	bOutputToStationInventory = true;
-	DefaultXPOnStartFraction = 0.0f;
 }
 
 void UCraftingStationComponent::BeginPlay()
@@ -31,277 +14,220 @@ void UCraftingStationComponent::BeginPlay()
 	Super::BeginPlay();
 }
 
-static UInventoryComponent* GetInvFromActor(AActor* Actor)
+void UCraftingStationComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
-	return Actor ? UInventoryHelpers::GetInventoryComponent(Actor) : nullptr;
+	GetWorld()->GetTimerManager().ClearTimer(CraftTimer);
+	Super::EndPlay(EndPlayReason);
 }
 
-UInventoryComponent* UCraftingStationComponent::ResolveOutputInventory(AActor* Instigator) const
-{
-	if (OutputInventoryOverride) return OutputInventoryOverride;
-	if (bOutputToStationInventory) return GetInvFromActor(GetOwner());
-	return GetInvFromActor(Instigator);
-}
+/* ------------------------ Query helpers ------------------------ */
 
-void UCraftingStationComponent::GrantOutputs(const TArray<FCraftItemOutput>& Outputs, int32 QualityTier, AActor* Instigator)
+void UCraftingStationComponent::GetAllStationRecipes(TArray<UCraftingRecipeDataAsset*>& Out) const
 {
-	if (UInventoryComponent* Inv = ResolveOutputInventory(Instigator))
+	for (const TSoftObjectPtr<UCraftingRecipeDataAsset>& Soft : StationRecipes)
 	{
-		for (const FCraftItemOutput& O : Outputs)
+		if (UCraftingRecipeDataAsset* R = Soft.LoadSynchronous())
 		{
-			if (!O.Item) continue;
-
-			int32 Qty = O.Quantity;
-			if (QualityTier > 0)
+			if (PassesStationFilters(R))
 			{
-				Qty += FMath::FloorToInt(QualityTier * 0.1f * O.Quantity);
+				Out.Add(R);
 			}
-			Inv->AddItem(O.Item, FMath::Max(1, Qty));
 		}
 	}
+	// If you want to support AllowedRecipeTags-driven discovery, add your registry/manager lookup here.
 }
 
-void UCraftingStationComponent::GiveStartXPIfAny(const FCraftingRequest& Req, AActor* Instigator)
+void UCraftingStationComponent::GetCraftableRecipes(AActor* Viewer, TArray<UCraftingRecipeDataAsset*>& OutCraftable, TArray<UCraftingRecipeDataAsset*>& OutLocked) const
 {
-	if (!AddXPEffectClass || !Req.SkillForXP || Req.XPGain <= 0.f) return;
-
-	const float Split = (Req.XPOnStartFraction >= 0.f) ? FMath::Clamp(Req.XPOnStartFraction, 0.f, 1.f) : DefaultXPOnStartFraction;
-	const float XPAmt = Req.XPGain * Split;
-	if (XPAmt <= 0.f) return;
-
-	AActor* Recipient = Req.XPRecipient.IsValid() ? Req.XPRecipient.Get() : Instigator;
-	if (!Recipient) return;
-
-	UProgressionBlueprintLibrary::ApplySkillXP_GE(Recipient, Recipient, AddXPEffectClass, Req.SkillForXP, XPAmt, -1.f, true);
-}
-
-void UCraftingStationComponent::GiveFinishXPIfAny(const FCraftingRequest& Req, AActor* Instigator, bool bSuccess)
-{
-	if (!bSuccess) return;
-	if (!AddXPEffectClass || !Req.SkillForXP || Req.XPGain <= 0.f) return;
-
-	const float StartSplit = (Req.XPOnStartFraction >= 0.f) ? FMath::Clamp(Req.XPOnStartFraction, 0.f, 1.f) : DefaultXPOnStartFraction;
-	const float FinishSplit = 1.f - StartSplit;
-	const float XPAmt = Req.XPGain * FinishSplit;
-	if (XPAmt <= 0.f) return;
-
-	AActor* Recipient = Req.XPRecipient.IsValid() ? Req.XPRecipient.Get() : Instigator;
-	if (!Recipient) return;
-
-	UProgressionBlueprintLibrary::ApplySkillXP_GE(Recipient, Recipient, AddXPEffectClass, Req.SkillForXP, XPAmt, -1.f, true);
-}
-
-bool UCraftingStationComponent::IsPresenceSatisfied(AActor* Instigator, const FCraftingRequest& Req) const
-{
-	if (!Instigator) return false;
-	if (Req.PresencePolicy == ECraftPresencePolicy::None) return true;
-
-	const AActor* StationOwner = GetOwner();
-	if (!StationOwner) return false;
-
-	const float Dist = FVector::Dist(StationOwner->GetActorLocation(), Instigator->GetActorLocation());
-	return Dist <= FMath::Max(0.f, Req.PresenceRadius);
-}
-
-bool UCraftingStationComponent::StartCraft(AActor* Instigator, const FCraftingRequest& Request)
-{
-	if (!GetOwner()) return false;
-
-	// Client → Server
-	if (!GetOwner()->HasAuthority())
+	TArray<UCraftingRecipeDataAsset*> All; GetAllStationRecipes(All);
+	for (UCraftingRecipeDataAsset* R : All)
 	{
-		ServerStartCraft(Instigator, Request);
-		return true; // request sent
-	}
-
-	// Server only
-	if (bIsCrafting) return false;
-
-	FCraftingRequest Req = Request;
-	if (!Req.CheckDef) Req.CheckDef = DefaultCheck;
-	if (!Req.CheckDef) return false;
-
-	// Presence gate at start if required
-	if (Req.PresencePolicy == ECraftPresencePolicy::RequireAtStart ||
-		Req.PresencePolicy == ECraftPresencePolicy::RequireStartFinish)
-	{
-		if (!IsPresenceSatisfied(Instigator, Req))
+		if (!R) continue;
+		if (IsRecipeUnlocked(Viewer, R))
 		{
-			return false;
+			OutCraftable.Add(R);
+		}
+		else
+		{
+			OutLocked.Add(R);
 		}
 	}
+}
 
-	// Skill check
-	FSkillCheckParams P;
-	FSkillCheckResult R;
-	if (!USkillCheckBlueprintLibrary::ComputeSkillCheck(Instigator ? Instigator : GetOwner(), GetOwner(), Req.CheckDef, P, R))
+/* ------------------------ Entry points ------------------------ */
+
+bool UCraftingStationComponent::StartCraftFromRecipe(AActor* Instigator, UCraftingRecipeDataAsset* Recipe, int32 Count)
+{
+	if (!Instigator || !Recipe) return false;
+	if (!PassesStationFilters(Recipe)) return false;
+	if (!IsRecipeUnlocked(Instigator, Recipe)) return false;
+
+	// Try to consume inputs up front
+	if (!HasAndConsumeInputs(Instigator, Recipe, Count))
 	{
 		return false;
 	}
 
-	const float FinalTime = FMath::Max(0.0f, Req.BaseTimeSeconds) * FMath::Max(0.01f, R.TimeMultiplier);
+	const float totalTime = FMath::Max(0.f, Recipe->BaseTimeSeconds * Count);
 
-	ActiveRequest = Req;
-	ActiveCheck = R;
-	CraftInstigator = Instigator;
-	bIsCrafting = true;
+	if (!bProcessing && (totalTime <= InstantThresholdSeconds || !bEnableQueue))
+	{
+		// Instant or direct craft
+		FCraftingJob Job; Job.RecipeID = Recipe->RecipeIDTag; Job.Recipe = Recipe; Job.Count = Count; Job.TotalTime = totalTime; Job.TimeRemaining = totalTime; Job.Instigator = Instigator;
+		OnCraftStarted.Broadcast(Job);
 
-	GiveStartXPIfAny(ActiveRequest, Instigator);
-	OnCraftStarted.Broadcast(ActiveRequest, FinalTime, ActiveCheck);
+		if (totalTime <= 0.f)
+		{
+			GrantOutputsAndXP(Instigator, Recipe, Count, /*bSuccess*/true);
+			OnCraftFinished.Broadcast(Job, /*bSuccess*/true);
+		}
+		else
+		{
+			bProcessing = true;
+			Queue.Insert(Job, 0);
+			GetWorld()->GetTimerManager().SetTimer(CraftTimer, this, &UCraftingStationComponent::TickActive, 0.1f, true);
+		}
+		return true;
+	}
 
-	GetWorld()->GetTimerManager().SetTimer(CraftTimer, this, &UCraftingStationComponent::FinishCraft, FinalTime, false);
+	// Enqueue
+	Enqueue(Recipe, Instigator, Count);
 	return true;
 }
 
-// -------- Server RPC body (MUST be this exact name/signature) --------
-void UCraftingStationComponent::ServerStartCraft_Implementation(AActor* Instigator, FCraftingRequest Request)
+bool UCraftingStationComponent::StartCraftByTag(AActor* Instigator, FGameplayTag RecipeID, int32 Count)
 {
-	StartCraft(Instigator, Request);
+	const UCraftingRecipeDataAsset* Recipe = nullptr;
+	if (!ResolveRecipeByTag(RecipeID, Recipe)) return false;
+	return StartCraftFromRecipe(Instigator, const_cast<UCraftingRecipeDataAsset*>(Recipe), Count);
 }
-// --------------------------------------------------------------------
 
-bool UCraftingStationComponent::StartCraftFromRecipe(AActor* Instigator, UCraftingRecipeDataAsset* Recipe)
+void UCraftingStationComponent::CancelActive()
+{
+	if (!bProcessing) return;
+	FinishActive(/*bSuccess*/false);
+}
+
+/* ------------------------ Internals ------------------------ */
+
+bool UCraftingStationComponent::ResolveRecipeByTag(FGameplayTag RecipeID, const UCraftingRecipeDataAsset*& OutRecipe) const
+{
+	for (const TSoftObjectPtr<UCraftingRecipeDataAsset>& Soft : StationRecipes)
+	{
+		if (const UCraftingRecipeDataAsset* R = Soft.LoadSynchronous())
+		{
+			if (R->RecipeIDTag == RecipeID) { OutRecipe = R; return true; }
+		}
+	}
+	return false;
+}
+
+bool UCraftingStationComponent::PassesStationFilters(const UCraftingRecipeDataAsset* Recipe) const
 {
 	if (!Recipe) return false;
-
-	// Reflective ingestion of your existing recipe asset:
-	FCraftingRequest Req;
-
-	// Inputs
-	if (FArrayProperty* Arr = FindFProperty<FArrayProperty>(Recipe->GetClass(), TEXT("Inputs")))
+	if (StationDiscipline.IsValid() && Recipe->CraftingDiscipline.IsValid() && Recipe->CraftingDiscipline != StationDiscipline)
 	{
-		if (FStructProperty* Inner = CastField<FStructProperty>(Arr->Inner))
-		{
-			FScriptArrayHelper Helper(Arr, Arr->ContainerPtrToValuePtr<void>(Recipe));
-			for (int32 i=0; i<Helper.Num(); ++i)
-			{
-				void* Elem = Helper.GetRawPtr(i);
-
-				FGameplayTag Tag;
-				if (FStructProperty* PTag = FindFProperty<FStructProperty>(Inner->Struct, TEXT("ItemID")))
-				{
-					if (PTag->Struct == TBaseStructure<FGameplayTag>::Get())
-						Tag = *PTag->ContainerPtrToValuePtr<FGameplayTag>(Elem);
-				}
-				else if (FStructProperty* PTag2 = FindFProperty<FStructProperty>(Inner->Struct, TEXT("ItemTag")))
-				{
-					if (PTag2->Struct == TBaseStructure<FGameplayTag>::Get())
-						Tag = *PTag2->ContainerPtrToValuePtr<FGameplayTag>(Elem);
-				}
-				else if (FStructProperty* PTag3 = FindFProperty<FStructProperty>(Inner->Struct, TEXT("ID")))
-				{
-					if (PTag3->Struct == TBaseStructure<FGameplayTag>::Get())
-						Tag = *PTag3->ContainerPtrToValuePtr<FGameplayTag>(Elem);
-				}
-
-				int32 Qty = 1;
-				if (FIntProperty* PQ = FindFProperty<FIntProperty>(Inner->Struct, TEXT("Quantity")))   Qty = PQ->GetPropertyValue_InContainer(Elem);
-				else if (FIntProperty* PQ2 = FindFProperty<FIntProperty>(Inner->Struct, TEXT("Qty")))  Qty = PQ2->GetPropertyValue_InContainer(Elem);
-				else if (FIntProperty* PQ3 = FindFProperty<FIntProperty>(Inner->Struct, TEXT("Count")))Qty = PQ3->GetPropertyValue_InContainer(Elem);
-				else if (FIntProperty* PQ4 = FindFProperty<FIntProperty>(Inner->Struct, TEXT("Amount")))Qty = PQ4->GetPropertyValue_InContainer(Elem);
-
-				FCraftItemCost Cost;
-				Cost.ItemID = Tag;
-				Cost.Quantity = FMath::Max(1, Qty);
-				Req.Inputs.Add(Cost);
-			}
-		}
+		return false;
 	}
-
-	// Outputs
-	if (FArrayProperty* ArrOut = FindFProperty<FArrayProperty>(Recipe->GetClass(), TEXT("Outputs")))
+	if (!Recipe->RequiredStationTags.IsEmpty() && !StationTags.HasAll(Recipe->RequiredStationTags))
 	{
-		if (FStructProperty* Inner = CastField<FStructProperty>(ArrOut->Inner))
-		{
-			FScriptArrayHelper Helper(ArrOut, ArrOut->ContainerPtrToValuePtr<void>(Recipe));
-			for (int32 i=0; i<Helper.Num(); ++i)
-			{
-				void* Elem = Helper.GetRawPtr(i);
-
-				UItemDataAsset* Item = nullptr;
-				if (FObjectProperty* PO = FindFProperty<FObjectProperty>(Inner->Struct, TEXT("Item")))
-				{
-					if (PO->PropertyClass->IsChildOf(UItemDataAsset::StaticClass()))
-						Item = *PO->ContainerPtrToValuePtr<UItemDataAsset*>(Elem);
-				}
-				else if (FObjectProperty* PO2 = FindFProperty<FObjectProperty>(Inner->Struct, TEXT("ItemAsset")))
-				{
-					if (PO2->PropertyClass->IsChildOf(UItemDataAsset::StaticClass()))
-						Item = *PO2->ContainerPtrToValuePtr<UItemDataAsset*>(Elem);
-				}
-				else if (FObjectProperty* PO3 = FindFProperty<FObjectProperty>(Inner->Struct, TEXT("ItemData")))
-				{
-					if (PO3->PropertyClass->IsChildOf(UItemDataAsset::StaticClass()))
-						Item = *PO3->ContainerPtrToValuePtr<UItemDataAsset*>(Elem);
-				}
-
-				int32 Qty = 1;
-				if (FIntProperty* PQ = FindFProperty<FIntProperty>(Inner->Struct, TEXT("Quantity")))   Qty = PQ->GetPropertyValue_InContainer(Elem);
-				else if (FIntProperty* PQ2 = FindFProperty<FIntProperty>(Inner->Struct, TEXT("Qty")))  Qty = PQ2->GetPropertyValue_InContainer(Elem);
-				else if (FIntProperty* PQ3 = FindFProperty<FIntProperty>(Inner->Struct, TEXT("Count")))Qty = PQ3->GetPropertyValue_InContainer(Elem);
-				else if (FIntProperty* PQ4 = FindFProperty<FIntProperty>(Inner->Struct, TEXT("Amount")))Qty = PQ4->GetPropertyValue_InContainer(Elem);
-
-				if (Item)
-				{
-					FCraftItemOutput Out;
-					Out.Item = Item;
-					Out.Quantity = FMath::Max(1, Qty);
-					Req.Outputs.Add(Out);
-				}
-			}
-		}
+		return false;
 	}
-
-	// Base time (try a few common field names, default 1s)
-	Req.BaseTimeSeconds = 1.0f;
-	if (FFloatProperty* PT = FindFProperty<FFloatProperty>(Recipe->GetClass(), TEXT("BaseTimeSeconds")))
-		Req.BaseTimeSeconds = PT->GetPropertyValue_InContainer(Recipe);
-	else if (FFloatProperty* PT2 = FindFProperty<FFloatProperty>(Recipe->GetClass(), TEXT("CraftTime")))
-		Req.BaseTimeSeconds = PT2->GetPropertyValue_InContainer(Recipe);
-	else if (FFloatProperty* PT3 = FindFProperty<FFloatProperty>(Recipe->GetClass(), TEXT("TimeToCraft")))
-		Req.BaseTimeSeconds = PT3->GetPropertyValue_InContainer(Recipe);
-
-	Req.XPRecipient = Instigator;
-
-	return StartCraft(Instigator, Req);
+	// Optional: AllowedRecipeTags filter (by RecipeIDTag)
+	if (!AllowedRecipeTags.IsEmpty() && !AllowedRecipeTags.HasTag(Recipe->RecipeIDTag))
+	{
+		return false;
+	}
+	return true;
 }
 
-void UCraftingStationComponent::CancelCraft()
+bool UCraftingStationComponent::IsRecipeUnlocked(AActor* Viewer, const UCraftingRecipeDataAsset* Recipe) const
 {
-	if (!bIsCrafting) return;
-	GetWorld()->GetTimerManager().ClearTimer(CraftTimer);
-	bIsCrafting = false;
-	ActiveRequest = FCraftingRequest{};
-	ActiveCheck = FSkillCheckResult{};
-	CraftInstigator = nullptr;
+	// If no unlock tag, treat as unlocked
+	if (!Recipe || !Recipe->UnlockTag.IsValid()) return true;
+
+	// Simple default: if the viewer (or its components) has the tag, it’s unlocked.
+	// Replace with your own unlock system (ASC owned tags, save data, etc.)
+	if (Viewer)
+	{
+		FGameplayTagContainer Owned;
+		Viewer->GetOwnedGameplayTags(Owned);
+		return Owned.HasTag(Recipe->UnlockTag);
+	}
+	return false;
 }
 
-void UCraftingStationComponent::FinishCraft()
+bool UCraftingStationComponent::HasAndConsumeInputs(AActor* Instigator, const UCraftingRecipeDataAsset* Recipe, int32 Count)
+{
+	// TODO: Hook to your inventory search: player + nearby/public chests.
+	// For now return true so you can test flow quickly.
+	return true;
+}
+
+void UCraftingStationComponent::GrantOutputsAndXP(AActor* Instigator, const UCraftingRecipeDataAsset* Recipe, int32 Count, bool bSuccess)
+{
+	if (!Recipe || !Instigator) return;
+
+	// TODO: Add items to output inventory / drop in world (use your InventoryComponent helpers)
+	// TODO: Award skill XP via your ExecCalc / GE (Recipe->PrimarySkillData, Recipe->BaseSkillXP * Count)
+	// Keep it server-authoritative.
+}
+
+void UCraftingStationComponent::Enqueue(const UCraftingRecipeDataAsset* Recipe, AActor* Instigator, int32 Count)
+{
+	FCraftingJob Job;
+	Job.RecipeID = Recipe->RecipeIDTag;
+	Job.Recipe   = Recipe;
+	Job.Count    = Count;
+	Job.TotalTime = FMath::Max(0.f, Recipe->BaseTimeSeconds * Count);
+	Job.TimeRemaining = Job.TotalTime;
+	Job.Instigator = Instigator;
+
+	Queue.Add(Job);
+
+	if (!bProcessing)
+	{
+		TryStartNext();
+	}
+}
+
+void UCraftingStationComponent::TryStartNext()
+{
+	if (Queue.Num() == 0 || bProcessing) return;
+
+	bProcessing = true;
+
+	// Fire Started for the head
+	OnCraftStarted.Broadcast(Queue[0]);
+
+	// Tick at 0.1s – adjust as you like
+	GetWorld()->GetTimerManager().SetTimer(CraftTimer, this, &UCraftingStationComponent::TickActive, 0.1f, true);
+}
+
+void UCraftingStationComponent::TickActive()
+{
+	if (Queue.Num() == 0) { GetWorld()->GetTimerManager().ClearTimer(CraftTimer); bProcessing = false; return; }
+
+	FCraftingJob& Head = Queue[0];
+	Head.TimeRemaining = FMath::Max(0.f, Head.TimeRemaining - 0.1f);
+
+	if (Head.TimeRemaining <= 0.f)
+	{
+		FinishActive(/*bSuccess*/true);
+	}
+}
+
+void UCraftingStationComponent::FinishActive(bool bSuccess)
 {
 	GetWorld()->GetTimerManager().ClearTimer(CraftTimer);
+	if (Queue.Num() == 0) { bProcessing = false; return; }
 
-	bool bSuccess = ActiveCheck.bSuccess;
-	AActor* Inst = CraftInstigator.Get();
+	FCraftingJob Done = Queue[0];
+	Queue.RemoveAt(0);
 
-	if (bSuccess && (ActiveRequest.PresencePolicy == ECraftPresencePolicy::RequireAtFinish ||
-					 ActiveRequest.PresencePolicy == ECraftPresencePolicy::RequireStartFinish))
-	{
-		if (!IsPresenceSatisfied(Inst, ActiveRequest))
-		{
-			bSuccess = false;
-		}
-	}
+	GrantOutputsAndXP(Done.Instigator.Get(), Done.Recipe, Done.Count, bSuccess);
+	OnCraftFinished.Broadcast(Done, bSuccess);
 
-	if (bSuccess)
-	{
-		GrantOutputs(ActiveRequest.Outputs, ActiveCheck.QualityTier, Inst);
-	}
-
-	GiveFinishXPIfAny(ActiveRequest, Inst, bSuccess);
-	OnCraftCompleted.Broadcast(ActiveRequest, ActiveCheck, bSuccess);
-
-	bIsCrafting = false;
-	ActiveRequest = FCraftingRequest{};
-	ActiveCheck = FSkillCheckResult{};
-	CraftInstigator = nullptr;
+	bProcessing = false;
+	TryStartNext(); // continue with next
 }

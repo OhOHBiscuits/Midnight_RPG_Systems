@@ -6,11 +6,15 @@
 #include "WorkstationActor.generated.h"
 
 class UUserWidget;
+class UCraftingStationComponent;
+class UCraftingQueueComponent;
+class UCraftingRecipeDataAsset;
+struct FCraftingRequest;
+struct FSkillCheckResult;
 
 /**
- * Base workstation actor (e.g., forge, oven, etc.)
- * - Shares the unified world-item UI pipeline from ABaseWorldItemActor.
- * - Child classes may override OpenWorkstationUIFor for custom preconditions.
+ * Base workstation actor (forge, oven, table, etc.)
+ * Keeps your world-item UI + adds Crafting Station & Queue (optional use).
  */
 UCLASS()
 class RPGSYSTEM_API AWorkstationActor : public ABaseWorldItemActor
@@ -28,15 +32,29 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Workstation")
 	FGameplayTag InteractionTypeTag;
 
+	/** Crafting Station (server-authoritative). */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="1_Crafting-Setup")
+	UCraftingStationComponent* CraftingStation;
+	
 	/** Called server-side when we want to open the workstation UI for an interactor. */
 	UFUNCTION(BlueprintCallable, Category="Workstation")
 	virtual void OpenWorkstationUIFor(AActor* Interactor);
+
+	// ---------- Crafting helpers (Blueprint-friendly) ----------
+	UFUNCTION(BlueprintCallable, Category="1_Crafting-Actions")
+	bool StartCraftFromRecipe(UCraftingRecipeDataAsset* Recipe);
+
+	UFUNCTION(BlueprintCallable, Category="1_Crafting-Actions")
+	int32 EnqueueRecipeBatch(UCraftingRecipeDataAsset* Recipe, int32 Quantity = 1);
+
+	UFUNCTION(BlueprintCallable, Category="1_Crafting-Actions")
+	void CancelCraft();
 
 protected:
 	/** Server-side interaction entry from the base class. */
 	virtual void HandleInteract_Server(AActor* Interactor) override;
 
-	/** Anchor only for stations that show extra visuals (VFX, temp meshes, etc.) */
+	/** Anchor for visuals (preview mesh, etc.) */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Workstation|Visuals")
 	USceneComponent* VisualsRoot;
 
@@ -44,6 +62,12 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Workstation|Visuals")
 	UStaticMeshComponent* PreviewMesh;
 
+	// Station event sinks (forwarded for convenience)
+	UFUNCTION()
+	void HandleCraftStarted(const FCraftingRequest& Request, float FinalTime, const FSkillCheckResult& Check);
+
+	UFUNCTION()
+	void HandleCraftCompleted(const FCraftingRequest& Request, const FSkillCheckResult& Check, bool bSuccess);
 
 	/** Simple hook you can call from BP when input changes, etc. */
 	UFUNCTION(BlueprintCallable, Category="Workstation|Visuals")

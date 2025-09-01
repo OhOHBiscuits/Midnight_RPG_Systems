@@ -1,4 +1,5 @@
 #include "Crafting/CraftingRecipeDataAsset.h"
+#include "GameplayTagsManager.h"
 
-// Intentionally empty: data asset only.
-// Keep logic in abilities/helpers to avoid coupling.
+
+

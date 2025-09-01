@@ -32,14 +32,12 @@ public:
 	UFUNCTION(BlueprintCallable, Category="1_Inventory-Fuel")
 	void StopBurn();
 
-	// NOTE: Base class already declares this as a UFUNCTION. Do NOT redeclare UFUNCTION here.
-	virtual void OpenWorkstationUIFor(AActor* Interactor) override;
-	// If your base is BlueprintNativeEvent instead, switch to:
-	// virtual void OpenWorkstationUIFor_Implementation(AActor* Interactor) override;
-
-	// Optional hook you can call from UI or logic
-	UFUNCTION(BlueprintCallable, Category="1_Inventory-Fuel")
+	// Optional hook
+	UFUNCTION(BlueprintCallable, Category="1_Crafting-Logic")
 	void OnCraftingActivated();
+
+	// UI passthrough
+	virtual void OpenWorkstationUIFor(AActor* Interactor) override;
 
 protected:
 	virtual void OnConstruction(const FTransform& Transform) override;
@@ -48,4 +46,5 @@ protected:
 
 private:
 	void SetupFuelLinks();
+	void SetupCraftingOutputRouting();
 };

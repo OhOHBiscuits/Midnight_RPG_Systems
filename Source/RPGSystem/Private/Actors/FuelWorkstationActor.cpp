@@ -2,6 +2,8 @@
 #include "Inventory/InventoryComponent.h"
 #include "FuelSystem/FuelComponent.h"
 
+#include "Crafting/CraftingStationComponent.h"
+
 AFuelWorkstationActor::AFuelWorkstationActor()
 {
 	FuelInputInventory = CreateDefaultSubobject<UInventoryComponent>(TEXT("FuelInputInventory"));
@@ -17,9 +19,18 @@ void AFuelWorkstationActor::SetupFuelLinks()
 {
 	if (FuelComponent)
 	{
-		// Directly assign because UFuelComponent doesn't provide setters in your build
 		FuelComponent->FuelInventory      = FuelInputInventory;
 		FuelComponent->ByproductInventory = OutputInventory;
+	}
+}
+
+void AFuelWorkstationActor::SetupCraftingOutputRouting()
+{
+	// Route crafted outputs to this actor's OutputInventory by default.
+	if (CraftingStation && OutputInventory)
+	{
+		CraftingStation->bOutputToStationInventory = true;
+		CraftingStation->OutputInventoryOverride   = OutputInventory;
 	}
 }
 
@@ -27,18 +38,21 @@ void AFuelWorkstationActor::OnConstruction(const FTransform& Transform)
 {
 	Super::OnConstruction(Transform);
 	SetupFuelLinks();
+	SetupCraftingOutputRouting();
 }
 
 void AFuelWorkstationActor::PostInitializeComponents()
 {
 	Super::PostInitializeComponents();
 	SetupFuelLinks();
+	SetupCraftingOutputRouting();
 }
 
 void AFuelWorkstationActor::BeginPlay()
 {
 	Super::BeginPlay();
 	SetupFuelLinks();
+	SetupCraftingOutputRouting();
 }
 
 void AFuelWorkstationActor::StartBurn()
@@ -51,24 +65,13 @@ void AFuelWorkstationActor::StopBurn()
 	if (FuelComponent) FuelComponent->StopBurn();
 }
 
-// If base declares UFUNCTION(BlueprintCallable) virtual void OpenWorkstationUIFor(AActor*);
 void AFuelWorkstationActor::OpenWorkstationUIFor(AActor* Interactor)
 {
 	Super::OpenWorkstationUIFor(Interactor);
-	// Optional: add station-specific pre/post UI logic here.
+	// Station-specific pre/post UI logic can go here if needed.
 }
-
-/*
-// If base declares UFUNCTION(BlueprintNativeEvent) void OpenWorkstationUIFor(AActor*);
-// Use this version instead (and comment the one above):
-void AFuelWorkstationActor::OpenWorkstationUIFor_Implementation(AActor* Interactor)
-{
-	Super::OpenWorkstationUIFor_Implementation(Interactor);
-}
-*/
 
 void AFuelWorkstationActor::OnCraftingActivated()
 {
-	// Keep lightweight & decoupled; no dependency on a specific UFuelComponent API.
-	// You can trigger station "active" state here if you add such a flag later.
+	// Optional hook (e.g., tick fuel, toggle fire FX, etc.)
 }
