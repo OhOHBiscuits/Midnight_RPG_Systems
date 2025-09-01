@@ -6,9 +6,14 @@
 
 AFuelWorkstationActor::AFuelWorkstationActor()
 {
+	PrimaryActorTick.bCanEverTick = false;
+
 	FuelInputInventory = CreateDefaultSubobject<UInventoryComponent>(TEXT("FuelInputInventory"));
 	OutputInventory    = CreateDefaultSubobject<UInventoryComponent>(TEXT("OutputInventory"));
 	FuelComponent      = CreateDefaultSubobject<UFuelComponent>(TEXT("FuelComponent"));
+
+	CraftingStation = CreateDefaultSubobject<UCraftingStationComponent>(TEXT("CraftingStation"));
+	CraftingStation->SetupAttachment(GetRootComponent());
 
 	if (FuelInputInventory) FuelInputInventory->SetIsReplicated(true);
 	if (OutputInventory)    OutputInventory->SetIsReplicated(true);

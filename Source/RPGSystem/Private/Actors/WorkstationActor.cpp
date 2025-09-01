@@ -1,94 +1,39 @@
 ﻿#include "Actors/WorkstationActor.h"
-#include "Blueprint/UserWidget.h"
-
 #include "Crafting/CraftingStationComponent.h"
 #include "Crafting/CraftingRecipeDataAsset.h"
 
 AWorkstationActor::AWorkstationActor()
 {
-	// Visuals
-	VisualsRoot = CreateDefaultSubobject<USceneComponent>(TEXT("VisualsRoot"));
-	VisualsRoot->SetupAttachment(GetRootComponent());
+	PrimaryActorTick.bCanEverTick = false;
 
-	PreviewMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("PreviewMesh"));
-	PreviewMesh->SetupAttachment(VisualsRoot);
-	PreviewMesh->SetMobility(EComponentMobility::Movable);
-	PreviewMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-	PreviewMesh->SetGenerateOverlapEvents(false);
-	PreviewMesh->SetHiddenInGame(true);
-
-	// Crafting
-	CraftingStation = CreateDefaultSubobject<UCraftingStationComponent>(TEXT("CraftingStation"));	
-
-	if (CraftingStation) CraftingStation->SetIsReplicated(true);	
-
-	// Workstations typically care about efficiency for capacity/cost scaling.
-	bUseEfficiency = true;
+	CraftingStation = CreateDefaultSubobject<UCraftingStationComponent>(TEXT("CraftingStation"));
 }
 
-void AWorkstationActor::HandleInteract_Server(AActor* Interactor)
+void AWorkstationActor::BeginPlay()
 {
-	OpenWorkstationUIFor(Interactor);
-}
+	Super::BeginPlay();
 
-void AWorkstationActor::OpenWorkstationUIFor(AActor* Interactor)
-{
-	if (WorkstationWidgetClass)
-	{
-		// Uses ABaseWorldItemActor's shared UI pipeline
-		ShowWorldItemUI(Interactor, WorkstationWidgetClass);
-	}
-
-	// Bind once for quick testing feedback (optional)
 	if (CraftingStation)
 	{
-		if (!CraftingStation->OnCraftStarted.IsAlreadyBound(this, &AWorkstationActor::HandleCraftStarted))
+		if (!CraftingStation->OnCraftFinished.IsAlreadyBound(this, &AWorkstationActor::HandleCraftFinished))
 		{
-			CraftingStation->OnCraftStarted.AddDynamic(this, &AWorkstationActor::HandleCraftStarted);
-		}
-		if (!CraftingStation->OnCraftCompleted.IsAlreadyBound(this, &AWorkstationActor::HandleCraftCompleted))
-		{
-			CraftingStation->OnCraftCompleted.AddDynamic(this, &AWorkstationActor::HandleCraftCompleted);
+			CraftingStation->OnCraftFinished.AddDynamic(this, &AWorkstationActor::HandleCraftFinished);
 		}
 	}
 }
 
-bool AWorkstationActor::StartCraftFromRecipe(UCraftingRecipeDataAsset* Recipe)
+bool AWorkstationActor::StartRecipe(UCraftingRecipeDataAsset* Recipe, int32 /*Quantity*/)
 {
-	if (!CraftingStation) return false;
+	if (!CraftingStation || !Recipe) return false;
 	return CraftingStation->StartCraftFromRecipe(this, Recipe);
 }
 
-int32 AWorkstationActor::EnqueueRecipeBatch(UCraftingRecipeDataAsset* Recipe, int32 Quantity)
+void AWorkstationActor::OpenWorkstationUIFor(AActor* /*Interactor*/)
 {
-	if (!CraftingQueue || !Recipe || Quantity <= 0) return 0;
-	// Keep this generic: queue owns how to start/drive the station internally.
-	return CraftingQueue->EnqueueRecipeFor(this, Recipe, Quantity);
+	// Default: do nothing. Derived classes can open widgets/HUD, play SFX, etc.
 }
 
-void AWorkstationActor::CancelCraft()
+void AWorkstationActor::HandleCraftFinished(const FCraftingJob& /*Job*/, bool /*bSuccess*/)
 {
-	if (CraftingStation)
-	{
-		CraftingStation->CancelCraft();
-	}
-}
-
-void AWorkstationActor::HandleCraftStarted(const FCraftingRequest& /*Request*/, float /*FinalTime*/, const FSkillCheckResult& /*Check*/)
-{
-	// Hook for bench-specific VFX/SFX if you want
-}
-
-void AWorkstationActor::HandleCraftCompleted(const FCraftingRequest& /*Request*/, const FSkillCheckResult& /*Check*/, bool /*bSuccess*/)
-{
-	// Hook for bench-specific VFX/SFX if you want
-}
-
-void AWorkstationActor::HidePreview()
-{
-	if (PreviewMesh)
-	{
-		PreviewMesh->SetStaticMesh(nullptr);
-		PreviewMesh->SetHiddenInGame(true);
-	}
+	// Toggle VFX/SFX here if desired.
 }

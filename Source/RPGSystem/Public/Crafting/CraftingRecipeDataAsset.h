@@ -1,57 +1,57 @@
-// CraftingRecipeDataAsset.h
 #pragma once
+
 #include "CoreMinimal.h"
 #include "Engine/DataAsset.h"
 #include "GameplayTagContainer.h"
-#include "Crafting/CraftingTypes.h"          // <— ADD
+#include "CraftingTypes.h"
 #include "CraftingRecipeDataAsset.generated.h"
+
+class UCheckDefinition;
+class USkillProgressionData;
 
 UCLASS(BlueprintType)
 class RPGSYSTEM_API UCraftingRecipeDataAsset : public UDataAsset
 {
 	GENERATED_BODY()
 public:
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="1_Crafting-Recipe")
+	// An ID for UI/filters; also copied into the request when crafted
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Recipe")
 	FGameplayTag RecipeIDTag;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="1_Crafting-Recipe")
-	FGameplayTag CraftingDiscipline;
+	// What this recipe consumes/produces
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Recipe")
+	TArray<FCraftItemCost> Inputs;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="2_Gates")
-	FGameplayTagContainer RequiredStationTags;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Recipe")
+	TArray<FCraftItemOutput> Outputs;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="2_Gates")
-	FGameplayTagContainer RequiredToolTags;
+	// Base craft time (will be modified by skill checks, buffs, etc.)
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Recipe", meta=(ClampMin="0.0"))
+	float BaseTimeSeconds = 1.0f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="3_Inputs")
-	TArray<FCraftingItemQuantity> Inputs;
+	// Optional skill check used when crafting this recipe
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Checks")
+	TObjectPtr<UCheckDefinition> Check = nullptr;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="4_Outputs")
-	TArray<FCraftingItemQuantity> Outputs;
+	// Skill line & XP values
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Progression")
+	TObjectPtr<USkillProgressionData> SkillForXP = nullptr;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="5_Timing", meta=(ClampMin="0.0"))
-	float BaseTimeSeconds = 1.f;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Progression", meta=(ClampMin="0.0"))
+	float XPTotal = 0.0f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="6_Progression")
-	TObjectPtr<class USkillProgressionData> PrimarySkillData = nullptr;
+	// Fraction of XP to grant at start (remainder on finish); <0 means "use station default"
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Progression", meta=(ClampMin="-1.0", ClampMax="1.0"))
+	float XPOnStartFraction = -1.f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="6_Progression")
-	float BaseSkillXP = 0.f;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="6_Progression")
-	float BaseCharacterXP = 0.f;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="7_Presence")
+	// Presence rules
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Presence")
 	ECraftPresencePolicy PresencePolicy = ECraftPresencePolicy::None;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="7_Presence", meta=(ClampMin="0.0"))
-	float PresenceRadius = 600.f;	
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Presence", meta=(ClampMin="0.0"))
+	float PresenceRadius = 600.f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="1_Crafting-Recipe")
-	FGameplayTag UnlockTag;                          
-
-	
-	
-
-
+	// (Optional) Which stations can run this; if empty, any station may (filtered by game rules/UI)
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Stations")
+	FGameplayTagContainer RequiredStationTags;
 };
