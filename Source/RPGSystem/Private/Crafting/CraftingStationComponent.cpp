@@ -1,16 +1,13 @@
 #include "Crafting/CraftingStationComponent.h"
 #include "Crafting/CraftingRecipeDataAsset.h"
-#include "Inventory/InventoryComponent.h"
-
+#include "GameplayTagAssetInterface.h"
+#include "GameFramework/PlayerState.h"
+#include "GameFramework/PlayerController.h"
 #include "AbilitySystemInterface.h"
 #include "AbilitySystemComponent.h"
-#include "GameplayTagAssetInterface.h"
-
-#include "GameFramework/Actor.h"
-#include "GameFramework/Pawn.h"
-#include "GameFramework/PlayerState.h"
-#include "GameFramework/Controller.h"
+#include "Inventory/InventoryComponent.h"
 #include "TimerManager.h"
+#include "Engine/World.h"
 
 UCraftingStationComponent::UCraftingStationComponent()
 {
@@ -23,226 +20,240 @@ void UCraftingStationComponent::BeginPlay()
 	Super::BeginPlay();
 }
 
+bool UCraftingStationComponent::StartCraft(AActor* Instigator, const FCraftingRequest& Request)
+{
+	if (!GetOwner() || !GetOwner()->HasAuthority()) return false;
+	if (bIsCrafting) return false;
+	if (!Instigator) Instigator = GetOwner();
+
+	if (!IsPresenceSatisfied(Instigator, Request))
+	{
+		return false;
+	}
+
+	CraftInstigator = Instigator;
+	ActiveRequest   = Request;
+	bIsCrafting     = true;
+
+	// Stub skill check (hook up your library here if desired)
+	if (ActiveRequest.CheckDef)
+	{
+		ActiveCheck = FSkillCheckResult();
+	}
+
+	FCraftingJob Job;
+	Job.Request  = ActiveRequest;
+	Job.FinalTime = ActiveRequest.BaseTimeSeconds;
+	OnCraftStarted.Broadcast(Job);
+
+	GiveStartXPIfAny(ActiveRequest, Instigator);
+
+	if (UWorld* W = GetWorld())
+	{
+		W->GetTimerManager().SetTimer(
+			CraftTimer,
+			this,
+			&UCraftingStationComponent::FinishCraft,
+			FMath::Max(ActiveRequest.BaseTimeSeconds, 0.01f),
+			false);
+	}
+	return true;
+}
+
 bool UCraftingStationComponent::StartCraftFromRecipe(AActor* Instigator, const UCraftingRecipeDataAsset* Recipe)
 {
 	if (!Recipe) return false;
 
 	FCraftingRequest Req;
-	Req.RecipeID          = Recipe->RecipeIDTag;
-	Req.Inputs            = Recipe->Inputs;
-	Req.Outputs           = Recipe->Outputs;
-	Req.BaseTimeSeconds   = Recipe->BaseTimeSeconds;
-	Req.CheckDef          = Recipe->Check;                     // may be null -> we’ll use DefaultCheck
-	Req.SkillForXP        = Recipe->SkillForXP;
-	Req.XPGain            = Recipe->XPTotal;
-	Req.XPOnStartFraction = Recipe->XPOnStartFraction;
-	Req.PresencePolicy    = Recipe->PresencePolicy;
-	Req.PresenceRadius    = Recipe->PresenceRadius;
+	Req.RecipeID         = Recipe->RecipeIDTag;
+	Req.BaseTimeSeconds  = Recipe->BaseTimeSeconds;
+	Req.CheckDef         = Recipe->CheckDef ? Recipe->CheckDef : DefaultCheck;
+	Req.SkillForXP       = Recipe->SkillForXP;
+	Req.XPGain           = Recipe->XPGain;
+	Req.XPOnStartFraction= (Recipe->XPOnStartFraction >= 0.f) ? Recipe->XPOnStartFraction : DefaultXPOnStartFraction;
+	Req.PresencePolicy   = Recipe->PresencePolicy;
+	Req.PresenceRadius   = Recipe->PresenceRadius;
+
+	Req.Inputs  = Recipe->Inputs;
+	Req.Outputs = Recipe->Outputs;
 
 	return StartCraft(Instigator, Req);
-}
-
-bool UCraftingStationComponent::StartCraft(AActor* Instigator, const FCraftingRequest& Request)
-{
-	if (bIsCrafting || !Instigator) return false;
-
-	ActiveRequest = Request;
-	if (!ActiveRequest.CheckDef && DefaultCheck)
-	{
-		ActiveRequest.CheckDef = DefaultCheck;
-	}
-
-	// === Skill Check ===
-	// To avoid hard dependency on your BP function name, use a safe default here.
-	// Hook your real check later (BP or C++) and set ActiveCheck there.
-	ActiveCheck = FSkillCheckResult{};
-	ActiveCheck.bSuccess       = true;      // default pass
-	ActiveCheck.TimeMultiplier = 1.0f;      // no speed change
-	ActiveCheck.QualityTier    = 0;         // baseline quality
-
-	const float TimeMult = FMath::Max(0.01f, ActiveCheck.TimeMultiplier);
-	const float FinalTime = FMath::Max(0.0f, ActiveRequest.BaseTimeSeconds * TimeMult);
-
-	// Broadcast start
-	FCraftingJob Job;
-	Job.Request   = ActiveRequest;
-	Job.FinalTime = FinalTime;
-	OnCraftStarted.Broadcast(Job);
-
-	// XP at start
-	GiveStartXPIfAny(ActiveRequest, Instigator);
-
-	// Timer
-	bIsCrafting = true;
-	CraftInstigator = Instigator;
-	GetWorld()->GetTimerManager().SetTimer(CraftTimer, this, &UCraftingStationComponent::FinishCraft, FinalTime, false);
-
-	return true;
 }
 
 void UCraftingStationComponent::CancelCraft()
 {
 	if (!bIsCrafting) return;
+	if (UWorld* W = GetWorld())
+	{
+		W->GetTimerManager().ClearTimer(CraftTimer);
+	}
 
-	GetWorld()->GetTimerManager().ClearTimer(CraftTimer);
+	const bool bSuccess = false;
 
 	FCraftingJob Job;
 	Job.Request  = ActiveRequest;
-	Job.FinalTime = 0.f;
+	Job.FinalTime = ActiveRequest.BaseTimeSeconds;
 
-	bIsCrafting = false;
-	CraftInstigator = nullptr;
+	bIsCrafting   = false;
+	ActiveRequest = FCraftingRequest();
+	ActiveCheck   = FSkillCheckResult();
 
-	OnCraftFinished.Broadcast(Job, false);
+	OnCraftFinished.Broadcast(Job, bSuccess);
 }
 
 void UCraftingStationComponent::FinishCraft()
 {
-	AActor* Instigator = CraftInstigator.Get();
-	const bool bPresenceOK = IsPresenceSatisfied(Instigator, ActiveRequest);
-	const bool bSuccess = bPresenceOK && ActiveCheck.bSuccess;
+	const bool bSuccess = true; // Replace with your success logic
 
-	if (bSuccess)
-	{
-		const int32 QualityTier = ActiveCheck.QualityTier;
-		GrantOutputs(ActiveRequest.Outputs, QualityTier, Instigator);
-	}
+	AActor* Instigator = CraftInstigator.Get();
+	GrantOutputs(ActiveRequest.Outputs, 0, Instigator);
 
 	GiveFinishXPIfAny(ActiveRequest, Instigator, bSuccess);
 
 	FCraftingJob Job;
-	Job.Request   = ActiveRequest;
-	Job.FinalTime = ActiveRequest.BaseTimeSeconds * FMath::Max(0.01f, ActiveCheck.TimeMultiplier);
+	Job.Request  = ActiveRequest;
+	Job.FinalTime = ActiveRequest.BaseTimeSeconds;
 
-	bIsCrafting = false;
-	CraftInstigator = nullptr;
+	bIsCrafting   = false;
+	ActiveRequest = FCraftingRequest();
+	ActiveCheck   = FSkillCheckResult();
 
 	OnCraftFinished.Broadcast(Job, bSuccess);
 }
 
 UInventoryComponent* UCraftingStationComponent::ResolveOutputInventory(AActor* Instigator) const
 {
-	if (AActor* Owner = GetOwner())
+	if (OutputInventoryOverride) return OutputInventoryOverride;
+
+	if (bOutputToStationInventory)
 	{
-		if (UInventoryComponent* Inv = Owner->FindComponentByClass<UInventoryComponent>())
+		if (const AActor* Owner = GetOwner())
 		{
-			return Inv;
+			return const_cast<AActor*>(Owner)->FindComponentByClass<UInventoryComponent>();
 		}
 	}
+
 	return Instigator ? Instigator->FindComponentByClass<UInventoryComponent>() : nullptr;
 }
 
 void UCraftingStationComponent::GrantOutputs(const TArray<FCraftItemOutput>& Outputs, int32 /*QualityTier*/, AActor* Instigator)
 {
-	if (Outputs.IsEmpty()) return;
+	if (Outputs.Num() == 0) return;
 
 	if (UInventoryComponent* OutInv = ResolveOutputInventory(Instigator))
 	{
-		// NOTE: Your InventoryComponent doesn’t expose AddItemByAsset.
-		// Hook your project’s real add API here. For now we just log for visibility.
 		for (const FCraftItemOutput& Out : Outputs)
 		{
 			if (!Out.Item || Out.Quantity <= 0) continue;
-			UE_LOG(LogTemp, Log, TEXT("[Crafting] GrantOutputs -> %s x%d"),
-				*GetNameSafe(Out.Item), Out.Quantity);
-			// TODO: Replace with your Inventory API, e.g. OutInv->AddItemByTag(Out.Item->ItemTag, Out.Quantity);
+
+			// TODO: call your actual inventory API here:
+			// OutInv->AddItemByAsset(Out.Item, Out.Quantity);
+
+			const TCHAR* ItemName = Out.Item ? *Out.Item->GetName() : TEXT("None");
+			const TCHAR* InvName  = OutInv   ? *OutInv->GetName()   : TEXT("None");
+			UE_LOG(LogTemp, Log, TEXT("[Crafting] Would grant %d x %s to %s"), Out.Quantity, ItemName, InvName);
+		}
+	}
+	else
+	{
+		for (const FCraftItemOutput& Out : Outputs)
+		{
+			const TCHAR* ItemName = Out.Item ? *Out.Item->GetName() : TEXT("None");
+			UE_LOG(LogTemp, Warning, TEXT("[Crafting] No inventory to receive %d x %s"), Out.Quantity, ItemName);
 		}
 	}
 }
 
+static UAbilitySystemComponent* GetASCFromAny(const UObject* Obj)
+{
+	if (!Obj) return nullptr;
+
+	if (const IAbilitySystemInterface* ASI = Cast<IAbilitySystemInterface>(Obj))
+	{
+		return ASI->GetAbilitySystemComponent();
+	}
+	if (const AActor* Actor = Cast<AActor>(Obj))
+	{
+		return Actor->FindComponentByClass<UAbilitySystemComponent>();
+	}
+	return nullptr;
+}
+
 void UCraftingStationComponent::GiveStartXPIfAny(const FCraftingRequest& Req, AActor* Instigator)
 {
-	if (!Req.SkillForXP || Req.XPGain <= 0.f) return;
-
-	const float StartFrac = (Req.XPOnStartFraction < 0.f) ? DefaultXPOnStartFraction : Req.XPOnStartFraction;
-	const float Amount = FMath::Clamp(StartFrac, 0.f, 1.f) * Req.XPGain;
-	if (Amount <= 0.f) return;
+	if (Req.XPGain <= 0.f || !Req.SkillForXP) return;
 
 	AActor* Recipient = Req.XPRecipient.IsValid() ? Req.XPRecipient.Get() : Instigator;
-	if (!Recipient) return;
+	const float Fraction = (Req.XPOnStartFraction >= 0.f) ? Req.XPOnStartFraction : DefaultXPOnStartFraction;
 
-	// TODO: Apply AddXPEffectClass to Recipient’s ASC for Amount
+	if (Fraction > 0.f && Recipient)
+	{
+		if (UAbilitySystemComponent* ASC = GetASCFromAny(Recipient))
+		{
+			// TODO: apply your XP logic here (GE or direct grant)
+			UE_LOG(LogTemp, Log, TEXT("[Crafting] Start XP %.2f to %s"), Req.XPGain * Fraction, *Recipient->GetName());
+		}
+	}
 }
 
 void UCraftingStationComponent::GiveFinishXPIfAny(const FCraftingRequest& Req, AActor* Instigator, bool /*bSuccess*/)
 {
-	if (!Req.SkillForXP || Req.XPGain <= 0.f) return;
-
-	const float StartFrac = (Req.XPOnStartFraction < 0.f) ? DefaultXPOnStartFraction : Req.XPOnStartFraction;
-	const float Remainder = FMath::Max(0.f, 1.f - FMath::Clamp(StartFrac, 0.f, 1.f));
-	const float Amount = Remainder * Req.XPGain;
-	if (Amount <= 0.f) return;
+	if (Req.XPGain <= 0.f || !Req.SkillForXP) return;
 
 	AActor* Recipient = Req.XPRecipient.IsValid() ? Req.XPRecipient.Get() : Instigator;
-	if (!Recipient) return;
+	const float Fraction = (Req.XPOnStartFraction >= 0.f) ? (1.f - Req.XPOnStartFraction) : (1.f - DefaultXPOnStartFraction);
 
-	// TODO: Apply AddXPEffectClass to Recipient’s ASC for Amount
+	if (Fraction > 0.f && Recipient)
+	{
+		if (UAbilitySystemComponent* ASC = GetASCFromAny(Recipient))
+		{
+			// TODO: apply your XP logic here (GE or direct grant)
+			UE_LOG(LogTemp, Log, TEXT("[Crafting] Finish XP %.2f to %s"), Req.XPGain * Fraction, *Recipient->GetName());
+		}
+	}
 }
 
 bool UCraftingStationComponent::IsPresenceSatisfied(AActor* Instigator, const FCraftingRequest& Req) const
 {
-	if (Req.PresencePolicy == ECraftPresencePolicy::None || !Instigator) return true;
+	if (!Instigator) return false;
+	if (Req.PresencePolicy == ECraftPresencePolicy::None) return true;
 
-	const AActor* Owner = GetOwner();
-	if (!Owner) return true;
-
-	const float DistSq = FVector::DistSquared(Owner->GetActorLocation(), Instigator->GetActorLocation());
-	return DistSq <= FMath::Square(Req.PresenceRadius);
+	const FVector OwnerLoc = GetOwner() ? GetOwner()->GetActorLocation() : FVector::ZeroVector;
+	const FVector InstLoc  = Instigator->GetActorLocation();
+	const float   Dist     = FVector::Dist(OwnerLoc, InstLoc);
+	return Dist <= Req.PresenceRadius;
 }
 
 void UCraftingStationComponent::GatherOwnedTagsFromActor(AActor* Viewer, FGameplayTagContainer& Out)
 {
 	if (!Viewer) return;
 
-	// 1) ASC on the actor
-	if (const IAbilitySystemInterface* ASI = Cast<IAbilitySystemInterface>(Viewer))
+	// Use the C++ interface directly (Execute_ wrapper is NOT provided for this one)
+	if (const IGameplayTagAssetInterface* Iface = Cast<IGameplayTagAssetInterface>(Viewer))
 	{
-		if (UAbilitySystemComponent* ASC = ASI->GetAbilitySystemComponent())
-		{
-			ASC->GetOwnedGameplayTags(Out);
-		}
+		Iface->GetOwnedGameplayTags(Out);
 	}
 
-	// 2) Actor implements tag interface
-	if (IGameplayTagAssetInterface* TagIF = Cast<IGameplayTagAssetInterface>(Viewer))
-	{
-		TagIF->GetOwnedGameplayTags(Out);
-	}
-
-	// 3) Pawn -> PlayerState
+	// Try PlayerState
 	if (const APawn* Pawn = Cast<APawn>(Viewer))
 	{
 		if (APlayerState* PS = Pawn->GetPlayerState())
 		{
-			if (const IAbilitySystemInterface* ASI2 = Cast<IAbilitySystemInterface>(PS))
+			if (const IGameplayTagAssetInterface* IfacePS = Cast<IGameplayTagAssetInterface>(PS))
 			{
-				if (UAbilitySystemComponent* ASC2 = ASI2->GetAbilitySystemComponent())
-				{
-					ASC2->GetOwnedGameplayTags(Out);
-				}
-			}
-			if (IGameplayTagAssetInterface* TagIF2 = Cast<IGameplayTagAssetInterface>(PS))
-			{
-				TagIF2->GetOwnedGameplayTags(Out);
+				IfacePS->GetOwnedGameplayTags(Out);
 			}
 		}
 	}
 
-	// 4) Controller -> PlayerState
-	if (const AController* PC = Cast<AController>(Viewer))
+	// Try Controller
+	if (const APawn* Pawn2 = Cast<APawn>(Viewer))
 	{
-		if (APlayerState* PS = PC->GetPlayerState<APlayerState>())
+		if (AController* PC = Pawn2->GetController())
 		{
-			if (const IAbilitySystemInterface* ASI3 = Cast<IAbilitySystemInterface>(PS))
+			if (const IGameplayTagAssetInterface* IfacePC = Cast<IGameplayTagAssetInterface>(PC))
 			{
-				if (UAbilitySystemComponent* ASC3 = ASI3->GetAbilitySystemComponent())
-				{
-					ASC3->GetOwnedGameplayTags(Out);
-				}
-			}
-			if (IGameplayTagAssetInterface* TagIF3 = Cast<IGameplayTagAssetInterface>(PS))
-			{
-				TagIF3->GetOwnedGameplayTags(Out);
+				IfacePC->GetOwnedGameplayTags(Out);
 			}
 		}
 	}

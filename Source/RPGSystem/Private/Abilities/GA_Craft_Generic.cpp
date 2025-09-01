@@ -2,51 +2,69 @@
 #include "Crafting/CraftingStationComponent.h"
 #include "Crafting/CraftingRecipeDataAsset.h"
 
-void UGA_Craft_Generic::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
-                                        const FGameplayAbilityActorInfo* ActorInfo,
-                                        const FGameplayAbilityActivationInfo ActivationInfo,
-                                        const FGameplayEventData* TriggerEventData)
+void UGA_Craft_Generic::ActivateAbility(
+	const FGameplayAbilitySpecHandle Handle,
+	const FGameplayAbilityActorInfo* ActorInfo,
+	const FGameplayAbilityActivationInfo ActivationInfo,
+	const FGameplayEventData* TriggerEventData)
 {
 	Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
 
-	if (!ActorInfo) { EndAbility(Handle, ActorInfo, ActivationInfo, true, true); return; }
+	AActor* Avatar = ActorInfo && ActorInfo->AvatarActor.IsValid() ? ActorInfo->AvatarActor.Get() : nullptr;
+	if (!Avatar)
+	{
+		EndAbility(Handle, ActorInfo, ActivationInfo, /*bReplicateEnd*/true, /*bWasCancelled*/true);
+		return;
+	}
 
-	const UCraftingRecipeDataAsset* Recipe =
-		Cast<UCraftingRecipeDataAsset>(TriggerEventData ? TriggerEventData->OptionalObject : nullptr);
-
-	const AActor* StationActorConst =
-		Cast<AActor>(TriggerEventData ? TriggerEventData->OptionalObject2 : nullptr);
-
-	AActor* StationActor = const_cast<AActor*>(StationActorConst);
-	if (!Recipe || !StationActor)
+	// Find a station on the avatar (you can change this lookup as needed)
+	UCraftingStationComponent* Station = Avatar->FindComponentByClass<UCraftingStationComponent>();
+	if (!Station)
 	{
 		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
 		return;
 	}
 
-	if (UCraftingStationComponent* Station = StationActor->FindComponentByClass<UCraftingStationComponent>())
+	// Bind delegates
+	if (!Station->OnCraftStarted.IsAlreadyBound(this, &UGA_Craft_Generic::OnStationCraftStarted))
 	{
-		// Bind UI/flow hooks
 		Station->OnCraftStarted.AddDynamic(this, &UGA_Craft_Generic::OnStationCraftStarted);
-		Station->OnCraftFinished.AddDynamic(this, &UGA_Craft_Generic::OnStationCraftFinished);
-
-		AActor* Instigator = ActorInfo->AvatarActor.Get();
-		Station->StartCraftFromRecipe(Instigator, Recipe);
 	}
-	else
+	if (!Station->OnCraftFinished.IsAlreadyBound(this, &UGA_Craft_Generic::OnStationCraftFinished))
 	{
-		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
+		Station->OnCraftFinished.AddDynamic(this, &UGA_Craft_Generic::OnStationCraftFinished);
 	}
+	BoundStation = Station;
+
+	// Kick off crafting from event data if a recipe was sent
+	if (TriggerEventData)
+	{
+		const UCraftingRecipeDataAsset* Recipe = Cast<UCraftingRecipeDataAsset>(TriggerEventData->OptionalObject);
+		if (Recipe)
+		{
+			Station->StartCraftFromRecipe(Avatar, Recipe);
+			return; // wait for callbacks
+		}
+	}
+
+	// If no recipe provided, just end (or you could open UI)
+	EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
 }
 
 void UGA_Craft_Generic::OnStationCraftStarted(const FCraftingJob& /*Job*/)
 {
-	// Optional: gameplay cues, UI updates, etc.
+	// Optionally: Play montage / SFX / lock input, etc.
 }
 
 void UGA_Craft_Generic::OnStationCraftFinished(const FCraftingJob& /*Job*/, bool bSuccess)
 {
-	// Unbind (safety) – find the station off the job owner if you keep a pointer, or rely on EndAbility cleanup
-	// Here we just end the ability.
-	EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, /*bReplicate*/true, /*bWasCancelled*/!bSuccess);
+	// Unbind and end ability
+	if (BoundStation)
+	{
+		BoundStation->OnCraftStarted.RemoveDynamic(this, &UGA_Craft_Generic::OnStationCraftStarted);
+		BoundStation->OnCraftFinished.RemoveDynamic(this, &UGA_Craft_Generic::OnStationCraftFinished);
+		BoundStation = nullptr;
+	}
+
+	EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, /*bReplicateEnd*/true, /*bWasCancelled*/!bSuccess);
 }

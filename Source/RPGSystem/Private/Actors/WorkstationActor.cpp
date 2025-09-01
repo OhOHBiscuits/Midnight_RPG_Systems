@@ -5,6 +5,7 @@
 AWorkstationActor::AWorkstationActor()
 {
 	PrimaryActorTick.bCanEverTick = false;
+	SetReplicates(true);
 
 	CraftingStation = CreateDefaultSubobject<UCraftingStationComponent>(TEXT("CraftingStation"));
 }
@@ -15,6 +16,10 @@ void AWorkstationActor::BeginPlay()
 
 	if (CraftingStation)
 	{
+		if (!CraftingStation->OnCraftStarted.IsAlreadyBound(this, &AWorkstationActor::HandleCraftStarted))
+		{
+			CraftingStation->OnCraftStarted.AddDynamic(this, &AWorkstationActor::HandleCraftStarted);
+		}
 		if (!CraftingStation->OnCraftFinished.IsAlreadyBound(this, &AWorkstationActor::HandleCraftFinished))
 		{
 			CraftingStation->OnCraftFinished.AddDynamic(this, &AWorkstationActor::HandleCraftFinished);
@@ -22,18 +27,26 @@ void AWorkstationActor::BeginPlay()
 	}
 }
 
-bool AWorkstationActor::StartRecipe(UCraftingRecipeDataAsset* Recipe, int32 /*Quantity*/)
+void AWorkstationActor::HandleCraftStarted(const FCraftingJob& /*Job*/)
+{
+	// TODO: trigger VFX/UI/etc
+}
+
+void AWorkstationActor::HandleCraftFinished(const FCraftingJob& /*Job*/, bool /*bSuccess*/)
+{
+	// TODO: trigger VFX/UI/etc
+}
+
+bool AWorkstationActor::StartRecipe(const UCraftingRecipeDataAsset* Recipe)
 {
 	if (!CraftingStation || !Recipe) return false;
 	return CraftingStation->StartCraftFromRecipe(this, Recipe);
 }
 
-void AWorkstationActor::OpenWorkstationUIFor(AActor* /*Interactor*/)
+void AWorkstationActor::CancelActiveCraft()
 {
-	// Default: do nothing. Derived classes can open widgets/HUD, play SFX, etc.
-}
-
-void AWorkstationActor::HandleCraftFinished(const FCraftingJob& /*Job*/, bool /*bSuccess*/)
-{
-	// Toggle VFX/SFX here if desired.
+	if (CraftingStation)
+	{
+		CraftingStation->CancelCraft();
+	}
 }

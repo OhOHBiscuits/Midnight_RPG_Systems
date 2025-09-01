@@ -2,10 +2,11 @@
 
 #include "CoreMinimal.h"
 #include "Abilities/GameplayAbility.h"
-#include "Crafting/CraftingTypes.h"          
+#include "Crafting/CraftingTypes.h"
 #include "GA_Craft_Generic.generated.h"
 
 class UCraftingRecipeDataAsset;
+class UCraftingStationComponent;
 
 UCLASS()
 class RPGSYSTEM_API UGA_Craft_Generic : public UGameplayAbility
@@ -24,4 +25,8 @@ protected:
 
 	UFUNCTION()
 	void OnStationCraftFinished(const FCraftingJob& Job, bool bSuccess);
+
+private:
+	UPROPERTY()
+	TObjectPtr<UCraftingStationComponent> BoundStation = nullptr;
 };

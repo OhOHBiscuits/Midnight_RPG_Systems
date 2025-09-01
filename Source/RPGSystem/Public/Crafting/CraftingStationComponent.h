@@ -3,7 +3,7 @@
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
 #include "GameplayTagContainer.h"
-#include "CraftingTypes.h"                    // <<— has FCraftingRequest + FCraftingJob
+#include "Crafting/CraftingTypes.h"
 #include "Progression/SkillCheckTypes.h"
 #include "CraftingStationComponent.generated.h"
 
@@ -23,6 +23,7 @@ class RPGSYSTEM_API UCraftingStationComponent : public UActorComponent
 public:
 	UCraftingStationComponent();
 
+	// Optional “discipline” / domain tag
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Setup")
 	FGameplayTag DomainTag;
 
@@ -35,8 +36,16 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Progression", meta=(ClampMin="0.0", ClampMax="1.0"))
 	float DefaultXPOnStartFraction = 0.0f;
 
+	// Recipes the station exposes
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Recipes")
 	TArray<TObjectPtr<const UCraftingRecipeDataAsset>> AvailableRecipes;
+
+	// Output routing knobs (needed by your Fuel workstation)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Output")
+	TObjectPtr<UInventoryComponent> OutputInventoryOverride = nullptr;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Output")
+	bool bOutputToStationInventory = true;
 
 	UFUNCTION(BlueprintCallable, Category="Crafting", meta=(DefaultToSelf="Instigator"))
 	bool StartCraft(AActor* Instigator, const FCraftingRequest& Request);
@@ -73,6 +82,7 @@ private:
 	void GrantOutputs(const TArray<FCraftItemOutput>& Outputs, int32 QualityTier, AActor* Instigator);
 	void GiveStartXPIfAny(const FCraftingRequest& Req, AActor* Instigator);
 	void GiveFinishXPIfAny(const FCraftingRequest& Req, AActor* Instigator, bool bSuccess);
+
 	bool IsPresenceSatisfied(AActor* Instigator, const FCraftingRequest& Req) const;
 	void FinishCraft();
 
