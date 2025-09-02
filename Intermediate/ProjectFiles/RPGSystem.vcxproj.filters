@@ -173,6 +173,9 @@
     <ClCompile Include="..\..\Source\RPGSystem\Private\Inventory\ItemDataAsset.cpp">
       <Filter>Source\RPGSystem\Private\Inventory</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Source\RPGSystem\Private\Inventory\WorkstationDataAsset.cpp">
+      <Filter>Source\RPGSystem\Private\Inventory</Filter>
+    </ClCompile>
     <Filter Include="Source\RPGSystem\Private\Progression">
       <UniqueIdentifier>{4534C57E-441B-3607-A1D4-F589B4E8582A}</UniqueIdentifier>
     </Filter>
@@ -285,6 +288,9 @@
       <Filter>Source\RPGSystem\Public\Inventory</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Source\RPGSystem\Public\Inventory\ItemDataAsset.h">
+      <Filter>Source\RPGSystem\Public\Inventory</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\RPGSystem\Public\Inventory\WorkstationDataAsset.h">
       <Filter>Source\RPGSystem\Public\Inventory</Filter>
     </ClInclude>
     <Filter Include="Source\RPGSystem\Public\Progression">

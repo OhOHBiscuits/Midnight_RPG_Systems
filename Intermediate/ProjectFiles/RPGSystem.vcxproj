@@ -790,6 +790,10 @@
       <AdditionalIncludeDirectories>$(ClCompile_AdditionalIncludeDirectories_1)</AdditionalIncludeDirectories>
       <ForcedIncludeFiles>$(ClCompile_ForcedIncludeFiles_1)</ForcedIncludeFiles>
     </ClCompile>
+    <ClCompile Include="..\..\Source\RPGSystem\Private\Inventory\WorkstationDataAsset.cpp">
+      <AdditionalIncludeDirectories>$(ClCompile_AdditionalIncludeDirectories_1)</AdditionalIncludeDirectories>
+      <ForcedIncludeFiles>$(ClCompile_ForcedIncludeFiles_1)</ForcedIncludeFiles>
+    </ClCompile>
     <ClCompile Include="..\..\Source\RPGSystem\Private\Progression\AbilityModProfile.cpp">
       <AdditionalIncludeDirectories>$(ClCompile_AdditionalIncludeDirectories_1)</AdditionalIncludeDirectories>
       <ForcedIncludeFiles>$(ClCompile_ForcedIncludeFiles_1)</ForcedIncludeFiles>
@@ -849,6 +853,7 @@
     <ClInclude Include="..\..\Source\RPGSystem\Public\Inventory\InventoryHelpers.h"/>
     <ClInclude Include="..\..\Source\RPGSystem\Public\Inventory\InventoryItem.h"/>
     <ClInclude Include="..\..\Source\RPGSystem\Public\Inventory\ItemDataAsset.h"/>
+    <ClInclude Include="..\..\Source\RPGSystem\Public\Inventory\WorkstationDataAsset.h"/>
     <ClInclude Include="..\..\Source\RPGSystem\Public\Progression\AbilityModProfile.h"/>
     <ClInclude Include="..\..\Source\RPGSystem\Public\Progression\CheckDefinition.h"/>
     <ClInclude Include="..\..\Source\RPGSystem\Public\Progression\ExecCalc_AddSkillXP.h"/>

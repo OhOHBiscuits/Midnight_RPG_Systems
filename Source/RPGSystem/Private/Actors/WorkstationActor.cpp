@@ -1,13 +1,19 @@
 ﻿#include "Actors/WorkstationActor.h"
 #include "Crafting/CraftingStationComponent.h"
+#include "Inventory/InventoryComponent.h"
 #include "Crafting/CraftingRecipeDataAsset.h"
+#include "Inventory/WorkstationDataAsset.h"
+
+#include "Engine/StreamableManager.h"
+#include "Engine/AssetManager.h"
 
 AWorkstationActor::AWorkstationActor()
 {
 	PrimaryActorTick.bCanEverTick = false;
-	SetReplicates(true);
 
 	CraftingStation = CreateDefaultSubobject<UCraftingStationComponent>(TEXT("CraftingStation"));
+	OutputInventory = CreateDefaultSubobject<UInventoryComponent>(TEXT("OutputInventory"));
+	// Both are UActorComponent; do not call SetupAttachment on them.
 }
 
 void AWorkstationActor::BeginPlay()
@@ -16,37 +22,80 @@ void AWorkstationActor::BeginPlay()
 
 	if (CraftingStation)
 	{
-		if (!CraftingStation->OnCraftStarted.IsAlreadyBound(this, &AWorkstationActor::HandleCraftStarted))
-		{
-			CraftingStation->OnCraftStarted.AddDynamic(this, &AWorkstationActor::HandleCraftStarted);
-		}
-		if (!CraftingStation->OnCraftFinished.IsAlreadyBound(this, &AWorkstationActor::HandleCraftFinished))
-		{
-			CraftingStation->OnCraftFinished.AddDynamic(this, &AWorkstationActor::HandleCraftFinished);
-		}
+		CraftingStation->OutputInventory = OutputInventory;
 	}
+
+	// Optionally resolve here so UI has immediate access
+	ResolveRecipesSync();
 }
 
-void AWorkstationActor::HandleCraftStarted(const FCraftingJob& /*Job*/)
+void AWorkstationActor::Interact_Implementation(AActor* Interactor)
 {
-	// TODO: trigger VFX/UI/etc
+	// Keep your existing flow in BaseWorldItemActor (opens UI, etc.)
+	Super::Interact_Implementation(Interactor);
+
+	// If you want to use the data-driven UI class:
+	// if (StationConfig && StationConfig->StationWidgetClass.IsValid())
+	//   create/show that widget for the Interactor.
 }
 
-void AWorkstationActor::HandleCraftFinished(const FCraftingJob& /*Job*/, bool /*bSuccess*/)
+void AWorkstationActor::ResolveRecipesSync()
 {
-	// TODO: trigger VFX/UI/etc
-}
+	if (!StationConfig) return;
 
-bool AWorkstationActor::StartRecipe(const UCraftingRecipeDataAsset* Recipe)
-{
-	if (!CraftingStation || !Recipe) return false;
-	return CraftingStation->StartCraftFromRecipe(this, Recipe);
-}
+	FStreamableManager& Streamable = UAssetManager::GetStreamableManager();
 
-void AWorkstationActor::CancelActiveCraft()
-{
-	if (CraftingStation)
+	for (const TSoftObjectPtr<UCraftingRecipeDataAsset>& Soft : StationConfig->AllowedRecipes)
 	{
-		CraftingStation->CancelCraft();
+		if (Soft.IsNull()) continue;
+
+		UCraftingRecipeDataAsset* R = Soft.LoadSynchronous();
+		if (R)
+		{
+			CachedRecipes.AddUnique(R);
+		}
 	}
+}
+
+const TArray<UCraftingRecipeDataAsset*>& AWorkstationActor::GetAvailableRecipes()
+{
+	// If someone added/changed the list at runtime, you can re-resolve here.
+	if (CachedRecipes.Num() == 0)
+	{
+		ResolveRecipesSync();
+	}
+	return reinterpret_cast<const TArray<UCraftingRecipeDataAsset*>&>(CachedRecipes);
+}
+
+bool AWorkstationActor::IsRecipeAllowed(const UCraftingRecipeDataAsset* Recipe)
+{
+	if (!Recipe || !StationConfig) return false;
+
+	// Quick path: already cached
+	for (const UCraftingRecipeDataAsset* R : CachedRecipes)
+	{
+		if (R == Recipe) return true;
+	}
+
+	// Fallback: see if the soft list contains it (and load if needed)
+	for (const TSoftObjectPtr<UCraftingRecipeDataAsset>& Soft : StationConfig->AllowedRecipes)
+	{
+		if (Soft.IsNull()) continue;
+
+		// If the soft already points to the same object, approve
+		if (Soft.Get() == Recipe)
+		{
+			CachedRecipes.AddUnique(const_cast<UCraftingRecipeDataAsset*>(Recipe));
+			return true;
+		}
+
+		// If not loaded, check by path
+		if (!Soft.IsValid() && Soft.ToSoftObjectPath() == Recipe->GetPathName())
+		{
+			CachedRecipes.AddUnique(const_cast<UCraftingRecipeDataAsset*>(Recipe));
+			return true;
+		}
+	}
+
+	return false;
 }

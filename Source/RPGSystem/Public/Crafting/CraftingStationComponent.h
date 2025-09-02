@@ -1,21 +1,18 @@
+// CraftingStationComponent.h
 #pragma once
 
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
 #include "GameplayTagContainer.h"
-#include "Crafting/CraftingTypes.h"
-#include "Progression/SkillCheckTypes.h"
+#include "CraftingTypes.h" // defines FCraftingJob (do NOT duplicate it here)
 #include "CraftingStationComponent.generated.h"
 
-class UInventoryComponent;
-class UCheckDefinition;
-class UGameplayEffect;
 class UCraftingRecipeDataAsset;
 
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnCraftStarted, const FCraftingJob&, Job);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnCraftStarted,  const FCraftingJob&, Job);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnCraftFinished, const FCraftingJob&, Job, bool, bSuccess);
 
-UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
+UCLASS(ClassGroup=(RPG), meta=(BlueprintSpawnableComponent))
 class RPGSYSTEM_API UCraftingStationComponent : public UActorComponent
 {
 	GENERATED_BODY()
@@ -23,68 +20,57 @@ class RPGSYSTEM_API UCraftingStationComponent : public UActorComponent
 public:
 	UCraftingStationComponent();
 
-	// Optional “discipline” / domain tag
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Setup")
-	FGameplayTag DomainTag;
+	// Events for UI/triggers
+	UPROPERTY(BlueprintAssignable, Category="Crafting|Events")
+	FOnCraftStarted OnCraftStarted;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Setup")
-	TObjectPtr<UCheckDefinition> DefaultCheck = nullptr;
+	UPROPERTY(BlueprintAssignable, Category="Crafting|Events")
+	FOnCraftFinished OnCraftFinished;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Setup")
-	TSubclassOf<UGameplayEffect> AddXPEffectClass;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Crafting")
+	TObjectPtr<UInventoryComponent> OutputInventory = nullptr;	
+	
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Progression", meta=(ClampMin="0.0", ClampMax="1.0"))
-	float DefaultXPOnStartFraction = 0.0f;
+	// Start/cancel
+	UFUNCTION(BlueprintCallable, Category="Crafting")
+    	bool StartCraftFromRecipe(AActor* InstigatorActor, const UCraftingRecipeDataAsset* Recipe);
 
-	// Recipes the station exposes
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Recipes")
-	TArray<TObjectPtr<const UCraftingRecipeDataAsset>> AvailableRecipes;
-
-	// Output routing knobs (needed by your Fuel workstation)
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Output")
-	TObjectPtr<UInventoryComponent> OutputInventoryOverride = nullptr;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Output")
-	bool bOutputToStationInventory = true;
-
-	UFUNCTION(BlueprintCallable, Category="Crafting", meta=(DefaultToSelf="Instigator"))
-	bool StartCraft(AActor* Instigator, const FCraftingRequest& Request);
-
-	UFUNCTION(BlueprintCallable, Category="Crafting", meta=(DefaultToSelf="Instigator"))
-	bool StartCraftFromRecipe(AActor* Instigator, const UCraftingRecipeDataAsset* Recipe);
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Crafting|Recipes")
+	TArray<TObjectPtr<UCraftingRecipeDataAsset>> StationRecipes;
 
 	UFUNCTION(BlueprintCallable, Category="Crafting")
 	void CancelCraft();
 
-	UPROPERTY(BlueprintAssignable, Category="Events")
-	FOnCraftStarted OnCraftStarted;
+	// Helpers
+	UFUNCTION(BlueprintPure, Category="Crafting")
+	bool IsCrafting() const { return bIsCrafting; }
 
-	UPROPERTY(BlueprintAssignable, Category="Events")
-	FOnCraftFinished OnCraftFinished;
+	UFUNCTION(BlueprintCallable, Category="Crafting|Tags")
+	void GatherOwnedTagsFromActor(AActor* Viewer, FGameplayTagContainer& Out) const;
 
-	UPROPERTY(BlueprintReadOnly, Category="State")
-	bool bIsCrafting = false;
+	// Add/remove/query helpers 
+	UFUNCTION(BlueprintCallable, Category="Crafting|Recipes")
+	void AddRecipe(UCraftingRecipeDataAsset* Recipe);
 
-	UPROPERTY(BlueprintReadOnly, Category="State")
-	FCraftingRequest ActiveRequest;
+	UFUNCTION(BlueprintCallable, Category="Crafting|Recipes")
+	void RemoveRecipe(UCraftingRecipeDataAsset* Recipe);
 
-	UPROPERTY(BlueprintReadOnly, Category="State")
-	FSkillCheckResult ActiveCheck;
+	UFUNCTION(BlueprintPure, Category="Crafting|Recipes")
+	bool HasRecipe(const UCraftingRecipeDataAsset* Recipe) const;
 
 protected:
-	virtual void BeginPlay() override;
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
-private:
-	TWeakObjectPtr<AActor> CraftInstigator;
-	FTimerHandle CraftTimer;
+	// Internals
+	void FinishCraft_Internal(bool bSuccess);
+	void DeliverOutputs(const UCraftingRecipeDataAsset* Recipe, AActor* Instigator);
+	void GiveFinishXPIIfAny(const UCraftingRecipeDataAsset* Recipe, AActor* Instigator, bool bSuccess);
 
-	UInventoryComponent* ResolveOutputInventory(AActor* Instigator) const;
-	void GrantOutputs(const TArray<FCraftItemOutput>& Outputs, int32 QualityTier, AActor* Instigator);
-	void GiveStartXPIfAny(const FCraftingRequest& Req, AActor* Instigator);
-	void GiveFinishXPIfAny(const FCraftingRequest& Req, AActor* Instigator, bool bSuccess);
+	UPROPERTY(Replicated)
+	FCraftingJob ActiveJob;
 
-	bool IsPresenceSatisfied(AActor* Instigator, const FCraftingRequest& Req) const;
-	void FinishCraft();
+	UPROPERTY(Replicated)
+	bool bIsCrafting = false;
 
-	static void GatherOwnedTagsFromActor(AActor* Viewer, FGameplayTagContainer& Out);
+	FTimerHandle CraftTimerHandle;
 };

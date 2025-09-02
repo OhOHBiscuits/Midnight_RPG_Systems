@@ -7,52 +7,42 @@
 #include "CraftingRecipeDataAsset.generated.h"
 
 class UCheckDefinition;
-class USkillProgressionData;
+class UXPGrantBundle;
 
-/**
- * Data for a single crafting recipe.
- * Keep this *data-only* so designers/modders can add recipes easily.
- */
 UCLASS(BlueprintType)
 class RPGSYSTEM_API UCraftingRecipeDataAsset : public UDataAsset
 {
 	GENERATED_BODY()
 
 public:
-	// Optional ID to reference via tags (UI, unlocks, etc.)
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Recipe|Identity")
+	
+		UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Recipe")
 	FGameplayTag RecipeIDTag;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Recipe")
+	FGameplayTag Discipline;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Unlocks")
+	FGameplayTag UnlockTag;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Stations")
+	FGameplayTagContainer RequiredStationTags;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Timing")
+	ECraftPresencePolicy PresencePolicy = ECraftPresencePolicy::CrafterMustRemain;
 
-	// How long the craft takes (before any station/player modifiers)
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Recipe|Timing", meta=(ClampMin="0.0"))
-	float BaseTimeSeconds = 1.0f;
-
-	// Optional skill check definition to run at start/finish
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Recipe|Check")
-	TObjectPtr<UCheckDefinition> CheckDef = nullptr;
-
-	// Which skill to grant XP in, and how much total XP this recipe yields
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Recipe|Progression")
-	TObjectPtr<USkillProgressionData> SkillForXP = nullptr;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Recipe|Progression", meta=(ClampMin="0.0"))
-	float XPGain = 0.0f;
-
-	// If >= 0, overrides station default; fraction awarded at start (remainder at finish)
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Recipe|Progression", meta=(ClampMin="-1.0", ClampMax="1.0"))
-	float XPOnStartFraction = -1.f;
-
-	// Presence rules for the crafter (must remain near the station, etc.)
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Recipe|Presence")
-	ECraftPresencePolicy PresencePolicy = ECraftPresencePolicy::None;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Recipe|Presence", meta=(ClampMin="0.0"))
-	float PresenceRadius = 600.f;
-
-	// Inputs & outputs (re-using the shared crafting structs)
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Recipe|IO")
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Timing", meta=(ClampMin="0.01"))
+	float CraftSeconds = 1.f;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Items")
 	TArray<FCraftItemCost> Inputs;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Recipe|IO")
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Items")
 	TArray<FCraftItemOutput> Outputs;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Skill")
+	TObjectPtr<UCheckDefinition> CheckDef = nullptr;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="XP", meta=(AllowedClasses="XPGrantBundle"))
+	TSoftObjectPtr<UXPGrantBundle> XPGain;
 };

@@ -5,91 +5,67 @@
 #include "CraftingTypes.generated.h"
 
 class UItemDataAsset;
-class UCheckDefinition;
-class USkillProgressionData;
+class UCraftingRecipeDataAsset;
 
-USTRUCT(BlueprintType)
-struct RPGSYSTEM_API FCraftItemCost
-{
-	GENERATED_BODY()
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Crafting")
-	FGameplayTag ItemID;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Crafting", meta=(ClampMin="1"))
-	int32 Quantity = 1;
-};
-
-USTRUCT(BlueprintType)
-struct RPGSYSTEM_API FCraftItemOutput
-{
-	GENERATED_BODY()
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Crafting")
-	TObjectPtr<UItemDataAsset> Item = nullptr;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Crafting", meta=(ClampMin="1"))
-	int32 Quantity = 1;
-};
-
+/** Where the crafter must be while the craft runs. */
 UENUM(BlueprintType)
 enum class ECraftPresencePolicy : uint8
 {
-	None,
-	RequireAtStart,
-	RequireAtFinish,
-	RequireStartFinish
+	CrafterCanLeave UMETA(DisplayName="Crafter Can Leave"),
+	CrafterMustRemain UMETA(DisplayName="Crafter Must Remain")
 };
 
+/** One input cost (item + quantity). */
 USTRUCT(BlueprintType)
-struct RPGSYSTEM_API FCraftingRequest
+struct FCraftItemCost
 {
 	GENERATED_BODY()
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Crafting")
-	FGameplayTag RecipeID;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	TObjectPtr<UItemDataAsset> Item = nullptr;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Crafting")
-	TArray<FCraftItemCost> Inputs;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Crafting")
-	TArray<FCraftItemOutput> Outputs;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Crafting", meta=(ClampMin="0.0"))
-	float BaseTimeSeconds = 1.0f;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Crafting|Check")
-	TObjectPtr<UCheckDefinition> CheckDef = nullptr;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Crafting|XP")
-	TObjectPtr<USkillProgressionData> SkillForXP = nullptr;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Crafting|XP", meta=(ClampMin="0.0"))
-	float XPGain = 0.0f;
-
-	// 0..1 at start; remainder on finish. <0 uses station default.
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Crafting|XP", meta=(ClampMin="-1.0", ClampMax="1.0"))
-	float XPOnStartFraction = -1.f;
-
-	// Defaults to Instigator if unset
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Crafting|XP")
-	TWeakObjectPtr<AActor> XPRecipient;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Crafting|Presence")
-	ECraftPresencePolicy PresencePolicy = ECraftPresencePolicy::None;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Crafting|Presence", meta=(ClampMin="0.0"))
-	float PresenceRadius = 600.f;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta=(ClampMin="1"))
+	int32 Quantity = 1;
 };
 
+/** One output (item + quantity). */
 USTRUCT(BlueprintType)
-struct RPGSYSTEM_API FCraftingJob
+struct FCraftItemOutput
 {
 	GENERATED_BODY()
 
-	UPROPERTY(BlueprintReadOnly, Category="Crafting")
-	FCraftingRequest Request;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	TObjectPtr<UItemDataAsset> Item = nullptr;
 
-	UPROPERTY(BlueprintReadOnly, Category="Crafting")
-	float FinalTime = 0.f;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta=(ClampMin="1"))
+	int32 Quantity = 1;
+};
+
+/** Replicated job snapshot for UI & listeners. */
+USTRUCT(BlueprintType)
+struct FCraftingJob
+{
+	GENERATED_BODY()
+
+	/** Recipe asset in progress. */
+	UPROPERTY(BlueprintReadOnly)
+	TObjectPtr<UCraftingRecipeDataAsset> Recipe = nullptr;
+
+	/** Who started it. */
+	UPROPERTY(BlueprintReadOnly)
+	TWeakObjectPtr<AActor> Instigator;
+
+	/** Server timestamp range. */
+	UPROPERTY(BlueprintReadOnly)
+	float StartTime = 0.f;
+
+	UPROPERTY(BlueprintReadOnly)
+	float EndTime = 0.f;
+
+	bool IsValid() const { return Recipe != nullptr; }
+	float RemainingSeconds(const UWorld* W) const
+	{
+		const float Now = (W ? W->GetTimeSeconds() : 0.f);
+		return FMath::Max(0.f, EndTime - Now);
+	}
 };
