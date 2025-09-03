@@ -2,8 +2,9 @@
 
 #include "CoreMinimal.h"
 #include "Engine/DataAsset.h"
-#include "GameplayTagContainer.h"
+#include "Inventory/ItemDataAsset.h"
 #include "Crafting/CraftingTypes.h"
+#include "GameplayTagContainer.h"
 #include "CraftingRecipeDataAsset.generated.h"
 
 class UCheckDefinition;
@@ -45,4 +46,6 @@ public:
 	
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="XP", meta=(AllowedClasses="XPGrantBundle"))
 	TSoftObjectPtr<UXPGrantBundle> XPGain;
+
+	
 };

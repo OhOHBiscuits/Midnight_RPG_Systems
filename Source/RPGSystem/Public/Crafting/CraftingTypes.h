@@ -1,71 +1,68 @@
-﻿#pragma once
+﻿// CraftingTypes.h
+#pragma once
 
 #include "CoreMinimal.h"
 #include "GameplayTagContainer.h"
 #include "CraftingTypes.generated.h"
 
-class UItemDataAsset;
 class UCraftingRecipeDataAsset;
+class AActor;
 
-/** Where the crafter must be while the craft runs. */
+/** How present the crafter must be for a job. */
 UENUM(BlueprintType)
 enum class ECraftPresencePolicy : uint8
 {
-	CrafterCanLeave UMETA(DisplayName="Crafter Can Leave"),
-	CrafterMustRemain UMETA(DisplayName="Crafter Must Remain")
+	CrafterMustRemain   UMETA(DisplayName="Crafter Must Remain"),
+	CrafterCanLeave     UMETA(DisplayName="Crafter Can Leave"),
+	CraftingIsRemote    UMETA(DisplayName="Remote / Automated"),
 };
 
-/** One input cost (item + quantity). */
+/** Simple item + quantity pair by tag id (adjust to your item system). */
 USTRUCT(BlueprintType)
-struct FCraftItemCost
+struct FCraftingItemQuantity
 {
 	GENERATED_BODY()
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	TObjectPtr<UItemDataAsset> Item = nullptr;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FGameplayTag ItemIDTag;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta=(ClampMin="1"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	int32 Quantity = 1;
 };
-
-/** One output (item + quantity). */
 USTRUCT(BlueprintType)
-struct FCraftItemOutput
+struct FCraftItemCost : public FCraftingItemQuantity
 {
 	GENERATED_BODY()
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	TObjectPtr<UItemDataAsset> Item = nullptr;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta=(ClampMin="1"))
-	int32 Quantity = 1;
 };
 
-/** Replicated job snapshot for UI & listeners. */
+USTRUCT(BlueprintType)
+struct FCraftItemOutput : public FCraftingItemQuantity
+{
+	GENERATED_BODY()
+};
+/** One in-flight crafting job. */
 USTRUCT(BlueprintType)
 struct FCraftingJob
 {
 	GENERATED_BODY()
 
-	/** Recipe asset in progress. */
-	UPROPERTY(BlueprintReadOnly)
+	/** Recipe being crafted. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
 	TObjectPtr<UCraftingRecipeDataAsset> Recipe = nullptr;
 
-	/** Who started it. */
-	UPROPERTY(BlueprintReadOnly)
+	/** Who started it (not replicated as a hard pointer). */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
 	TWeakObjectPtr<AActor> Instigator;
 
-	/** Server timestamp range. */
-	UPROPERTY(BlueprintReadOnly)
+	/** How many times to craft this recipe in one go. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+	int32 Count = 1;
+
+	/** Server time when job started. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
 	float StartTime = 0.f;
 
-	UPROPERTY(BlueprintReadOnly)
-	float EndTime = 0.f;
-
-	bool IsValid() const { return Recipe != nullptr; }
-	float RemainingSeconds(const UWorld* W) const
-	{
-		const float Now = (W ? W->GetTimeSeconds() : 0.f);
-		return FMath::Max(0.f, EndTime - Now);
-	}
+	/** Server time when job should complete. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+	float EndTime   = 0.f;
 };

@@ -8,10 +8,7 @@
 class UFuelComponent;
 class UInventoryComponent;
 
-/**
- * Workstation that consumes fuel (campfire / forge / cooker, etc.)
- * Inherits the OutputInventory and CraftingStation from AWorkstationActor.
- */
+
 UCLASS()
 class RPGSYSTEM_API AFuelWorkstationActor : public AWorkstationActor
 {

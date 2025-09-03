@@ -3,16 +3,17 @@
 
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
-#include "GameplayTagContainer.h"
-#include "CraftingTypes.h" // defines FCraftingJob (do NOT duplicate it here)
+#include "Crafting/CraftingTypes.h"
 #include "CraftingStationComponent.generated.h"
 
 class UCraftingRecipeDataAsset;
+class UInventoryComponent;
+class AWorkstationActor;
 
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnCraftStarted,  const FCraftingJob&, Job);
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnCraftFinished, const FCraftingJob&, Job, bool, bSuccess);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FCraftingStartedSignature, const FCraftingJob&, Job);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FCraftingFinishedSignature, const FCraftingJob&, Job, bool, bSuccess);
 
-UCLASS(ClassGroup=(RPG), meta=(BlueprintSpawnableComponent))
+UCLASS(ClassGroup=(RPGSystem), meta=(BlueprintSpawnableComponent))
 class RPGSYSTEM_API UCraftingStationComponent : public UActorComponent
 {
 	GENERATED_BODY()
@@ -20,57 +21,75 @@ class RPGSYSTEM_API UCraftingStationComponent : public UActorComponent
 public:
 	UCraftingStationComponent();
 
-	// Events for UI/triggers
-	UPROPERTY(BlueprintAssignable, Category="Crafting|Events")
-	FOnCraftStarted OnCraftStarted;
+	// ---------------------------------------------------------------------
+	// Inventories (wired by the owning actor)
+	// ---------------------------------------------------------------------
+	/** Materials are staged here while the job runs. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Crafting|Inventories")
+	TObjectPtr<UInventoryComponent> InputInventory = nullptr;
 
-	UPROPERTY(BlueprintAssignable, Category="Crafting|Events")
-	FOnCraftFinished OnCraftFinished;
+	/** Results are deposited here on success. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Crafting|Inventories")
+	TObjectPtr<UInventoryComponent> OutputInventory = nullptr;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Crafting")
-	TObjectPtr<UInventoryComponent> OutputInventory = nullptr;	
-	
+	// ---------------------------------------------------------------------
+	// Replicated state
+	// ---------------------------------------------------------------------
+	UPROPERTY(Replicated, VisibleAnywhere, BlueprintReadOnly, Category="Crafting|State")
+	FCraftingJob ActiveJob;
 
-	// Start/cancel
+	UPROPERTY(Replicated, VisibleAnywhere, BlueprintReadOnly, Category="Crafting|State")
+	bool bIsCrafting = false;
+
+	UPROPERTY(Replicated, VisibleAnywhere, BlueprintReadOnly, Category="Crafting|State")
+	bool bIsPaused = false;
+
+	// ---------------------------------------------------------------------
+	// API
+	// ---------------------------------------------------------------------
+	/** Try to start crafting a recipe (Times = how many to craft back-to-back). */
 	UFUNCTION(BlueprintCallable, Category="Crafting")
-    	bool StartCraftFromRecipe(AActor* InstigatorActor, const UCraftingRecipeDataAsset* Recipe);
+	bool StartCraftFromRecipe(AActor* InstigatorActor, const UCraftingRecipeDataAsset* Recipe, int32 Times = 1);
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Crafting|Recipes")
-	TArray<TObjectPtr<UCraftingRecipeDataAsset>> StationRecipes;
-
+	/** Cancel the running job (materials can be returned from Input if you want). */
 	UFUNCTION(BlueprintCallable, Category="Crafting")
 	void CancelCraft();
 
-	// Helpers
-	UFUNCTION(BlueprintPure, Category="Crafting")
-	bool IsCrafting() const { return bIsCrafting; }
+	/** Pause current job (timer is stopped; materials remain in Input). */
+	UFUNCTION(BlueprintCallable, Category="Crafting")
+	void PauseCraft();
 
-	UFUNCTION(BlueprintCallable, Category="Crafting|Tags")
+	/** Resume a paused job. */
+	UFUNCTION(BlueprintCallable, Category="Crafting")
+	void ResumeCraft();
+
+	/** Convenience: collect all gameplay tags owned by an actor (self/PS/PC/ASC). */
+	UFUNCTION(BlueprintCallable, Category="Crafting|Utility")
 	void GatherOwnedTagsFromActor(AActor* Viewer, FGameplayTagContainer& Out) const;
 
-	// Add/remove/query helpers 
-	UFUNCTION(BlueprintCallable, Category="Crafting|Recipes")
-	void AddRecipe(UCraftingRecipeDataAsset* Recipe);
+	// Events
+	UPROPERTY(BlueprintAssignable, Category="Crafting|Events")
+	FCraftingStartedSignature OnCraftStarted;
 
-	UFUNCTION(BlueprintCallable, Category="Crafting|Recipes")
-	void RemoveRecipe(UCraftingRecipeDataAsset* Recipe);
-
-	UFUNCTION(BlueprintPure, Category="Crafting|Recipes")
-	bool HasRecipe(const UCraftingRecipeDataAsset* Recipe) const;
+	UPROPERTY(BlueprintAssignable, Category="Crafting|Events")
+	FCraftingFinishedSignature OnCraftFinished;
 
 protected:
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
-	// Internals
-	void FinishCraft_Internal(bool bSuccess);
-	void DeliverOutputs(const UCraftingRecipeDataAsset* Recipe, AActor* Instigator);
-	void GiveFinishXPIIfAny(const UCraftingRecipeDataAsset* Recipe, AActor* Instigator, bool bSuccess);
+	/** Called by timers; finishes current craft tick. */
+	void FinishCraft_Internal();
 
-	UPROPERTY(Replicated)
-	FCraftingJob ActiveJob;
+	// --- Hook points to your inventory system (kept minimal so this compiles clean) ---
+	/** Move the required materials (Times) into the Input inventory. Return false if you can’t stage everything. */
+	bool MoveRequiredToInput(const UCraftingRecipeDataAsset* Recipe, int32 Times);
 
-	UPROPERTY(Replicated)
-	bool bIsCrafting = false;
+	/** Give outputs from Recipe to Output inventory. */
+	void DeliverOutputs(const UCraftingRecipeDataAsset* Recipe);
 
+	/** Optional XP hook. */
+	void GiveFinishXPIIfAny(const UCraftingRecipeDataAsset* Recipe, AActor* InstigatorActor, bool bSuccess);
+
+private:
 	FTimerHandle CraftTimerHandle;
 };

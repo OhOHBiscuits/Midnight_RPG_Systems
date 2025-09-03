@@ -1,4 +1,5 @@
-﻿#pragma once
+﻿// WorkstationActor.h
+#pragma once
 
 #include "CoreMinimal.h"
 #include "Actors/BaseWorldItemActor.h"
@@ -8,6 +9,7 @@ class UCraftingStationComponent;
 class UInventoryComponent;
 class UCraftingRecipeDataAsset;
 class UWorkstationDataAsset;
+class UUserWidget;
 
 UCLASS()
 class RPGSYSTEM_API AWorkstationActor : public ABaseWorldItemActor
@@ -17,36 +19,33 @@ class RPGSYSTEM_API AWorkstationActor : public ABaseWorldItemActor
 public:
 	AWorkstationActor();
 
-protected:
-	virtual void BeginPlay() override;
-
-public:
-	virtual void Interact_Implementation(AActor* Interactor) override;
-
-	/** Core crafting logic lives here. */
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Crafting")
+	// Components
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Workstation")
 	TObjectPtr<UCraftingStationComponent> CraftingStation;
 
-	/** Where finished items are delivered by default. */
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Crafting")
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Workstation|Inventory")
+	TObjectPtr<UInventoryComponent>      InputInventory;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Workstation|Inventory")
 	TObjectPtr<UInventoryComponent>      OutputInventory;
 
-	/** Data-driven configuration (recipes, UI, tags…). */
+	// Data-driven setup
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Workstation")
-	TObjectPtr<UWorkstationDataAsset>    StationConfig;
+	TObjectPtr<UWorkstationDataAsset>    WorkstationData = nullptr;
 
-	/** Returns the hard-loaded recipes (resolved from StationConfig). */
+	// UI to show when interacted
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Workstation|UI")
+	TSubclassOf<UUserWidget>             WorkstationUIClass;
+
+	/** Simple allow-list gate. */
 	UFUNCTION(BlueprintCallable, Category="Workstation")
-	const TArray<UCraftingRecipeDataAsset*>& GetAvailableRecipes();
+	bool IsRecipeAllowed(const UCraftingRecipeDataAsset* Recipe) const;
 
-	/** Is this recipe allowed by the station data? (loads soft reference if needed) */
-	UFUNCTION(BlueprintCallable, Category="Workstation")
-	bool IsRecipeAllowed(const UCraftingRecipeDataAsset* Recipe);
+	// Interaction
+	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category="Interaction")
+	void OnInteract(AActor* Interactor);
+	virtual void OnInteract_Implementation(AActor* Interactor); // not marked override on purpose
 
-private:
-	// runtime cache only (not authored) so UI/crafting can use hard pointers
-	UPROPERTY(Transient)
-	TArray<TObjectPtr<UCraftingRecipeDataAsset>> CachedRecipes;
-
-	void ResolveRecipesSync(); // simple, safe sync load; swap to async later if desired
+protected:
+	virtual void BeginPlay() override;
 };
