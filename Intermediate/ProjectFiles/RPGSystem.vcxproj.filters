@@ -98,12 +98,6 @@
     <Filter Include="Source\RPGSystem\Private">
       <UniqueIdentifier>{2FF76552-CDC3-37F7-B465-B17141A27E70}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Source\RPGSystem\Private\Abilities">
-      <UniqueIdentifier>{2D81BC29-783C-3AB2-8833-6EEAF68B3ADC}</UniqueIdentifier>
-    </Filter>
-    <ClCompile Include="..\..\Source\RPGSystem\Private\Abilities\GA_Craft_Generic.cpp">
-      <Filter>Source\RPGSystem\Private\Abilities</Filter>
-    </ClCompile>
     <Filter Include="Source\RPGSystem\Private\Actors">
       <UniqueIdentifier>{385AA83C-3E46-34BD-9B2C-77DB2DD001E2}</UniqueIdentifier>
     </Filter>
@@ -209,15 +203,21 @@
     <ClCompile Include="..\..\Source\RPGSystem\Private\Progression\XPGrantBundle.cpp">
       <Filter>Source\RPGSystem\Private\Progression</Filter>
     </ClCompile>
+    <Filter Include="Source\RPGSystem\Private\Stats">
+      <UniqueIdentifier>{E89E7854-A2DC-3E3D-845F-9C9271237B55}</UniqueIdentifier>
+    </Filter>
+    <ClCompile Include="..\..\Source\RPGSystem\Private\Stats\RPGStatComponent.cpp">
+      <Filter>Source\RPGSystem\Private\Stats</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\RPGSystem\Private\Stats\RPGStatGASLibrary.cpp">
+      <Filter>Source\RPGSystem\Private\Stats</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\RPGSystem\Private\Stats\StatSetDataAsset.cpp">
+      <Filter>Source\RPGSystem\Private\Stats</Filter>
+    </ClCompile>
     <Filter Include="Source\RPGSystem\Public">
       <UniqueIdentifier>{72AFB710-0C59-3767-A861-A9A44630F591}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Source\RPGSystem\Public\Abilities">
-      <UniqueIdentifier>{68F66077-0912-3A61-B75D-101C0E099EA4}</UniqueIdentifier>
-    </Filter>
-    <ClInclude Include="..\..\Source\RPGSystem\Public\Abilities\GA_Craft_Generic.h">
-      <Filter>Source\RPGSystem\Public\Abilities</Filter>
-    </ClInclude>
     <Filter Include="Source\RPGSystem\Public\Actors">
       <UniqueIdentifier>{1B001223-6518-3554-A3F4-4D7A3B7BC6C7}</UniqueIdentifier>
     </Filter>
@@ -325,6 +325,18 @@
     </ClInclude>
     <ClInclude Include="..\..\Source\RPGSystem\Public\Progression\XPGrantBundle.h">
       <Filter>Source\RPGSystem\Public\Progression</Filter>
+    </ClInclude>
+    <Filter Include="Source\RPGSystem\Public\Stats">
+      <UniqueIdentifier>{554E4E25-F673-3B9D-A650-A2CCA2AA9024}</UniqueIdentifier>
+    </Filter>
+    <ClInclude Include="..\..\Source\RPGSystem\Public\Stats\RPGStatComponent.h">
+      <Filter>Source\RPGSystem\Public\Stats</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\RPGSystem\Public\Stats\RPGStatGASLibrary.h">
+      <Filter>Source\RPGSystem\Public\Stats</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\RPGSystem\Public\Stats\StatSetDataAsset.h">
+      <Filter>Source\RPGSystem\Public\Stats</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

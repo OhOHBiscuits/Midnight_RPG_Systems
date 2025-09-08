@@ -2,6 +2,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Inventory/ItemDataAsset.h"
 #include "GameplayTagContainer.h"
 #include "CraftingTypes.generated.h"
 
