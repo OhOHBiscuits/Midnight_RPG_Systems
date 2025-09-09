@@ -149,6 +149,15 @@
     <ClCompile Include="..\..\Source\RPGSystem\Private\GAS\RPGAbilitySystemComponent.cpp">
       <Filter>Source\RPGSystem\Private\GAS</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Source\RPGSystem\Private\GAS\RPGCue_StatNotify.cpp">
+      <Filter>Source\RPGSystem\Private\GAS</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\RPGSystem\Private\GAS\RPGGameplayAbility.cpp">
+      <Filter>Source\RPGSystem\Private\GAS</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\RPGSystem\Private\GAS\RPGMMC_StatTag.cpp">
+      <Filter>Source\RPGSystem\Private\GAS</Filter>
+    </ClCompile>
     <Filter Include="Source\RPGSystem\Private\Interfaces">
       <UniqueIdentifier>{73EE105A-F299-3251-AD90-7B624ADB7DDD}</UniqueIdentifier>
     </Filter>
@@ -285,6 +294,15 @@
       <UniqueIdentifier>{6FAAEF53-56A2-37D5-B735-9B842C2F8A70}</UniqueIdentifier>
     </Filter>
     <ClInclude Include="..\..\Source\RPGSystem\Public\GAS\RPGAbilitySystemComponent.h">
+      <Filter>Source\RPGSystem\Public\GAS</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\RPGSystem\Public\GAS\RPGCue_StatNotify.h">
+      <Filter>Source\RPGSystem\Public\GAS</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\RPGSystem\Public\GAS\RPGGameplayAbility.h">
+      <Filter>Source\RPGSystem\Public\GAS</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\RPGSystem\Public\GAS\RPGMMC_StatTag.h">
       <Filter>Source\RPGSystem\Public\GAS</Filter>
     </ClInclude>
     <Filter Include="Source\RPGSystem\Public\Interfaces">

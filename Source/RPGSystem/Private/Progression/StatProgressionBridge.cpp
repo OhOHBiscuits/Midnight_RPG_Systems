@@ -1,145 +1,157 @@
-﻿// Source/RPGSystem/Private/Progression/StatProgressionBridge.cpp
-#include "Progression/StatProgressionBridge.h"
+﻿#include "Progression/StatProgressionBridge.h"
 
-#include "Progression/XPGrantBundle.h"
-#include "Progression/SkillProgressionData.h"
-
-#include "Stats/StatProviderInterface.h"       // your interface
 #include "Components/ActorComponent.h"
 #include "GameFramework/Actor.h"
+#include "GameFramework/Controller.h"
+#include "GameFramework/PlayerState.h"
 
-static const float KSmall = 1e-6f;
-
-UObject* UStatProgressionBridge::FindStatProvider(UObject* Context)
+static bool ImplementsStatProvider(UObject* Obj)
 {
-	if (!Context) return nullptr;
+	return Obj && Obj->GetClass()->ImplementsInterface(UStatProviderInterface::StaticClass());
+}
 
-	// 1) Directly on the object?
-	if (Context->GetClass()->ImplementsInterface(UStatProviderInterface::StaticClass()))
+float UStatProgressionBridge::GetStat(UObject* Provider, FGameplayTag Tag, float DefaultValue)
+{
+	if (!ImplementsStatProvider(Provider) || !Tag.IsValid())
 	{
-		return Context;
+		return DefaultValue;
+	}
+	return IStatProviderInterface::Execute_GetStat(Provider, Tag, DefaultValue);
+}
+
+void UStatProgressionBridge::SetStat(UObject* Provider, FGameplayTag Tag, float NewValue)
+{
+	if (!ImplementsStatProvider(Provider) || !Tag.IsValid())
+	{
+		return;
+	}
+	IStatProviderInterface::Execute_SetStat(Provider, Tag, NewValue);
+}
+
+void UStatProgressionBridge::AddToStat(UObject* Provider, FGameplayTag Tag, float Delta)
+{
+	if (!ImplementsStatProvider(Provider) || !Tag.IsValid())
+	{
+		return;
+	}
+	IStatProviderInterface::Execute_AddToStat(Provider, Tag, Delta);
+}
+
+UObject* UStatProgressionBridge::FindStatProviderOn(AActor* Root)
+{
+	if (!Root) return nullptr;
+
+	// 1) The actor itself
+	if (ImplementsStatProvider(Root))
+	{
+		return Root;
 	}
 
-	// 2) If it's an actor, search its components
-	if (const AActor* Actor = Cast<AActor>(Context))
+	// 2) Any components on the actor
 	{
-		TArray<UActorComponent*> Comps;
-		Actor->GetComponents(Comps);
+		TInlineComponentArray<UActorComponent*> Comps(Root);
 		for (UActorComponent* C : Comps)
 		{
-			if (C && C->GetClass()->ImplementsInterface(UStatProviderInterface::StaticClass()))
+			if (ImplementsStatProvider(C))
 			{
 				return C;
 			}
 		}
 	}
 
+	// 3) Controller (if any)
+	if (AController* Ctrl = Root->GetInstigatorController())
+	{
+		if (ImplementsStatProvider(Ctrl))
+		{
+			return Ctrl;
+		}
+
+		TInlineComponentArray<UActorComponent*> CtrlComps(Ctrl);
+		for (UActorComponent* C : CtrlComps)
+		{
+			if (ImplementsStatProvider(C))
+			{
+				return C;
+			}
+		}
+
+		// 4) PlayerState (if any)
+		if (APlayerState* PS = Ctrl->GetPlayerState<APlayerState>())
+		{
+			if (ImplementsStatProvider(PS))
+			{
+				return PS;
+			}
+
+			// PlayerState is an Actor; we can search its components as well.
+			TInlineComponentArray<UActorComponent*> PSComps(static_cast<const AActor*>(PS));
+			for (UActorComponent* C : PSComps)
+			{
+				if (ImplementsStatProvider(C))
+				{
+					return C;
+				}
+			}
+		}
+	}
+
+	// 5) Walk up the owner chain if present
+	if (AActor* Owner = Root->GetOwner())
+	{
+		if (UObject* OnOwner = FindStatProviderOn(Owner))
+		{
+			return OnOwner;
+		}
+	}
+
 	return nullptr;
 }
 
-float UStatProgressionBridge::GetStat(UObject* Provider, const FGameplayTag& Tag, float DefaultValue)
+void UStatProgressionBridge::ApplyXPAndLevelUp(
+	UObject* Provider,
+	FGameplayTag LevelTag,
+	FGameplayTag XPTag,
+	FGameplayTag XPToNextTag,
+	float DeltaXP,
+	float MinLevel,
+	float MaxLevel)
 {
-	if (!Provider || !Tag.IsValid()) return DefaultValue;
-	return IStatProviderInterface::Execute_GetStat(Provider, Tag, DefaultValue);
-}
-
-void UStatProgressionBridge::SetStat(UObject* Provider, const FGameplayTag& Tag, float NewValue)
-{
-	if (!Provider || !Tag.IsValid()) return;
-	IStatProviderInterface::Execute_SetStat(Provider, Tag, NewValue);
-}
-
-float UStatProgressionBridge::ComputeNextThreshold(const USkillProgressionData* Skill, float NewLevel, float IncrementOverride)
-{
-	const float Inc = (IncrementOverride > 0.f) ? IncrementOverride : (Skill ? Skill->BaseIncrementPerLevel : 1000.f);
-	const float Level = FMath::Max(1.f, NewLevel);
-	return FMath::Max(1.f, Inc * Level);
-}
-
-bool UStatProgressionBridge::ApplyXPBundle(AActor* Target, UXPGrantBundle* Bundle)
-{
-	if (!Target || !Bundle) return false;
-
-	bool bAny = false;
-	for (const FSkillXPGrant& G : Bundle->Grants)
+	if (!ImplementsStatProvider(Provider) || DeltaXP == 0.f)
 	{
-		if (G.Skill && G.XPGain != 0.f)
-		{
-			bAny |= ApplySkillXP(Target, G.Skill, G.XPGain, G.IncrementOverride, G.bCarryRemainderOverride);
-		}
-	}
-	return bAny;
-}
-
-bool UStatProgressionBridge::ApplySkillXP(AActor* Target, USkillProgressionData* Skill, float XPGain,
-                                          float IncrementOverride, bool bCarryRemainderOverride)
-{
-	if (!Target || !Skill) return false;
-
-	UObject* Provider = FindStatProvider(Target);
-	if (!Provider)
-	{
-		UE_LOG(LogTemp, Warning, TEXT("[StatProgressionBridge] No StatProvider on %s"), *GetNameSafe(Target));
-		return false;
+		return;
 	}
 
-	// Grab tags; if a tag is missing, allow auto-derivation from SkillTag (optional)
-	FGameplayTag LevelTag    = Skill->LevelTag;
-	FGameplayTag XPTag       = Skill->XPTag;
-	FGameplayTag XPToNextTag = Skill->XPToNextTag;
-
-	// OPTIONAL auto-derive: Skill.MySkill -> Skill.MySkill.Level / .XP / .XPToNext
-	auto DeriveIfMissing = [](const FGameplayTag& Base, const TCHAR* Suffix) -> FGameplayTag
-	{
-		if (!Base.IsValid()) return FGameplayTag();
-		const FString Derived = Base.ToString() + TEXT(".") + Suffix;
-		return FGameplayTag::RequestGameplayTag(FName(*Derived), /*ErrorIfNotFound*/false);
-	};
-
-	if (!LevelTag.IsValid())    LevelTag    = DeriveIfMissing(Skill->SkillTag, TEXT("Level"));
-	if (!XPTag.IsValid())       XPTag       = DeriveIfMissing(Skill->SkillTag, TEXT("XP"));
-	if (!XPToNextTag.IsValid()) XPToNextTag = DeriveIfMissing(Skill->SkillTag, TEXT("XPToNext"));
-
-	// Read current values
 	float Level    = GetStat(Provider, LevelTag,    0.f);
 	float XP       = GetStat(Provider, XPTag,       0.f);
 	float XPToNext = GetStat(Provider, XPToNextTag, 0.f);
 
-	// Establish rule inputs
-	const bool bCarry = (bCarryRemainderOverride) ? true : Skill->bCarryRemainder;
-	if (XPToNext <= KSmall)
+	XP += DeltaXP;
+
+	// Provide a default curve if XPToNext is not initialized
+	auto DefaultThresholdForLevel = [](float Lvl) -> float
 	{
-		XPToNext = ComputeNextThreshold(Skill, FMath::Max(1.f, Level + 1.f), IncrementOverride);
+		// very basic curve: grows linearly; replace with your DataAsset lookups when ready
+		return FMath::Max(10.f, 100.f + (Lvl * 25.f));
+	};
+
+	if (XPToNext <= 0.f)
+	{
+		XPToNext = DefaultThresholdForLevel(Level);
 	}
 
-	// Apply gain
-	XP += XPGain;
-
-	// Level-up(s)
-	int32 LevelsGained = 0;
-	while (XP >= XPToNext && XPToNext > KSmall)
+	// Level up while we have enough XP
+	while (XP >= XPToNext)
 	{
-		LevelsGained++;
-		if (bCarry)
-		{
-			XP -= XPToNext;
-		}
-		else
-		{
-			XP = 0.f;
-		}
+		XP -= XPToNext;
+		Level = FMath::Clamp(Level + 1.f, MinLevel, MaxLevel);
 
-		Level += 1.f;
-		XPToNext = ComputeNextThreshold(Skill, Level + 1.f, IncrementOverride);
+		// Next threshold – here we just recompute by level.
+		XPToNext = DefaultThresholdForLevel(Level);
 	}
 
-	// Write back
+	// Write back results
 	SetStat(Provider, LevelTag,    Level);
 	SetStat(Provider, XPTag,       FMath::Max(0.f, XP));
-	SetStat(Provider, XPToNextTag, XPToNext);
-
-	UE_LOG(LogTemp, Log, TEXT("[StatProgressionBridge] %s: +%0.2f XP -> Lvl %0.0f (%d up), XP=%0.2f / Next=%0.2f"),
-	       *GetNameSafe(Skill), XPGain, Level, LevelsGained, XP, XPToNext);
-
-	return true;
+	SetStat(Provider, XPToNextTag, FMath::Max(1.f, XPToNext));
 }

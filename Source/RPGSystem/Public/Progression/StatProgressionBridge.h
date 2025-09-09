@@ -1,18 +1,16 @@
-﻿// Source/RPGSystem/Public/Progression/StatProgressionBridge.h
-#pragma once
+﻿#pragma once
 
 #include "CoreMinimal.h"
+#include "GameplayTagContainer.h"               // FGameplayTag
 #include "Kismet/BlueprintFunctionLibrary.h"
+#include "Stats/StatProviderInterface.h"              // your interface
 #include "StatProgressionBridge.generated.h"
 
-class UXPGrantBundle;
-class USkillProgressionData;
-
 /**
- * Minimal glue that routes XP/Level changes through your Stat System
- * using UStatProviderInterface (by GameplayTags).
+ * Central, engine-safe helpers to read/write your stats and to locate an IStatProviderInterface
+ * anywhere on a Pawn/Controller/PlayerState/Components chain.
  *
- * Safe to call from BP or C++.
+ * All functions are BlueprintCallable so designers and cues/MMCs can use them too.
  */
 UCLASS()
 class RPGSYSTEM_API UStatProgressionBridge : public UBlueprintFunctionLibrary
@@ -20,25 +18,30 @@ class RPGSYSTEM_API UStatProgressionBridge : public UBlueprintFunctionLibrary
 	GENERATED_BODY()
 
 public:
-	/** Apply a bundle of XP grants to Target (server-authoritative recommended). */
-	UFUNCTION(BlueprintCallable, Category="1_Progression|Bridge")
-	static bool ApplyXPBundle(AActor* Target, UXPGrantBundle* Bundle);
+	/** Find first object that implements StatProviderInterface on the given root (actor, its components, controller, playerstate, or owner chain). */
+	UFUNCTION(BlueprintCallable, Category="Stats")
+	static UObject* FindStatProviderOn(AActor* Root);
 
-	/** Apply XP to a single skill on Target. */
-	UFUNCTION(BlueprintCallable, Category="1_Progression|Bridge")
-	static bool ApplySkillXP(AActor* Target, USkillProgressionData* Skill, float XPGain,
-							 float IncrementOverride = -1.f, bool bCarryRemainderOverride = false);
+	/** Safe GetStat: returns DefaultValue if Provider is null or doesn’t implement the interface. */
+	UFUNCTION(BlueprintCallable, Category="Stats")
+	static float GetStat(UObject* Provider, FGameplayTag Tag, float DefaultValue = 0.f);
 
-private:
-	/** Find any object on the Actor that implements UStatProviderInterface (component or actor). */
-	static UObject* FindStatProvider(UObject* Context);
+	/** Safe SetStat: no-op if Provider is null or doesn’t implement the interface. */
+	UFUNCTION(BlueprintCallable, Category="Stats")
+	static void  SetStat(UObject* Provider, FGameplayTag Tag, float NewValue);
 
-	/** Get stat through interface (returns DefaultValue if not found). */
-	static float GetStat(UObject* Provider, const FGameplayTag& Tag, float DefaultValue);
+	/** Safe AddToStat: no-op if Provider is null or doesn’t implement the interface. */
+	UFUNCTION(BlueprintCallable, Category="Stats")
+	static void  AddToStat(UObject* Provider, FGameplayTag Tag, float Delta);
 
-	/** Set stat through interface. */
-	static void  SetStat(UObject* Provider, const FGameplayTag& Tag, float NewValue);
-
-	/** Compute next threshold based on linear rule. Always >= 1. */
-	static float ComputeNextThreshold(const USkillProgressionData* Skill, float NewLevel, float IncrementOverride);
+	/** Simple, data-agnostic levelling helper (optional). Keeps things designer-driven via tags. */
+	UFUNCTION(BlueprintCallable, Category="Progression")
+	static void ApplyXPAndLevelUp(
+		UObject* Provider,
+		FGameplayTag LevelTag,
+		FGameplayTag XPTag,
+		FGameplayTag XPToNextTag,
+		float DeltaXP,
+		float MinLevel = 0.f,
+		float MaxLevel = 9999.f);
 };

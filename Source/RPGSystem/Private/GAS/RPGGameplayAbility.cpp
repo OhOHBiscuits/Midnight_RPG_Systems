@@ -1,42 +1,71 @@
-﻿// Source/RPGSystem/Private/GAS/RPGGameplayAbility.cpp
-#include "GAS/RPGGameplayAbility.h"
-#include "GAS/RPGAbilitySystemComponent.h"
+﻿#include "GAS/RPGGameplayAbility.h"
 
-URPGAbilitySystemComponent* URPGGameplayAbility::GetRPGASC() const
+#include "AbilitySystemComponent.h"
+#include "GAS/RPGAbilitySystemComponent.h"      // optional subclass
+#include "Progression/StatProgressionBridge.h"  // bridge to your stat system
+
+UObject* URPGGameplayAbility::FindProviderForSelf() const
 {
-	return Cast<URPGAbilitySystemComponent>(GetAbilitySystemComponentFromActorInfo());
+	if (!CurrentActorInfo)
+	{
+		return nullptr;
+	}
+
+	// Prefer the ASC we’re executing on
+	if (UAbilitySystemComponent* ASC = CurrentActorInfo->AbilitySystemComponent.Get())
+	{
+		// If it’s your subclass, let it pick the provider.
+		if (const URPGAbilitySystemComponent* RPGASC = Cast<URPGAbilitySystemComponent>(ASC))
+		{
+			if (UObject* P = RPGASC->FindBestStatProvider())
+			{
+				return P;
+			}
+		}
+
+		// Otherwise: try avatar, then owner via the bridge.
+		if (AActor* Avatar = CurrentActorInfo->AvatarActor.Get())
+		{
+			if (UObject* P = UStatProgressionBridge::FindStatProviderOn(Avatar))
+			{
+				return P;
+			}
+		}
+		if (AActor* Owner = CurrentActorInfo->OwnerActor.Get())
+		{
+			if (UObject* P = UStatProgressionBridge::FindStatProviderOn(Owner))
+			{
+				return P;
+			}
+		}
+	}
+
+	return nullptr;
 }
 
-float URPGGameplayAbility::GA_GetStat(FGameplayTag Tag, float DefaultValue) const
+float URPGGameplayAbility::GetStatOnSelf(const FGameplayTag& Tag, float DefaultValue) const
 {
-	if (const URPGAbilitySystemComponent* ASC = GetRPGASC())
+	if (!Tag.IsValid())
 	{
-		return ASC->GetStat(Tag, DefaultValue);
+		return DefaultValue;
+	}
+
+	if (UObject* Provider = FindProviderForSelf())
+	{
+		return UStatProgressionBridge::GetStat(Provider, Tag, DefaultValue);
 	}
 	return DefaultValue;
 }
 
-bool URPGGameplayAbility::GA_ApplyEffect_SetByCaller(UGameplayEffect* Effect, FGameplayTag MagnitudeTag, float Magnitude, FActiveGameplayEffectHandle& OutHandle) const
+void URPGGameplayAbility::AddToStatOnSelf(const FGameplayTag& Tag, float Delta, bool bClampToValidRange) const
 {
-	OutHandle = FActiveGameplayEffectHandle();
-	if (!Effect || !MagnitudeTag.IsValid()) return false;
+	if (!Tag.IsValid())
+	{
+		return;
+	}
 
-	UAbilitySystemComponent* ASC = GetAbilitySystemComponentFromActorInfo();
-	if (!ASC) return false;
-
-	FGameplayEffectContextHandle Ctx = ASC->MakeEffectContext();
-	FGameplayEffectSpecHandle     Sh = ASC->MakeOutgoingSpec(Effect->GetClass(), GetAbilityLevel(), Ctx);
-	if (!Sh.IsValid()) return false;
-
-	Sh.Data->SetSetByCallerMagnitude(MagnitudeTag, Magnitude);
-
-	OutHandle = ASC->ApplyGameplayEffectSpecToSelf(*Sh.Data.Get());
-	return OutHandle.IsValid();
-}
-
-bool URPGGameplayAbility::GA_ApplyEffect_FromStat(UGameplayEffect* Effect, FGameplayTag MagnitudeTag, FGameplayTag StatTag, float Scale, float ClampMin, float ClampMax, FActiveGameplayEffectHandle& OutHandle) const
-{
-	const float Raw = GA_GetStat(StatTag, 0.f);
-	const float Mag = FMath::Clamp(Raw * Scale, ClampMin, ClampMax);
-	return GA_ApplyEffect_SetByCaller(Effect, MagnitudeTag, Mag, OutHandle);
+	if (UObject* Provider = FindProviderForSelf())
+	{
+		UStatProgressionBridge::AddToStat(Provider, Tag, Delta, bClampToValidRange);
+	}
 }

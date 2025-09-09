@@ -1,61 +1,38 @@
-﻿// Source/RPGSystem/Private/GAS/RPGMMC_StatTag.cpp
-#include "GAS/RPGMMC_StatTag.h"
+﻿#include "GAS/RPGMMC_StatTag.h"
 #include "AbilitySystemComponent.h"
-#include "Stats/StatProviderInterface.h"
+#include "GameplayEffectTypes.h"
+#include "Progression/StatProgressionBridge.h" // UStatProgressionBridge
 
-URPGMMC_StatTag::URPGMMC_StatTag()
-{
-}
-
-UObject* URPGMMC_StatTag::FindProviderFromASC(const UAbilitySystemComponent* ASC)
-{
-	if (!ASC) return nullptr;
-
-	// Directly on avatar or owner…
-	auto TryFind = [](UObject* Obj) -> UObject*
-	{
-		if (!Obj) return nullptr;
-
-		if (Obj->GetClass()->ImplementsInterface(UStatProviderInterface::StaticClass()))
-			return Obj;
-
-		if (AActor* A = Cast<AActor>(Obj))
-		{
-			TArray<UActorComponent*> Comps;
-			A->GetComponents(Comps);
-			for (UActorComponent* C : Comps)
-			{
-				if (C && C->GetClass()->ImplementsInterface(UStatProviderInterface::StaticClass()))
-					return C;
-			}
-		}
-		return nullptr;
-	};
-
-	if (UObject* P = TryFind(ASC->GetAvatarActor())) return P;
-	if (UObject* P = TryFind(ASC->GetOwnerActor()))  return P;
-	return nullptr;
-}
+// NOTE: Header for URPGMMC_StatTag should declare a UPROPERTY(EditDefaultsOnly)
+// FGameplayTag StatToRead;  This cpp assumes that property exists.
 
 float URPGMMC_StatTag::CalculateBaseMagnitude_Implementation(const FGameplayEffectSpec& Spec) const
 {
-	if (!StatTag.IsValid())
+	// Prefer reading stats from the source (instigator) side.
+	const UAbilitySystemComponent* SourceASC =
+		Spec.GetContext().GetOriginalInstigatorAbilitySystemComponent();
+
+	UObject* Provider = nullptr;
+
+	if (SourceASC && SourceASC->GetOwnerActor())
 	{
-		return DefaultValue;
+		Provider = UStatProgressionBridge::FindStatProviderOn(SourceASC->GetOwnerActor());
 	}
 
-	const UAbilitySystemComponent* SourceASC = Spec.GetContext().GetInstigatorAbilitySystemComponent();
-	const UAbilitySystemComponent* TargetASC = Spec.GetEffectContext().GetOriginalInstigatorAbilitySystemComponent(); // fallback approach
-
-	const UAbilitySystemComponent* ASC = (StatFrom == ERPGStatSource::Source) ? SourceASC : Spec.GetTargetAbilitySystemComponent();
-
-	UObject* Provider = FindProviderFromASC(ASC);
+	// Fall back to effect causer (often the weapon or avatar) if needed.
 	if (!Provider)
 	{
-		// Try the other side as a last resort
-		Provider = FindProviderFromASC(StatFrom == ERPGStatSource::Source ? Spec.GetTargetAbilitySystemComponent() : SourceASC);
+		if (AActor* Causer = Spec.GetContext().GetEffectCauser())
+		{
+			Provider = UStatProgressionBridge::FindStatProviderOn(Causer);
+		}
 	}
-	if (!Provider) return DefaultValue;
 
-	return IStatProviderInterface::Execute_GetStat(Provider, StatTag, DefaultValue);
+	// If we still don’t have anything, just return 0 (or a default if you prefer).
+	if (!Provider || !StatToRead.IsValid())
+	{
+		return 0.f;
+	}
+
+	return UStatProgressionBridge::GetStat(Provider, StatToRead, 0.f);
 }

@@ -38,6 +38,10 @@ public:
 	UPROPERTY(EditDefaultsOnly, Category="RPG|Stat")
 	float DefaultValue = 0.f;
 
+	UPROPERTY(EditDefaultsOnly, Category="Stats")
+	FGameplayTag StatToRead;
+
+
 	// UGameplayModMagnitudeCalculation
 	virtual float CalculateBaseMagnitude_Implementation(const FGameplayEffectSpec& Spec) const override;
 
