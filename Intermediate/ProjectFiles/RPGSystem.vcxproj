@@ -713,10 +713,12 @@
     <None Include="..\..\Plugins\IconCreator\IconCreator.uplugin"/>
     <None Include="..\..\Plugins\IconCreator\Resources\Icon128.png"/>
     <None Include="..\..\Source\RPGSystem\RPGSystem.Build.cs"/>
+    <ClCompile Include="..\..\Source\RPGSystem\Private\Progression\StatProgressionBridge.cpp" />
     <ClCompile Include="..\..\Source\RPGSystem\RPGSystem.cpp">
       <AdditionalIncludeDirectories>$(ClCompile_AdditionalIncludeDirectories_1)</AdditionalIncludeDirectories>
       <ForcedIncludeFiles>$(ClCompile_ForcedIncludeFiles_1)</ForcedIncludeFiles>
     </ClCompile>
+    <ClInclude Include="..\..\Source\RPGSystem\Public\Progression\StatProgressionBridge.h" />
     <ClInclude Include="..\..\Source\RPGSystem\RPGSystem.h"/>
     <ClCompile Include="..\..\Source\RPGSystem\Private\Actors\AreaVolumeActor.cpp">
       <AdditionalIncludeDirectories>$(ClCompile_AdditionalIncludeDirectories_1)</AdditionalIncludeDirectories>

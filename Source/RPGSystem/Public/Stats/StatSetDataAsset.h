@@ -5,73 +5,49 @@
 #include "GameplayTagContainer.h"
 #include "StatSetDataAsset.generated.h"
 
+/** Scalar: single float (e.g., MoveSpeed, CritChance) */
 USTRUCT(BlueprintType)
-struct FScalarDef
+struct RPGSYSTEM_API FRPGScalarDef
 {
 	GENERATED_BODY()
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	FGameplayTag Tag;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	FText Name;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	float DefaultValue = 0.f;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly) FGameplayTag Tag;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly) FText        Name;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly) float        DefaultValue = 0.f;
 };
 
+/** Vital: Current/Max pair (e.g., Health, Stamina, Hunger) */
 USTRUCT(BlueprintType)
-struct FVitalDef
+struct RPGSYSTEM_API FRPGVitalDef
 {
 	GENERATED_BODY()
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	FGameplayTag Tag;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	FText Name;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta=(ClampMin="0"))
-	float DefaultCurrent = 0.f;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta=(ClampMin="0"))
-	float Max = 100.f;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly) FGameplayTag Tag;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly) FText        Name;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly) float        DefaultCurrent = 0.f;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly) float        DefaultMax     = 100.f;
 };
 
+/** Skill: Level & XP (e.g., Smithing, Cooking) */
 USTRUCT(BlueprintType)
-struct FSkillDef
+struct RPGSYSTEM_API FRPGSkillDef
 {
 	GENERATED_BODY()
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	FGameplayTag Tag;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	FText Name;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta=(ClampMin="0"))
-	int32 DefaultLevel = 1;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta=(ClampMin="0"))
-	float StartingXP = 0.f;
-
-	// If <=0, component computes XP to next using its rule.
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta=(ClampMin="0"))
-	float XPToNextOverride = 0.f;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly) FGameplayTag Tag;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly) FText        Name;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly) int32        DefaultLevel    = 0;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly) float        DefaultXP       = 0.f;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly) float        DefaultXPToNext = 100.f;
 };
 
+/** Bundle of stat definitions that designers/mods can author. */
 UCLASS(BlueprintType)
-class UStatSetDataAsset : public UDataAsset
+class RPGSYSTEM_API UStatSetDataAsset : public UDataAsset
 {
 	GENERATED_BODY()
-
 public:
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Stats")
-	TArray<FScalarDef> Scalars;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Stats")
-	TArray<FVitalDef> Vitals;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Stats")
-	TArray<FSkillDef> Skills;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly) TArray<FRPGScalarDef> Modifiers;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly) TArray<FRPGVitalDef>  Vitals;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly) TArray<FRPGSkillDef>  Skills;
 };

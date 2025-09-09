@@ -1,4 +1,5 @@
-﻿#pragma once
+﻿// Source/RPGSystem/Public/Progression/XPGrantBundle.h
+#pragma once
 
 #include "CoreMinimal.h"
 #include "Engine/DataAsset.h"

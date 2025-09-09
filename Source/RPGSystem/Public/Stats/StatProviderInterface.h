@@ -1,31 +1,35 @@
-// StatProviderInterface.h
 #pragma once
 
+#include "CoreMinimal.h"
 #include "UObject/Interface.h"
 #include "GameplayTagContainer.h"
 #include "StatProviderInterface.generated.h"
 
+/** UE interface wrapper */
 UINTERFACE(BlueprintType)
-class UStatProviderInterface : public UInterface
+class RPGSYSTEM_API UStatProviderInterface : public UInterface
 {
 	GENERATED_BODY()
 };
 
-/** Implement this on a component (or actor) that owns stats */
-class IStatProviderInterface
+/**
+ * Pure interface (implemented by URPGStatComponent and optionally others).
+ * NOTE: Implementations go in *_Implementation methods.
+ */
+class RPGSYSTEM_API IStatProviderInterface
 {
 	GENERATED_BODY()
 
 public:
-	/** Pure read; safe on client. */
-	UFUNCTION(BlueprintCallable, BlueprintNativeEvent, Category="RPG|Stats")
-	float GetStat(FGameplayTag Tag, float DefaultValue /*=0.f*/) const;
+	/** Reads a stat; returns DefaultValue if the tag isn’t found. */
+	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category="Stats")
+	float GetStat(FGameplayTag Tag, float DefaultValue) const;
 
-	/** Server-authoritative; implementer should route RPC as needed. */
-	UFUNCTION(BlueprintCallable, BlueprintNativeEvent, Category="RPG|Stats")
-	void SetStat(FGameplayTag Tag, float NewValue);
+	/** Sets a stat to an absolute value (vitals clamp to [0..Max]). */
+	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category="Stats")
+	void  SetStat(FGameplayTag Tag, float NewValue);
 
-	/** Server-authoritative; implementer should route RPC as needed. */
-	UFUNCTION(BlueprintCallable, BlueprintNativeEvent, Category="RPG|Stats")
-	void AddToStat(FGameplayTag Tag, float Delta);
+	/** Adds Delta to a stat (vitals clamp to [0..Max]). */
+	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category="Stats")
+	void  AddToStat(FGameplayTag Tag, float Delta);
 };
