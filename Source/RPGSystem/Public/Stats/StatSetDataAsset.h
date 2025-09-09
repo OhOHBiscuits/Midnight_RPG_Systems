@@ -5,12 +5,73 @@
 #include "GameplayTagContainer.h"
 #include "StatSetDataAsset.generated.h"
 
-UCLASS(BlueprintType)
-class RPGSYSTEM_API UStatSetDataAsset : public UDataAsset
+USTRUCT(BlueprintType)
+struct FScalarDef
 {
 	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	FGameplayTag Tag;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	FText Name;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	float DefaultValue = 0.f;
+};
+
+USTRUCT(BlueprintType)
+struct FVitalDef
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	FGameplayTag Tag;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	FText Name;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta=(ClampMin="0"))
+	float DefaultCurrent = 0.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta=(ClampMin="0"))
+	float Max = 100.f;
+};
+
+USTRUCT(BlueprintType)
+struct FSkillDef
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	FGameplayTag Tag;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	FText Name;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta=(ClampMin="0"))
+	int32 DefaultLevel = 1;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta=(ClampMin="0"))
+	float StartingXP = 0.f;
+
+	// If <=0, component computes XP to next using its rule.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta=(ClampMin="0"))
+	float XPToNextOverride = 0.f;
+};
+
+UCLASS(BlueprintType)
+class UStatSetDataAsset : public UDataAsset
+{
+	GENERATED_BODY()
+
 public:
-	// Default values for any stat tag. Mods can add their own tags here.
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Stats")
-	TMap<FGameplayTag, float> Defaults;
+	TArray<FScalarDef> Scalars;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Stats")
+	TArray<FVitalDef> Vitals;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Stats")
+	TArray<FSkillDef> Skills;
 };

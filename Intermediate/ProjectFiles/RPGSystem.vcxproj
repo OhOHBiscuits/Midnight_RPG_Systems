@@ -838,6 +838,14 @@
       <AdditionalIncludeDirectories>$(ClCompile_AdditionalIncludeDirectories_1)</AdditionalIncludeDirectories>
       <ForcedIncludeFiles>$(ClCompile_ForcedIncludeFiles_1)</ForcedIncludeFiles>
     </ClCompile>
+    <ClCompile Include="..\..\Source\RPGSystem\Private\Stats\StatBlueprintLibrary.cpp">
+      <AdditionalIncludeDirectories>$(ClCompile_AdditionalIncludeDirectories_1)</AdditionalIncludeDirectories>
+      <ForcedIncludeFiles>$(ClCompile_ForcedIncludeFiles_1)</ForcedIncludeFiles>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\RPGSystem\Private\Stats\StatProviderInterface.cpp">
+      <AdditionalIncludeDirectories>$(ClCompile_AdditionalIncludeDirectories_1)</AdditionalIncludeDirectories>
+      <ForcedIncludeFiles>$(ClCompile_ForcedIncludeFiles_1)</ForcedIncludeFiles>
+    </ClCompile>
     <ClCompile Include="..\..\Source\RPGSystem\Private\Stats\StatSetDataAsset.cpp">
       <AdditionalIncludeDirectories>$(ClCompile_AdditionalIncludeDirectories_1)</AdditionalIncludeDirectories>
       <ForcedIncludeFiles>$(ClCompile_ForcedIncludeFiles_1)</ForcedIncludeFiles>
@@ -873,6 +881,8 @@
     <ClInclude Include="..\..\Source\RPGSystem\Public\Progression\XPGrantBundle.h"/>
     <ClInclude Include="..\..\Source\RPGSystem\Public\Stats\RPGStatComponent.h"/>
     <ClInclude Include="..\..\Source\RPGSystem\Public\Stats\RPGStatGASLibrary.h"/>
+    <ClInclude Include="..\..\Source\RPGSystem\Public\Stats\StatBlueprintLibrary.h"/>
+    <ClInclude Include="..\..\Source\RPGSystem\Public\Stats\StatProviderInterface.h"/>
     <ClInclude Include="..\..\Source\RPGSystem\Public\Stats\StatSetDataAsset.h"/>
   </ItemGroup>
   <PropertyGroup>

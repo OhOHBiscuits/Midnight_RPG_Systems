@@ -1,118 +1,256 @@
-// RPGStatComponent.h
 #pragma once
 
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
 #include "GameplayTagContainer.h"
 #include "Net/Serialization/FastArraySerializer.h"
+#include "StatProviderInterface.h"
 #include "RPGStatComponent.generated.h"
 
+class UStatSetDataAsset;
 class URPGStatComponent;
 
-/** One replicated stat row */
-USTRUCT(BlueprintType)
-struct FRPGStatEntry : public FFastArraySerializerItem
-{
-	GENERATED_BODY()
+// ---------- Scalars ----------
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	FGameplayTag Tag;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	float Value = 0.f;
-};
-
-/** FastArray wrapper for all stats on the component */
 USTRUCT()
-struct FRPGStatList : public FFastArraySerializer
+struct FRPGScalarEntry : public FFastArraySerializerItem
 {
 	GENERATED_BODY()
 
 	UPROPERTY()
-	TArray<FRPGStatEntry> Items;
+	FGameplayTag Tag;
 
-	/** Back-pointer so FastArray callbacks can rebuild the component’s cache */
-	UPROPERTY(NotReplicated, Transient)
-	URPGStatComponent* Owner = nullptr;
+	UPROPERTY()
+	FText Name;
 
-	/** FastArray plumb-in */
-	bool NetDeltaSerialize(FNetDeltaSerializeInfo& DeltaParms);
-
-	/** FastArray callbacks (defined in .cpp so we can see URPGStatComponent) */
-	void PostReplicatedAdd   (const TArrayView<int32>& ChangedIndices, int32 FinalSize);
-	void PostReplicatedChange(const TArrayView<int32>& ChangedIndices, int32 FinalSize);
-	void PostReplicatedRemove(const TArrayView<int32>& ChangedIndices, int32 FinalSize);
+	UPROPERTY()
+	float Value = 0.f;
 };
 
-template<>
-struct TStructOpsTypeTraits<FRPGStatList> : public TStructOpsTypeTraitsBase2<FRPGStatList>
+USTRUCT()
+struct FRPGScalarList : public FFastArraySerializer
+{
+	GENERATED_BODY()
+
+	UPROPERTY()
+	TArray<FRPGScalarEntry> Items;
+
+	// Not replicated; set by owner to allow callbacks to rebuild caches
+	UPROPERTY(Transient)
+	URPGStatComponent* Owner = nullptr;
+
+	void Register(URPGStatComponent* InOwner) { Owner = InOwner; }
+
+	bool NetDeltaSerialize(FNetDeltaSerializeInfo& DeltaParams)
+	{
+		return FFastArraySerializer::FastArrayDeltaSerialize<FRPGScalarEntry, FRPGScalarList>(Items, DeltaParams, *this);
+	}
+
+	// declared here, defined in .cpp to avoid “use of undefined type” errors
+	void PostReplicatedAdd   (const TArrayView<int32>& AddedIndices,   int32 FinalSize);
+	void PostReplicatedChange(const TArrayView<int32>& ChangedIndices, int32 FinalSize);
+	void PostReplicatedRemove(const TArrayView<int32>& RemovedIndices, int32 FinalSize);
+};
+
+template<> struct TStructOpsTypeTraits<FRPGScalarList> : public TStructOpsTypeTraitsBase2<FRPGScalarList>
 {
 	enum { WithNetDeltaSerializer = true };
 };
 
-/** Fired whenever a stat changes (server or after client receives replication) */
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnStatChanged, FGameplayTag, Tag, float, NewValue);
+// ---------- Vitals (Current / Max) ----------
 
-/**
- * Lightweight, data-driven stat store (GAS-friendly).
- * Replicates via FastArray, keeps a local map cache for fast lookups.
- */
-UCLASS(ClassGroup=(RPG), meta=(BlueprintSpawnableComponent))
-class RPGSYSTEM_API URPGStatComponent : public UActorComponent
+USTRUCT()
+struct FRPGVitalEntry : public FFastArraySerializerItem
+{
+	GENERATED_BODY()
+
+	UPROPERTY()
+	FGameplayTag Tag;
+
+	UPROPERTY()
+	FText Name;
+
+	UPROPERTY()
+	float Current = 0.f;
+
+	UPROPERTY()
+	float Max = 100.f;
+};
+
+USTRUCT()
+struct FRPGVitalList : public FFastArraySerializer
+{
+	GENERATED_BODY()
+
+	UPROPERTY()
+	TArray<FRPGVitalEntry> Items;
+
+	UPROPERTY(Transient)
+	URPGStatComponent* Owner = nullptr;
+
+	void Register(URPGStatComponent* InOwner) { Owner = InOwner; }
+
+	bool NetDeltaSerialize(FNetDeltaSerializeInfo& DeltaParams)
+	{
+		return FFastArraySerializer::FastArrayDeltaSerialize<FRPGVitalEntry, FRPGVitalList>(Items, DeltaParams, *this);
+	}
+
+	void PostReplicatedAdd   (const TArrayView<int32>& AddedIndices,   int32 FinalSize);
+	void PostReplicatedChange(const TArrayView<int32>& ChangedIndices, int32 FinalSize);
+	void PostReplicatedRemove(const TArrayView<int32>& RemovedIndices, int32 FinalSize);
+};
+
+template<> struct TStructOpsTypeTraits<FRPGVitalList> : public TStructOpsTypeTraitsBase2<FRPGVitalList>
+{
+	enum { WithNetDeltaSerializer = true };
+};
+
+// ---------- Skills (Level / XP / XPToNext) ----------
+
+USTRUCT()
+struct FRPGSkillEntry : public FFastArraySerializerItem
+{
+	GENERATED_BODY()
+
+	UPROPERTY()
+	FGameplayTag Tag;
+
+	UPROPERTY()
+	FText Name;
+
+	UPROPERTY()
+	int32 Level = 1;
+
+	UPROPERTY()
+	float XP = 0.f;
+
+	UPROPERTY()
+	float XPToNext = 100.f;
+};
+
+USTRUCT()
+struct FRPGSkillList : public FFastArraySerializer
+{
+	GENERATED_BODY()
+
+	UPROPERTY()
+	TArray<FRPGSkillEntry> Items;
+
+	UPROPERTY(Transient)
+	URPGStatComponent* Owner = nullptr;
+
+	void Register(URPGStatComponent* InOwner) { Owner = InOwner; }
+
+	bool NetDeltaSerialize(FNetDeltaSerializeInfo& DeltaParams)
+	{
+		return FFastArraySerializer::FastArrayDeltaSerialize<FRPGSkillEntry, FRPGSkillList>(Items, DeltaParams, *this);
+	}
+
+	void PostReplicatedAdd   (const TArrayView<int32>& AddedIndices,   int32 FinalSize);
+	void PostReplicatedChange(const TArrayView<int32>& ChangedIndices, int32 FinalSize);
+	void PostReplicatedRemove(const TArrayView<int32>& RemovedIndices, int32 FinalSize);
+};
+
+template<> struct TStructOpsTypeTraits<FRPGSkillList> : public TStructOpsTypeTraitsBase2<FRPGSkillList>
+{
+	enum { WithNetDeltaSerializer = true };
+};
+
+// ---------- Delegates for UI ----------
+
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnScalarChanged, FGameplayTag, StatTag, float, NewValue);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(FOnVitalChanged,  FGameplayTag, StatTag, float, NewCurrent, float, NewMax);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(FOnSkillChanged,  FGameplayTag, StatTag, int32, NewLevel, float, NewXP);
+
+// ---------- Component ----------
+
+UCLASS(BlueprintType, Blueprintable, ClassGroup=(RPG), meta=(BlueprintSpawnableComponent))
+class RPGSYSTEM_API URPGStatComponent : public UActorComponent, public IStatProviderInterface
 {
 	GENERATED_BODY()
 
 public:
 	URPGStatComponent();
 
-	// --- UActorComponent
-	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
-	virtual void OnRegister() override;
+	// Data-driven seed: assign one or more sets in BP
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Stats|Setup")
+	TArray<TObjectPtr<UStatSetDataAsset>> StatSets;
 
-	// --- Query API
+	// Replicated live state
+	UPROPERTY(Replicated)
+	FRPGScalarList ScalarStats;
 
-	/** Get a stat. If not found, returns DefaultValue (0 by default). */
-	UFUNCTION(BlueprintCallable, Category="RPG|Stats")
-	float GetStat(FGameplayTag Tag, float DefaultValue = 0.f) const;
+	UPROPERTY(Replicated)
+	FRPGVitalList  Vitals;
 
-	/** Returns true if a stat row exists. */
-	UFUNCTION(BlueprintCallable, Category="RPG|Stats")
-	bool HasStat(FGameplayTag Tag) const { return FindIndex(Tag) != INDEX_NONE; }
+	UPROPERTY(Replicated)
+	FRPGSkillList  Skills;
 
-	// --- Mutate API (call on server, or will route via RPC) ---
+	// UI events (client)
+	UPROPERTY(BlueprintAssignable, Category="Stats|Events")
+	FOnScalarChanged OnScalarChanged;
 
-	UFUNCTION(BlueprintCallable, Category="RPG|Stats")
-	void SetStat(FGameplayTag Tag, float NewValue);
+	UPROPERTY(BlueprintAssignable, Category="Stats|Events")
+	FOnVitalChanged OnVitalChanged;
 
-	UFUNCTION(BlueprintCallable, Category="RPG|Stats")
-	void AddToStat(FGameplayTag Tag, float Delta);
+	UPROPERTY(BlueprintAssignable, Category="Stats|Events")
+	FOnSkillChanged OnSkillChanged;
 
-	UFUNCTION(BlueprintCallable, Category="RPG|Stats")
-	void RemoveFromStat(FGameplayTag Tag, float Delta) { AddToStat(Tag, -Delta); }
+	// ---- Interface (implementations in .cpp) ----
+	virtual float GetStat_Implementation(FGameplayTag Tag) const override;
+	virtual void  SetStat_Implementation(FGameplayTag Tag, float NewValue, bool bClampToValidRange) override;
+	virtual void  AddToStat_Implementation(FGameplayTag Tag, float Delta, bool bClampToValidRange) override;
 
-	/** UI can bind to this for immediate updates on clients */
-	UPROPERTY(BlueprintAssignable, Category="RPG|Stats")
-	FOnStatChanged OnStatChanged;
+	// Seeding from assets (server only)
+	UFUNCTION(BlueprintCallable, Category="Stats|Setup")
+	void InitializeFromStatSets(bool bClearExisting = false);
 
-	/** Rebuild the local cache from replicated array (called by FastArray hooks) */
-	void RebuildCache();
+	// Utilities
+	UFUNCTION(BlueprintCallable, Category="Stats")
+	bool HasStat(FGameplayTag Tag) const;
+
+	UFUNCTION(BlueprintCallable, Category="Stats")
+	void GetAllStatTags(TArray<FGameplayTag>& OutTags) const;
 
 protected:
-	/** The replicated stat list */
-	UPROPERTY(Replicated)
-	FRPGStatList ReplicatedStats;
+	virtual void BeginPlay() override;
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
-	/** Client-side cache for quick lookups */
-	TMap<FGameplayTag, float> Cache;
+private:
+	friend struct FRPGScalarList;
+	friend struct FRPGVitalList;
+	friend struct FRPGSkillList;
+	void RebuildCaches();
+	// quick lookups
+	TMap<FGameplayTag, int32> ScalarIndex;
+	TMap<FGameplayTag, int32> VitalIndex;
+	TMap<FGameplayTag, int32> SkillIndex;
 
-	// --- Internals ---
-	int32 FindIndex(FGameplayTag Tag) const;
-	void SetStat_Internal(FGameplayTag Tag, float NewValue);
+	bool bInitializedFromSets = false;
 
-	// --- RPCs (so BP/users can safely call from client) ---
+	// cache mgmt
+	void RebuildCaches();
+
+	// find or add helpers (server)
+	int32 FindScalarIdx(FGameplayTag Tag) const;
+	int32 FindVitalIdx (FGameplayTag Tag) const;
+	int32 FindSkillIdx (FGameplayTag Tag) const;
+
+	int32 FindOrAddScalar(FGameplayTag Tag, const FText* DisplayName = nullptr);
+	int32 FindOrAddVital (FGameplayTag Tag, const FText* DisplayName = nullptr, float InitCurrent = 0.f, float InitMax = 100.f);
+	int32 FindOrAddSkill (FGameplayTag Tag, const FText* DisplayName = nullptr, int32 InitLevel = 1);
+
+	// skill rule
+	float ComputeXPToNext(int32 Level) const;
+
+	// client UI notifies
+	void BroadcastScalar(const FRPGScalarEntry& E) const;
+	void BroadcastVital (const FRPGVitalEntry&  E) const;
+	void BroadcastSkill (const FRPGSkillEntry&  E) const;
+
+	// RPCs for client requests (optional; safe-guarded)
 	UFUNCTION(Server, Reliable)
-	void ServerSetStat(FGameplayTag Tag, float NewValue);
-
+	void ServerSetStat(FGameplayTag Tag, float NewValue, bool bClamp);
 	UFUNCTION(Server, Reliable)
-	void ServerAddToStat(FGameplayTag Tag, float Delta);
+	void ServerAddToStat(FGameplayTag Tag, float Delta, bool bClamp);
 };

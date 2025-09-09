@@ -212,6 +212,12 @@
     <ClCompile Include="..\..\Source\RPGSystem\Private\Stats\RPGStatGASLibrary.cpp">
       <Filter>Source\RPGSystem\Private\Stats</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Source\RPGSystem\Private\Stats\StatBlueprintLibrary.cpp">
+      <Filter>Source\RPGSystem\Private\Stats</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\RPGSystem\Private\Stats\StatProviderInterface.cpp">
+      <Filter>Source\RPGSystem\Private\Stats</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Source\RPGSystem\Private\Stats\StatSetDataAsset.cpp">
       <Filter>Source\RPGSystem\Private\Stats</Filter>
     </ClCompile>
@@ -333,6 +339,12 @@
       <Filter>Source\RPGSystem\Public\Stats</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Source\RPGSystem\Public\Stats\RPGStatGASLibrary.h">
+      <Filter>Source\RPGSystem\Public\Stats</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\RPGSystem\Public\Stats\StatBlueprintLibrary.h">
+      <Filter>Source\RPGSystem\Public\Stats</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\RPGSystem\Public\Stats\StatProviderInterface.h">
       <Filter>Source\RPGSystem\Public\Stats</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Source\RPGSystem\Public\Stats\StatSetDataAsset.h">
