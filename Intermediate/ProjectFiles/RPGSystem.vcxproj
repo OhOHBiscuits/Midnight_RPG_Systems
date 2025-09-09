@@ -713,12 +713,16 @@
     <None Include="..\..\Plugins\IconCreator\IconCreator.uplugin"/>
     <None Include="..\..\Plugins\IconCreator\Resources\Icon128.png"/>
     <None Include="..\..\Source\RPGSystem\RPGSystem.Build.cs"/>
-    <ClCompile Include="..\..\Source\RPGSystem\Private\Progression\StatProgressionBridge.cpp" />
+    <ClCompile Include="..\..\Source\RPGSystem\Private\GAS\RPGCue_StatNotify.cpp" />
+    <ClCompile Include="..\..\Source\RPGSystem\Private\GAS\RPGGameplayAbility.cpp" />
+    <ClCompile Include="..\..\Source\RPGSystem\Private\GAS\RPGMMC_StatTag.cpp" />
     <ClCompile Include="..\..\Source\RPGSystem\RPGSystem.cpp">
       <AdditionalIncludeDirectories>$(ClCompile_AdditionalIncludeDirectories_1)</AdditionalIncludeDirectories>
       <ForcedIncludeFiles>$(ClCompile_ForcedIncludeFiles_1)</ForcedIncludeFiles>
     </ClCompile>
-    <ClInclude Include="..\..\Source\RPGSystem\Public\Progression\StatProgressionBridge.h" />
+    <ClInclude Include="..\..\Source\RPGSystem\Public\GAS\RPGCue_StatNotify.h" />
+    <ClInclude Include="..\..\Source\RPGSystem\Public\GAS\RPGGameplayAbility.h" />
+    <ClInclude Include="..\..\Source\RPGSystem\Public\GAS\RPGMMC_StatTag.h" />
     <ClInclude Include="..\..\Source\RPGSystem\RPGSystem.h"/>
     <ClCompile Include="..\..\Source\RPGSystem\Private\Actors\AreaVolumeActor.cpp">
       <AdditionalIncludeDirectories>$(ClCompile_AdditionalIncludeDirectories_1)</AdditionalIncludeDirectories>
@@ -761,6 +765,10 @@
       <ForcedIncludeFiles>$(ClCompile_ForcedIncludeFiles_1)</ForcedIncludeFiles>
     </ClCompile>
     <ClCompile Include="..\..\Source\RPGSystem\Private\FuelSystem\FuelComponent.cpp">
+      <AdditionalIncludeDirectories>$(ClCompile_AdditionalIncludeDirectories_1)</AdditionalIncludeDirectories>
+      <ForcedIncludeFiles>$(ClCompile_ForcedIncludeFiles_1)</ForcedIncludeFiles>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\RPGSystem\Private\GAS\RPGAbilitySystemComponent.cpp">
       <AdditionalIncludeDirectories>$(ClCompile_AdditionalIncludeDirectories_1)</AdditionalIncludeDirectories>
       <ForcedIncludeFiles>$(ClCompile_ForcedIncludeFiles_1)</ForcedIncludeFiles>
     </ClCompile>
@@ -828,6 +836,10 @@
       <AdditionalIncludeDirectories>$(ClCompile_AdditionalIncludeDirectories_1)</AdditionalIncludeDirectories>
       <ForcedIncludeFiles>$(ClCompile_ForcedIncludeFiles_1)</ForcedIncludeFiles>
     </ClCompile>
+    <ClCompile Include="..\..\Source\RPGSystem\Private\Progression\StatProgressionBridge.cpp">
+      <AdditionalIncludeDirectories>$(ClCompile_AdditionalIncludeDirectories_1)</AdditionalIncludeDirectories>
+      <ForcedIncludeFiles>$(ClCompile_ForcedIncludeFiles_1)</ForcedIncludeFiles>
+    </ClCompile>
     <ClCompile Include="..\..\Source\RPGSystem\Private\Progression\XPGrantBundle.cpp">
       <AdditionalIncludeDirectories>$(ClCompile_AdditionalIncludeDirectories_1)</AdditionalIncludeDirectories>
       <ForcedIncludeFiles>$(ClCompile_ForcedIncludeFiles_1)</ForcedIncludeFiles>
@@ -864,6 +876,7 @@
     <ClInclude Include="..\..\Source\RPGSystem\Public\Crafting\CraftingTypes.h"/>
     <ClInclude Include="..\..\Source\RPGSystem\Public\DecaySystem\DecayComponent.h"/>
     <ClInclude Include="..\..\Source\RPGSystem\Public\FuelSystem\FuelComponent.h"/>
+    <ClInclude Include="..\..\Source\RPGSystem\Public\GAS\RPGAbilitySystemComponent.h"/>
     <ClInclude Include="..\..\Source\RPGSystem\Public\Interfaces\InteractionInterface.h"/>
     <ClInclude Include="..\..\Source\RPGSystem\Public\Inventory\InventoryAssetManager.h"/>
     <ClInclude Include="..\..\Source\RPGSystem\Public\Inventory\InventoryComponent.h"/>
@@ -880,6 +893,7 @@
     <ClInclude Include="..\..\Source\RPGSystem\Public\Progression\SkillCheckBlueprintLibrary.h"/>
     <ClInclude Include="..\..\Source\RPGSystem\Public\Progression\SkillCheckTypes.h"/>
     <ClInclude Include="..\..\Source\RPGSystem\Public\Progression\SkillProgressionData.h"/>
+    <ClInclude Include="..\..\Source\RPGSystem\Public\Progression\StatProgressionBridge.h"/>
     <ClInclude Include="..\..\Source\RPGSystem\Public\Progression\XPGrantBundle.h"/>
     <ClInclude Include="..\..\Source\RPGSystem\Public\Stats\RPGStatComponent.h"/>
     <ClInclude Include="..\..\Source\RPGSystem\Public\Stats\RPGStatGASLibrary.h"/>

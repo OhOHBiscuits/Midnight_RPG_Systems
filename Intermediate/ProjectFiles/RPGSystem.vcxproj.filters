@@ -143,6 +143,12 @@
     <ClCompile Include="..\..\Source\RPGSystem\Private\FuelSystem\FuelComponent.cpp">
       <Filter>Source\RPGSystem\Private\FuelSystem</Filter>
     </ClCompile>
+    <Filter Include="Source\RPGSystem\Private\GAS">
+      <UniqueIdentifier>{DD029E50-4A90-3D4E-A138-E4D0FFDC6F5D}</UniqueIdentifier>
+    </Filter>
+    <ClCompile Include="..\..\Source\RPGSystem\Private\GAS\RPGAbilitySystemComponent.cpp">
+      <Filter>Source\RPGSystem\Private\GAS</Filter>
+    </ClCompile>
     <Filter Include="Source\RPGSystem\Private\Interfaces">
       <UniqueIdentifier>{73EE105A-F299-3251-AD90-7B624ADB7DDD}</UniqueIdentifier>
     </Filter>
@@ -198,6 +204,9 @@
       <Filter>Source\RPGSystem\Private\Progression</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Source\RPGSystem\Private\Progression\SkillProgressionData.cpp">
+      <Filter>Source\RPGSystem\Private\Progression</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\RPGSystem\Private\Progression\StatProgressionBridge.cpp">
       <Filter>Source\RPGSystem\Private\Progression</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Source\RPGSystem\Private\Progression\XPGrantBundle.cpp">
@@ -272,6 +281,12 @@
     <ClInclude Include="..\..\Source\RPGSystem\Public\FuelSystem\FuelComponent.h">
       <Filter>Source\RPGSystem\Public\FuelSystem</Filter>
     </ClInclude>
+    <Filter Include="Source\RPGSystem\Public\GAS">
+      <UniqueIdentifier>{6FAAEF53-56A2-37D5-B735-9B842C2F8A70}</UniqueIdentifier>
+    </Filter>
+    <ClInclude Include="..\..\Source\RPGSystem\Public\GAS\RPGAbilitySystemComponent.h">
+      <Filter>Source\RPGSystem\Public\GAS</Filter>
+    </ClInclude>
     <Filter Include="Source\RPGSystem\Public\Interfaces">
       <UniqueIdentifier>{AD6C4ECA-D2BB-3746-9142-063D58BD753A}</UniqueIdentifier>
     </Filter>
@@ -327,6 +342,9 @@
       <Filter>Source\RPGSystem\Public\Progression</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Source\RPGSystem\Public\Progression\SkillProgressionData.h">
+      <Filter>Source\RPGSystem\Public\Progression</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\RPGSystem\Public\Progression\StatProgressionBridge.h">
       <Filter>Source\RPGSystem\Public\Progression</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Source\RPGSystem\Public\Progression\XPGrantBundle.h">
