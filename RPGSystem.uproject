@@ -12,7 +12,7 @@
 				"Engine",
 				"UMG",
 				"GameplayAbilities",
-				"GASCompanion"
+				
 			]
 		}
 	],
@@ -35,7 +35,7 @@
 		},
 		{
 			"Name": "BlueprintAttributes",
-			"Enabled": true,
+			"Enabled": false,
 			"MarketplaceURL": "com.epicgames.launcher://ue/marketplace/product/28504afab17e48babd161baa61a87d05"
 		},
 		{

@@ -1,84 +1,52 @@
+// ExecCalc_AddSkillXP.cpp
+
 #include "Progression/ExecCalc_AddSkillXP.h"
 
 #include "AbilitySystemComponent.h"
-#include "GameplayEffect.h"
-#include "GameplayEffectExtension.h"
-#include "GameplayTagContainer.h"
-#include "Progression/StatProgressionBridge.h" // UStatProgressionBridge
-
-struct FAddSkillXPStatics
-{
-	// Tag of the stat that will store XP for the skill.
-	// Change to whatever your data uses (or drive from GE if you prefer).
-	FGameplayTag SkillStatTag;
-
-	// Optional SetByCaller to configure XP amount on the GE.
-	FGameplayTag XPDeltaTag;
-
-	FAddSkillXPStatics()
-	{
-		SkillStatTag = FGameplayTag::RequestGameplayTag(FName("Gameplay.Stat.Skill.Crafting.XP"));
-		XPDeltaTag   = FGameplayTag::RequestGameplayTag(FName("SetByCaller.XPDelta"));
-	}
-};
-
-static FAddSkillXPStatics& AddSkillXPStatics()
-{
-	static FAddSkillXPStatics S;
-	return S;
-}
+#include "GameplayEffectTypes.h"
+#include "Progression/StatProgressionBridge.h"
 
 UExecCalc_AddSkillXP::UExecCalc_AddSkillXP()
 {
-	// purely tag/stat driven; no captured attributes
 }
 
 void UExecCalc_AddSkillXP::Execute_Implementation(
 	const FGameplayEffectCustomExecutionParameters& ExecutionParams,
-	FGameplayEffectCustomExecutionOutput& OutExecutionOutput) const
+	FGameplayEffectCustomExecutionOutput& /*OutExecutionOutput*/) const
 {
-	const FGameplayEffectSpec& Spec = ExecutionParams.GetOwningSpec();
+	const FGameplayEffectSpec& Spec  = ExecutionParams.GetOwningSpec();
+	UAbilitySystemComponent*   TASC  = ExecutionParams.GetTargetAbilitySystemComponent();
+	UAbilitySystemComponent*   SASC  = ExecutionParams.GetSourceAbilitySystemComponent();
 
-	UAbilitySystemComponent* TargetASC = ExecutionParams.GetTargetAbilitySystemComponent();
-	UAbilitySystemComponent* SourceASC = ExecutionParams.GetSourceAbilitySystemComponent();
-
-	// Prefer the target to receive XP
+	// Find a stat provider (Target first, then Source).
 	UObject* Provider = nullptr;
-
-	if (TargetASC && TargetASC->GetOwnerActor())
+	if (TASC && TASC->GetOwner())
 	{
-		Provider = UStatProgressionBridge::FindStatProviderOn(TargetASC->GetOwnerActor());
+		Provider = UStatProgressionBridge::FindStatProviderOn(TASC->GetOwner());
 	}
-	if (!Provider && SourceASC && SourceASC->GetOwnerActor())
+	if (!Provider && SASC && SASC->GetOwner())
 	{
-		Provider = UStatProgressionBridge::FindStatProviderOn(SourceASC->GetOwnerActor());
+		Provider = UStatProgressionBridge::FindStatProviderOn(SASC->GetOwner());
 	}
-
 	if (!Provider)
 	{
-		return; // No stat provider available, nothing to do.
+		return; // nowhere to write XP
 	}
 
-	const FAddSkillXPStatics& S = AddSkillXPStatics();
-
-	// Read XP from SetByCaller if present, otherwise default to 1.
-	float XPDelta = 1.f;
-
-	// On some engine versions, TryGetSetByCallerMagnitude isn’t available.
-	// GetSetByCallerMagnitude(...) returns 0 if not set (with WarnIfNotFound=false).
+	// Read the XP delta (SetByCaller). UE 5.2+ API:
+	const float XPDelta = Spec.GetSetByCallerMagnitude(SBC.XPDeltaTag, /*Default*/0.f);
+	if (FMath::IsNearlyZero(XPDelta))
 	{
-		// Ensure we see the full type (GameplayEffect.h is already included above).
-		const float Maybe = Spec.GetSetByCallerMagnitude(S.XPDeltaTag, /*WarnIfNotFound=*/false);
-		if (Maybe != 0.f)
-		{
-			XPDelta = Maybe;
-		}
+		return; // nothing to add
 	}
 
-	// Which stat to add XP into?
-	const FGameplayTag SkillXPTag = S.SkillStatTag;
-	if (SkillXPTag.IsValid())
+	// Which stat to add into? (configured on the calc asset)
+	const FGameplayTag SkillXPTag = SBC.SkillStatTag;
+	if (!SkillXPTag.IsValid())
 	{
-		UStatProgressionBridge::AddToStat(Provider, SkillXPTag, XPDelta, /*bClampToValidRange=*/true);
+		return; // misconfigured calc asset
 	}
+
+	// Add XP using your stat bridge (3-arg version).
+	UStatProgressionBridge::AddToStat(Provider, SkillXPTag, XPDelta);
 }

@@ -1,19 +1,24 @@
+// RPGAbilitySystemComponent.h
 #pragma once
 
 #include "CoreMinimal.h"
 #include "AbilitySystemComponent.h"
+#include "GameplayTagContainer.h"
 #include "RPGAbilitySystemComponent.generated.h"
 
-/**
- * Thin ASC subclass that knows how to find your stat provider on Avatar or Owner.
- */
-UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
+/** Small helpers so GAS nodes can read/write your custom stat system. */
+UCLASS()
 class RPGSYSTEM_API URPGAbilitySystemComponent : public UAbilitySystemComponent
 {
 	GENERATED_BODY()
 
 public:
-	/** Returns the first object on Avatar -> Owner that implements StatProviderInterface (component, actor, controller, or player state). */
 	UFUNCTION(BlueprintCallable, Category="Stats")
-	UObject* FindBestStatProvider() const;
+	float GetStat(const FGameplayTag& Tag, float DefaultValue = 0.f) const;
+
+	UFUNCTION(BlueprintCallable, Category="Stats")
+	void SetStat(const FGameplayTag& Tag, float NewValue) const;
+
+	UFUNCTION(BlueprintCallable, Category="Stats")
+	void AddToStat(const FGameplayTag& Tag, float Delta) const;
 };

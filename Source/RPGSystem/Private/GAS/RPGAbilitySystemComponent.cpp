@@ -1,26 +1,68 @@
+// RPGAbilitySystemComponent.cpp
+
 #include "GAS/RPGAbilitySystemComponent.h"
-#include "Progression/StatProgressionBridge.h" // UStatProgressionBridge
+#include "Progression/StatProgressionBridge.h"
 #include "GameFramework/Actor.h"
 
-UObject* URPGAbilitySystemComponent::FindBestStatProvider() const
+float URPGAbilitySystemComponent::GetStat(const FGameplayTag& Tag, float DefaultValue) const
 {
-	// Prefer the avatar the client sees
-	if (AActor* Avatar = GetAvatarActor())
+	if (!Tag.IsValid()) return DefaultValue;
+
+	if (const AActor* Avatar = GetAvatarActor())
 	{
 		if (UObject* P = UStatProgressionBridge::FindStatProviderOn(Avatar))
 		{
-			return P;
+			return UStatProgressionBridge::GetStat(P, Tag, DefaultValue);
 		}
 	}
-
-	// Fall back to the ASC's owner
-	if (AActor* OwningActor = GetOwnerActor())
+	if (const AActor* Owner = GetOwnerActor())
 	{
-		if (UObject* P = UStatProgressionBridge::FindStatProviderOn(OwningActor))
+		if (UObject* P = UStatProgressionBridge::FindStatProviderOn(Owner))
 		{
-			return P;
+			return UStatProgressionBridge::GetStat(P, Tag, DefaultValue);
 		}
 	}
+	return DefaultValue;
+}
 
-	return nullptr;
+void URPGAbilitySystemComponent::SetStat(const FGameplayTag& Tag, float NewValue) const
+{
+	if (!Tag.IsValid()) return;
+
+	if (const AActor* Avatar = GetAvatarActor())
+	{
+		if (UObject* P = UStatProgressionBridge::FindStatProviderOn(Avatar))
+		{
+			UStatProgressionBridge::SetStat(P, Tag, NewValue);
+			return;
+		}
+	}
+	if (const AActor* Owner = GetOwnerActor())
+	{
+		if (UObject* P = UStatProgressionBridge::FindStatProviderOn(Owner))
+		{
+			UStatProgressionBridge::SetStat(P, Tag, NewValue);
+		}
+	}
+}
+
+void URPGAbilitySystemComponent::AddToStat(const FGameplayTag& Tag, float Delta) const
+{
+	if (!Tag.IsValid()) return;
+
+	if (const AActor* Avatar = GetAvatarActor())
+	{
+		if (UObject* P = UStatProgressionBridge::FindStatProviderOn(Avatar))
+		{
+			UStatProgressionBridge::AddToStat(P, Tag, Delta);
+			return;
+		}
+	}
+	if (const AActor* Owner = GetOwnerActor())
+	{
+		if (UObject* P = UStatProgressionBridge::FindStatProviderOn(Owner))
+		{
+			UStatProgressionBridge::AddToStat(P, Tag, Delta);
+		}
+	}
 }

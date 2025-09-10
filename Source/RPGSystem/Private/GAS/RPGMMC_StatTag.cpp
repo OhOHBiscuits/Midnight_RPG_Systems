@@ -1,38 +1,56 @@
-﻿#include "GAS/RPGMMC_StatTag.h"
-#include "AbilitySystemComponent.h"
-#include "GameplayEffectTypes.h"
-#include "Progression/StatProgressionBridge.h" // UStatProgressionBridge
+﻿// GAS/RPGMMC_StatTag.cpp
 
-// NOTE: Header for URPGMMC_StatTag should declare a UPROPERTY(EditDefaultsOnly)
-// FGameplayTag StatToRead;  This cpp assumes that property exists.
+#include "GAS/RPGMMC_StatTag.h"
+#include "Progression/StatProgressionBridge.h"
+
+#include "GameplayEffectTypes.h"
+#include "GameFramework/Actor.h"
+
+URPGMMC_StatTag::URPGMMC_StatTag()
+{
+	// Pure lookup MMC; no capture defs needed.
+}
 
 float URPGMMC_StatTag::CalculateBaseMagnitude_Implementation(const FGameplayEffectSpec& Spec) const
 {
-	// Prefer reading stats from the source (instigator) side.
-	const UAbilitySystemComponent* SourceASC =
-		Spec.GetContext().GetOriginalInstigatorAbilitySystemComponent();
-
-	UObject* Provider = nullptr;
-
-	if (SourceASC && SourceASC->GetOwnerActor())
-	{
-		Provider = UStatProgressionBridge::FindStatProviderOn(SourceASC->GetOwnerActor());
-	}
-
-	// Fall back to effect causer (often the weapon or avatar) if needed.
-	if (!Provider)
-	{
-		if (AActor* Causer = Spec.GetContext().GetEffectCauser())
-		{
-			Provider = UStatProgressionBridge::FindStatProviderOn(Causer);
-		}
-	}
-
-	// If we still don’t have anything, just return 0 (or a default if you prefer).
-	if (!Provider || !StatToRead.IsValid())
+	if (!StatToRead.IsValid())
 	{
 		return 0.f;
 	}
 
-	return UStatProgressionBridge::GetStat(Provider, StatToRead, 0.f);
+	const FGameplayEffectContextHandle& Ctx = Spec.GetContext();
+
+	UObject* Provider = nullptr;
+
+	// 1) Effect Causer (often weapon or avatar)
+	if (const AActor* Causer = Ctx.GetEffectCauser())
+	{
+		Provider = UStatProgressionBridge::FindStatProviderOn(Causer);
+	}
+
+	// 2) Optional: SourceObject (some effects set this to an Actor/DataAsset)
+	if (!Provider)
+	{
+		if (UObject* SourceObj = Ctx.GetSourceObject())
+		{
+			if (const AActor* SourceActor = Cast<AActor>(SourceObj))
+			{
+				Provider = UStatProgressionBridge::FindStatProviderOn(SourceActor);
+			}
+			else
+			{
+				// If SourceObject itself implements the stat provider interface,
+				// the bridge will handle it when we call GetStat below.
+				Provider = SourceObj;
+			}
+		}
+	}
+
+	// Nothing found? Return 0 safely.
+	if (!Provider)
+	{
+		return 0.f;
+	}
+
+	return UStatProgressionBridge::GetStat(Provider, StatToRead, /*Default*/ 0.f);
 }

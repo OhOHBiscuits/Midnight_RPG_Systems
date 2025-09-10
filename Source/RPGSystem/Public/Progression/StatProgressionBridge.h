@@ -1,16 +1,16 @@
-﻿#pragma once
+﻿// StatProgressionBridge.h
+#pragma once
 
 #include "CoreMinimal.h"
-#include "GameplayTagContainer.h"               // FGameplayTag
 #include "Kismet/BlueprintFunctionLibrary.h"
-#include "Stats/StatProviderInterface.h"              // your interface
+#include "GameplayTagContainer.h"
 #include "StatProgressionBridge.generated.h"
 
+class AActor;
+
 /**
- * Central, engine-safe helpers to read/write your stats and to locate an IStatProviderInterface
- * anywhere on a Pawn/Controller/PlayerState/Components chain.
- *
- * All functions are BlueprintCallable so designers and cues/MMCs can use them too.
+ * Thin utility layer that lets GAS/other code talk to anything that implements
+ * UStatProviderInterface (actors or components).
  */
 UCLASS()
 class RPGSYSTEM_API UStatProgressionBridge : public UBlueprintFunctionLibrary
@@ -18,30 +18,20 @@ class RPGSYSTEM_API UStatProgressionBridge : public UBlueprintFunctionLibrary
 	GENERATED_BODY()
 
 public:
-	/** Find first object that implements StatProviderInterface on the given root (actor, its components, controller, playerstate, or owner chain). */
+	/** Returns DefaultValue if Provider is null, Tag invalid, or Provider doesn't implement the interface. */
 	UFUNCTION(BlueprintCallable, Category="Stats")
-	static UObject* FindStatProviderOn(AActor* Root);
+	static float GetStat(UObject* Provider, const FGameplayTag& Tag, float DefaultValue = 0.f);
 
-	/** Safe GetStat: returns DefaultValue if Provider is null or doesn’t implement the interface. */
 	UFUNCTION(BlueprintCallable, Category="Stats")
-	static float GetStat(UObject* Provider, FGameplayTag Tag, float DefaultValue = 0.f);
+	static void SetStat(UObject* Provider, const FGameplayTag& Tag, float NewValue);
 
-	/** Safe SetStat: no-op if Provider is null or doesn’t implement the interface. */
 	UFUNCTION(BlueprintCallable, Category="Stats")
-	static void  SetStat(UObject* Provider, FGameplayTag Tag, float NewValue);
+	static void AddToStat(UObject* Provider, const FGameplayTag& Tag, float Delta);
 
-	/** Safe AddToStat: no-op if Provider is null or doesn’t implement the interface. */
+	/** Walks common ownership/possession chains and components to find a StatProvider on/near this actor. */
 	UFUNCTION(BlueprintCallable, Category="Stats")
-	static void  AddToStat(UObject* Provider, FGameplayTag Tag, float Delta);
+	static UObject* FindStatProviderOn(const AActor* Actor);
 
-	/** Simple, data-agnostic levelling helper (optional). Keeps things designer-driven via tags. */
-	UFUNCTION(BlueprintCallable, Category="Progression")
-	static void ApplyXPAndLevelUp(
-		UObject* Provider,
-		FGameplayTag LevelTag,
-		FGameplayTag XPTag,
-		FGameplayTag XPToNextTag,
-		float DeltaXP,
-		float MinLevel = 0.f,
-		float MaxLevel = 9999.f);
+	/** Convenience: does this object implement UStatProviderInterface? (not exposed to BP) */
+	static bool Implements(UObject* Obj);
 };

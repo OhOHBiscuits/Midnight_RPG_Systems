@@ -1,4 +1,4 @@
-﻿// Source/RPGSystem/Public/GAS/RPGMMC_StatTag.h
+﻿// GAS/RPGMMC_StatTag.h
 #pragma once
 
 #include "CoreMinimal.h"
@@ -6,17 +6,11 @@
 #include "GameplayTagContainer.h"
 #include "RPGMMC_StatTag.generated.h"
 
-/** Choose whether to read the stat from the source or the target. */
-UENUM(BlueprintType)
-enum class ERPGStatSource : uint8
-{
-	Source  UMETA(DisplayName="Source (Instigator)"),
-	Target  UMETA(DisplayName="Target")
-};
-
 /**
- * Simple MMC: returns the value of a Stat (by GameplayTag) on Source or Target via StatProviderInterface.
- * Set the StatTag (and Source) on the MMC asset in the editor.
+ * Reads a numeric value from your custom Stat system (via UStatProgressionBridge)
+ * and returns it as this MMC’s base magnitude.
+ *
+ * Add this MMC to a GameplayEffect and set StatToRead to the tag you want.
  */
 UCLASS()
 class RPGSYSTEM_API URPGMMC_StatTag : public UGameplayModMagnitudeCalculation
@@ -26,25 +20,9 @@ class RPGSYSTEM_API URPGMMC_StatTag : public UGameplayModMagnitudeCalculation
 public:
 	URPGMMC_StatTag();
 
-	/** Which side to read from. */
-	UPROPERTY(EditDefaultsOnly, Category="RPG|Stat")
-	ERPGStatSource StatFrom = ERPGStatSource::Source;
-
-	/** Stat tag to read (e.g., Stat.Stamina.Current) */
-	UPROPERTY(EditDefaultsOnly, Category="RPG|Stat")
-	FGameplayTag StatTag;
-
-	/** Fallback if provider/tag missing. */
-	UPROPERTY(EditDefaultsOnly, Category="RPG|Stat")
-	float DefaultValue = 0.f;
-
-	UPROPERTY(EditDefaultsOnly, Category="Stats")
+	/** Which stat tag to read from the provider. */
+	UPROPERTY(EditDefaultsOnly, Category="Config")
 	FGameplayTag StatToRead;
 
-
-	// UGameplayModMagnitudeCalculation
 	virtual float CalculateBaseMagnitude_Implementation(const FGameplayEffectSpec& Spec) const override;
-
-private:
-	static UObject* FindProviderFromASC(const UAbilitySystemComponent* ASC);
 };
