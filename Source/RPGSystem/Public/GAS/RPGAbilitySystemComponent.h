@@ -7,12 +7,28 @@
 #include "RPGAbilitySystemComponent.generated.h"
 
 /** Small helpers so GAS nodes can read/write your custom stat system. */
-UCLASS()
+UCLASS(ClassGroup=(RPG), BlueprintType, meta=(BlueprintSpawnableComponent))
 class RPGSYSTEM_API URPGAbilitySystemComponent : public UAbilitySystemComponent
 {
 	GENERATED_BODY()
 
 public:
+	URPGAbilitySystemComponent(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get());
+	
+
+	/** Initialize GAS with Owner/Avatar (call any time the avatar changes). */
+	UFUNCTION(BlueprintCallable, Category="RPG|ASC")
+	void InitializeForActor(AActor* InOwnerActor, AActor* InAvatarActor);
+
+	/** Ensure an RPG ASC exists on Target (creates, registers, and initializes if missing). */
+	UFUNCTION(BlueprintCallable, Category="RPG|ASC")
+	static URPGAbilitySystemComponent* AddTo(AActor* Target);
+
+	/** Quick check */
+	UFUNCTION(BlueprintPure, Category="RPG|ASC")
+	static bool HasRPGASC(const AActor* Target);
+	
+	///Add Above--Below gets Stats form Custom system///
 	UFUNCTION(BlueprintCallable, Category="Stats")
 	float GetStat(const FGameplayTag& Tag, float DefaultValue = 0.f) const;
 
@@ -22,3 +38,5 @@ public:
 	UFUNCTION(BlueprintCallable, Category="Stats")
 	void AddToStat(const FGameplayTag& Tag, float Delta) const;
 };
+
+

@@ -766,6 +766,14 @@
       <AdditionalIncludeDirectories>$(ClCompile_AdditionalIncludeDirectories_1)</AdditionalIncludeDirectories>
       <ForcedIncludeFiles>$(ClCompile_ForcedIncludeFiles_1)</ForcedIncludeFiles>
     </ClCompile>
+    <ClCompile Include="..\..\Source\RPGSystem\Private\GAS\RPGASCSetupLibrary.cpp">
+      <AdditionalIncludeDirectories>$(ClCompile_AdditionalIncludeDirectories_1)</AdditionalIncludeDirectories>
+      <ForcedIncludeFiles>$(ClCompile_ForcedIncludeFiles_1)</ForcedIncludeFiles>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\RPGSystem\Private\GAS\RPGCharacterBase.cpp">
+      <AdditionalIncludeDirectories>$(ClCompile_AdditionalIncludeDirectories_1)</AdditionalIncludeDirectories>
+      <ForcedIncludeFiles>$(ClCompile_ForcedIncludeFiles_1)</ForcedIncludeFiles>
+    </ClCompile>
     <ClCompile Include="..\..\Source\RPGSystem\Private\GAS\RPGCue_StatNotify.cpp">
       <AdditionalIncludeDirectories>$(ClCompile_AdditionalIncludeDirectories_1)</AdditionalIncludeDirectories>
       <ForcedIncludeFiles>$(ClCompile_ForcedIncludeFiles_1)</ForcedIncludeFiles>
@@ -775,6 +783,14 @@
       <ForcedIncludeFiles>$(ClCompile_ForcedIncludeFiles_1)</ForcedIncludeFiles>
     </ClCompile>
     <ClCompile Include="..\..\Source\RPGSystem\Private\GAS\RPGMMC_StatTag.cpp">
+      <AdditionalIncludeDirectories>$(ClCompile_AdditionalIncludeDirectories_1)</AdditionalIncludeDirectories>
+      <ForcedIncludeFiles>$(ClCompile_ForcedIncludeFiles_1)</ForcedIncludeFiles>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\RPGSystem\Private\GAS\RPGPlayerController.cpp">
+      <AdditionalIncludeDirectories>$(ClCompile_AdditionalIncludeDirectories_1)</AdditionalIncludeDirectories>
+      <ForcedIncludeFiles>$(ClCompile_ForcedIncludeFiles_1)</ForcedIncludeFiles>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\RPGSystem\Private\GAS\RPGPlayerState.cpp">
       <AdditionalIncludeDirectories>$(ClCompile_AdditionalIncludeDirectories_1)</AdditionalIncludeDirectories>
       <ForcedIncludeFiles>$(ClCompile_ForcedIncludeFiles_1)</ForcedIncludeFiles>
     </ClCompile>
@@ -883,9 +899,13 @@
     <ClInclude Include="..\..\Source\RPGSystem\Public\DecaySystem\DecayComponent.h"/>
     <ClInclude Include="..\..\Source\RPGSystem\Public\FuelSystem\FuelComponent.h"/>
     <ClInclude Include="..\..\Source\RPGSystem\Public\GAS\RPGAbilitySystemComponent.h"/>
+    <ClInclude Include="..\..\Source\RPGSystem\Public\GAS\RPGASCSetupLibrary.h"/>
+    <ClInclude Include="..\..\Source\RPGSystem\Public\GAS\RPGCharacterBase.h"/>
     <ClInclude Include="..\..\Source\RPGSystem\Public\GAS\RPGCue_StatNotify.h"/>
     <ClInclude Include="..\..\Source\RPGSystem\Public\GAS\RPGGameplayAbility.h"/>
     <ClInclude Include="..\..\Source\RPGSystem\Public\GAS\RPGMMC_StatTag.h"/>
+    <ClInclude Include="..\..\Source\RPGSystem\Public\GAS\RPGPlayerController.h"/>
+    <ClInclude Include="..\..\Source\RPGSystem\Public\GAS\RPGPlayerState.h"/>
     <ClInclude Include="..\..\Source\RPGSystem\Public\Interfaces\InteractionInterface.h"/>
     <ClInclude Include="..\..\Source\RPGSystem\Public\Inventory\InventoryAssetManager.h"/>
     <ClInclude Include="..\..\Source\RPGSystem\Public\Inventory\InventoryComponent.h"/>

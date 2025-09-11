@@ -4,6 +4,50 @@
 #include "Progression/StatProgressionBridge.h"
 #include "GameFramework/Actor.h"
 
+URPGAbilitySystemComponent::URPGAbilitySystemComponent(const FObjectInitializer& ObjectInitializer)
+	: Super(ObjectInitializer)
+{
+	SetIsReplicatedByDefault(true);
+}
+
+void URPGAbilitySystemComponent::InitializeForActor(AActor* InOwnerActor, AActor* InAvatarActor)
+{
+	if (!InOwnerActor)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("InitializeForActor called with null Owner"));
+		return;
+	}
+	AActor* AvatarToUse = InAvatarActor ? InAvatarActor : InOwnerActor;
+	InitAbilityActorInfo(InOwnerActor, AvatarToUse);
+}
+
+URPGAbilitySystemComponent* URPGAbilitySystemComponent::AddTo(AActor* Target)
+{
+	if (!Target) return nullptr;
+
+	if (URPGAbilitySystemComponent* Existing = Target->FindComponentByClass<URPGAbilitySystemComponent>())
+	{
+		return Existing;
+	}
+
+	URPGAbilitySystemComponent* NewASC =
+		NewObject<URPGAbilitySystemComponent>(Target, URPGAbilitySystemComponent::StaticClass(), TEXT("RPGAbilitySystemComponent"));
+	if (NewASC)
+	{
+		NewASC->RegisterComponent();
+		NewASC->OnComponentCreated();
+		NewASC->InitializeForActor(Target, Target);
+	}
+	return NewASC;
+}
+
+bool URPGAbilitySystemComponent::HasRPGASC(const AActor* Target)
+{
+	return Target && Target->FindComponentByClass<URPGAbilitySystemComponent>() != nullptr;
+}
+
+////
+
 float URPGAbilitySystemComponent::GetStat(const FGameplayTag& Tag, float DefaultValue) const
 {
 	if (!Tag.IsValid()) return DefaultValue;

@@ -149,6 +149,12 @@
     <ClCompile Include="..\..\Source\RPGSystem\Private\GAS\RPGAbilitySystemComponent.cpp">
       <Filter>Source\RPGSystem\Private\GAS</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Source\RPGSystem\Private\GAS\RPGASCSetupLibrary.cpp">
+      <Filter>Source\RPGSystem\Private\GAS</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\RPGSystem\Private\GAS\RPGCharacterBase.cpp">
+      <Filter>Source\RPGSystem\Private\GAS</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Source\RPGSystem\Private\GAS\RPGCue_StatNotify.cpp">
       <Filter>Source\RPGSystem\Private\GAS</Filter>
     </ClCompile>
@@ -156,6 +162,12 @@
       <Filter>Source\RPGSystem\Private\GAS</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Source\RPGSystem\Private\GAS\RPGMMC_StatTag.cpp">
+      <Filter>Source\RPGSystem\Private\GAS</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\RPGSystem\Private\GAS\RPGPlayerController.cpp">
+      <Filter>Source\RPGSystem\Private\GAS</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\RPGSystem\Private\GAS\RPGPlayerState.cpp">
       <Filter>Source\RPGSystem\Private\GAS</Filter>
     </ClCompile>
     <Filter Include="Source\RPGSystem\Private\Interfaces">
@@ -296,6 +308,12 @@
     <ClInclude Include="..\..\Source\RPGSystem\Public\GAS\RPGAbilitySystemComponent.h">
       <Filter>Source\RPGSystem\Public\GAS</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Source\RPGSystem\Public\GAS\RPGASCSetupLibrary.h">
+      <Filter>Source\RPGSystem\Public\GAS</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\RPGSystem\Public\GAS\RPGCharacterBase.h">
+      <Filter>Source\RPGSystem\Public\GAS</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Source\RPGSystem\Public\GAS\RPGCue_StatNotify.h">
       <Filter>Source\RPGSystem\Public\GAS</Filter>
     </ClInclude>
@@ -303,6 +321,12 @@
       <Filter>Source\RPGSystem\Public\GAS</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Source\RPGSystem\Public\GAS\RPGMMC_StatTag.h">
+      <Filter>Source\RPGSystem\Public\GAS</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\RPGSystem\Public\GAS\RPGPlayerController.h">
+      <Filter>Source\RPGSystem\Public\GAS</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\RPGSystem\Public\GAS\RPGPlayerState.h">
       <Filter>Source\RPGSystem\Public\GAS</Filter>
     </ClInclude>
     <Filter Include="Source\RPGSystem\Public\Interfaces">
