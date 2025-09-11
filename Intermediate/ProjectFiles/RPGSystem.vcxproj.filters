@@ -38,9 +38,678 @@
     <Filter Include="Plugins">
       <UniqueIdentifier>{BB38096A-B391-30DC-A0D4-4F3EA6B44507}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Plugins\GASCompanion">
+      <UniqueIdentifier>{D0B4454C-58D1-3DC0-BC22-F0E968A6B020}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Plugins\GASCompanion\Source">
+      <UniqueIdentifier>{C51AB320-8605-390C-A727-484CC9723187}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Plugins\GASCompanion\Source\GASCompanionDeveloper">
+      <UniqueIdentifier>{34852080-C7D7-3D92-8639-35295D6F99F7}</UniqueIdentifier>
+    </Filter>
+    <None Include="..\..\Plugins\GASCompanion\Source\GASCompanionDeveloper\GASCompanionDeveloper.Build.cs">
+      <Filter>Plugins\GASCompanion\Source\GASCompanionDeveloper</Filter>
+    </None>
+    <Filter Include="Plugins\GASCompanion\Source\GASCompanionDeveloper\Private">
+      <UniqueIdentifier>{8243EEBC-B272-33E6-857D-363BCD51BEE5}</UniqueIdentifier>
+    </Filter>
+    <ClCompile Include="..\..\Plugins\GASCompanion\Source\GASCompanionDeveloper\Private\GASCompanionDeveloper.cpp">
+      <Filter>Plugins\GASCompanion\Source\GASCompanionDeveloper\Private</Filter>
+    </ClCompile>
+    <Filter Include="Plugins\GASCompanion\Source\GASCompanionDeveloper\Private\BlueprintGraph">
+      <UniqueIdentifier>{18C3C7F9-7590-3C1D-B08C-F307A14DEE12}</UniqueIdentifier>
+    </Filter>
+    <ClCompile Include="..\..\Plugins\GASCompanion\Source\GASCompanionDeveloper\Private\BlueprintGraph\GSCK2Node_SwitchGameplayAttribute.cpp">
+      <Filter>Plugins\GASCompanion\Source\GASCompanionDeveloper\Private\BlueprintGraph</Filter>
+    </ClCompile>
+    <Filter Include="Plugins\GASCompanion\Source\GASCompanionDeveloper\Public">
+      <UniqueIdentifier>{0D7F113B-9FA7-3BAF-B447-D3DF4D093171}</UniqueIdentifier>
+    </Filter>
+    <ClInclude Include="..\..\Plugins\GASCompanion\Source\GASCompanionDeveloper\Public\GASCompanionDeveloper.h">
+      <Filter>Plugins\GASCompanion\Source\GASCompanionDeveloper\Public</Filter>
+    </ClInclude>
+    <Filter Include="Plugins\GASCompanion\Source\GASCompanionDeveloper\Public\BlueprintGraph">
+      <UniqueIdentifier>{435B4210-B5B6-3DD6-9744-6362E79D1982}</UniqueIdentifier>
+    </Filter>
+    <ClInclude Include="..\..\Plugins\GASCompanion\Source\GASCompanionDeveloper\Public\BlueprintGraph\GSCK2Node_SwitchGameplayAttribute.h">
+      <Filter>Plugins\GASCompanion\Source\GASCompanionDeveloper\Public\BlueprintGraph</Filter>
+    </ClInclude>
+    <None Include="..\..\Plugins\GASCompanion\GASCompanion.uplugin">
+      <Filter>Plugins\GASCompanion</Filter>
+    </None>
+    <Filter Include="Plugins\GASCompanion\Config">
+      <UniqueIdentifier>{DA3B0FC7-CA4E-3E06-9628-00CCADD02D3F}</UniqueIdentifier>
+    </Filter>
+    <None Include="..\..\Plugins\GASCompanion\Config\BaseGASCompanion.ini">
+      <Filter>Plugins\GASCompanion\Config</Filter>
+    </None>
+    <None Include="..\..\Plugins\GASCompanion\Config\DefaultGASCompanion.ini">
+      <Filter>Plugins\GASCompanion\Config</Filter>
+    </None>
+    <None Include="..\..\Plugins\GASCompanion\Config\FilterPlugin.ini">
+      <Filter>Plugins\GASCompanion\Config</Filter>
+    </None>
+    <Filter Include="Plugins\GASCompanion\Resources">
+      <UniqueIdentifier>{9306D742-7617-32D9-B2FA-C0CE5F4D1273}</UniqueIdentifier>
+    </Filter>
+    <None Include="..\..\Plugins\GASCompanion\Resources\GSC20X20.png">
+      <Filter>Plugins\GASCompanion\Resources</Filter>
+    </None>
+    <None Include="..\..\Plugins\GASCompanion\Resources\GSC40x40.png">
+      <Filter>Plugins\GASCompanion\Resources</Filter>
+    </None>
+    <None Include="..\..\Plugins\GASCompanion\Resources\GSCIcon.png">
+      <Filter>Plugins\GASCompanion\Resources</Filter>
+    </None>
+    <None Include="..\..\Plugins\GASCompanion\Resources\Icon128.png">
+      <Filter>Plugins\GASCompanion\Resources</Filter>
+    </None>
+    <Filter Include="Plugins\GASCompanion\Resources\Common">
+      <UniqueIdentifier>{F1222F3D-FF5B-3B17-AD08-D5C2997B06D6}</UniqueIdentifier>
+    </Filter>
+    <None Include="..\..\Plugins\GASCompanion\Resources\Common\TextBlockHighlightShape.png">
+      <Filter>Plugins\GASCompanion\Resources\Common</Filter>
+    </None>
+    <Filter Include="Plugins\GASCompanion\Resources\CoreWidgets">
+      <UniqueIdentifier>{8DBFB647-E7B8-3509-91C0-083FD7DF919A}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Plugins\GASCompanion\Resources\CoreWidgets\SegmentedBox">
+      <UniqueIdentifier>{2ACC917B-7ECD-3334-9CD0-819BE07CD9A7}</UniqueIdentifier>
+    </Filter>
+    <None Include="..\..\Plugins\GASCompanion\Resources\CoreWidgets\SegmentedBox\left.png">
+      <Filter>Plugins\GASCompanion\Resources\CoreWidgets\SegmentedBox</Filter>
+    </None>
+    <None Include="..\..\Plugins\GASCompanion\Resources\CoreWidgets\SegmentedBox\left.svg">
+      <Filter>Plugins\GASCompanion\Resources\CoreWidgets\SegmentedBox</Filter>
+    </None>
+    <None Include="..\..\Plugins\GASCompanion\Resources\CoreWidgets\SegmentedBox\right.png">
+      <Filter>Plugins\GASCompanion\Resources\CoreWidgets\SegmentedBox</Filter>
+    </None>
+    <None Include="..\..\Plugins\GASCompanion\Resources\CoreWidgets\SegmentedBox\right.svg">
+      <Filter>Plugins\GASCompanion\Resources\CoreWidgets\SegmentedBox</Filter>
+    </None>
+    <Filter Include="Plugins\GASCompanion\Resources\icons">
+      <UniqueIdentifier>{E0532DCB-B095-34C7-A932-DC5DBF2F25B9}</UniqueIdentifier>
+    </Filter>
+    <None Include="..\..\Plugins\GASCompanion\Resources\icons\discord_icon_16x.png">
+      <Filter>Plugins\GASCompanion\Resources\icons</Filter>
+    </None>
+    <None Include="..\..\Plugins\GASCompanion\Resources\icons\lock.png">
+      <Filter>Plugins\GASCompanion\Resources\icons</Filter>
+    </None>
+    <Filter Include="Plugins\GASCompanion\Resources\Old">
+      <UniqueIdentifier>{F8511345-0207-36C6-A757-835DCC0A4665}</UniqueIdentifier>
+    </Filter>
+    <None Include="..\..\Plugins\GASCompanion\Resources\Old\HyperlinkDotted.png">
+      <Filter>Plugins\GASCompanion\Resources\Old</Filter>
+    </None>
+    <None Include="..\..\Plugins\GASCompanion\Resources\Old\HyperlinkUnderline.png">
+      <Filter>Plugins\GASCompanion\Resources\Old</Filter>
+    </None>
     <Filter Include="Plugins\IconCreator">
       <UniqueIdentifier>{F3562AFF-E198-3559-BC0C-3A43AAC60FE5}</UniqueIdentifier>
     </Filter>
+    <None Include="..\..\Plugins\IconCreator\IconCreator.uplugin">
+      <Filter>Plugins\IconCreator</Filter>
+    </None>
+    <Filter Include="Plugins\IconCreator\Resources">
+      <UniqueIdentifier>{9489CC6A-F554-316D-AA93-65FD45B760A6}</UniqueIdentifier>
+    </Filter>
+    <None Include="..\..\Plugins\IconCreator\Resources\Icon128.png">
+      <Filter>Plugins\IconCreator\Resources</Filter>
+    </None>
+    <Filter Include="Plugins\GASCompanion\Source\GASCompanionEditor">
+      <UniqueIdentifier>{DA3E9AF2-B3A8-3896-9072-7ACAB396C966}</UniqueIdentifier>
+    </Filter>
+    <None Include="..\..\Plugins\GASCompanion\Source\GASCompanionEditor\GASCompanionEditor.Build.cs">
+      <Filter>Plugins\GASCompanion\Source\GASCompanionEditor</Filter>
+    </None>
+    <Filter Include="Plugins\GASCompanion\Source\GASCompanionEditor\Private">
+      <UniqueIdentifier>{A787BC9C-3039-3946-AF3F-28F443D70804}</UniqueIdentifier>
+    </Filter>
+    <ClCompile Include="..\..\Plugins\GASCompanion\Source\GASCompanionEditor\Private\GASCompanionEditorModule.cpp">
+      <Filter>Plugins\GASCompanion\Source\GASCompanionEditor\Private</Filter>
+    </ClCompile>
+    <Filter Include="Plugins\GASCompanion\Source\GASCompanionEditor\Private\Core">
+      <UniqueIdentifier>{522A12DA-BAA5-31A7-8AE6-335F5A8EB243}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Plugins\GASCompanion\Source\GASCompanionEditor\Private\Core\Common">
+      <UniqueIdentifier>{2DEE0DC1-9EC5-3CBC-B401-0990C427154F}</UniqueIdentifier>
+    </Filter>
+    <ClCompile Include="..\..\Plugins\GASCompanion\Source\GASCompanionEditor\Private\Core\Common\GSCAttributesGenSettings.cpp">
+      <Filter>Plugins\GASCompanion\Source\GASCompanionEditor\Private\Core\Common</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Plugins\GASCompanion\Source\GASCompanionEditor\Private\Core\Common\GSCAttributesWizardCommands.cpp">
+      <Filter>Plugins\GASCompanion\Source\GASCompanionEditor\Private\Core\Common</Filter>
+    </ClCompile>
+    <Filter Include="Plugins\GASCompanion\Source\GASCompanionEditor\Private\Core\Logging">
+      <UniqueIdentifier>{D3730A64-A423-387B-B422-4ADEFE31F5B2}</UniqueIdentifier>
+    </Filter>
+    <ClCompile Include="..\..\Plugins\GASCompanion\Source\GASCompanionEditor\Private\Core\Logging\GASCompanionEditorLog.cpp">
+      <Filter>Plugins\GASCompanion\Source\GASCompanionEditor\Private\Core\Logging</Filter>
+    </ClCompile>
+    <Filter Include="Plugins\GASCompanion\Source\GASCompanionEditor\Private\CreationMenu">
+      <UniqueIdentifier>{52FB7577-C059-359C-AB8D-A5A03FEB2466}</UniqueIdentifier>
+    </Filter>
+    <ClCompile Include="..\..\Plugins\GASCompanion\Source\GASCompanionEditor\Private\CreationMenu\GSCCreationMenu.cpp">
+      <Filter>Plugins\GASCompanion\Source\GASCompanionEditor\Private\CreationMenu</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Plugins\GASCompanion\Source\GASCompanionEditor\Private\CreationMenu\GSCGameplayAbilityCreationMenu.cpp">
+      <Filter>Plugins\GASCompanion\Source\GASCompanionEditor\Private\CreationMenu</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Plugins\GASCompanion\Source\GASCompanionEditor\Private\CreationMenu\GSCGameplayEffectCreationMenu.cpp">
+      <Filter>Plugins\GASCompanion\Source\GASCompanionEditor\Private\CreationMenu</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Plugins\GASCompanion\Source\GASCompanionEditor\Private\CreationMenu\GSCGameplayEffectTemplateDetails.cpp">
+      <Filter>Plugins\GASCompanion\Source\GASCompanionEditor\Private\CreationMenu</Filter>
+    </ClCompile>
+    <Filter Include="Plugins\GASCompanion\Source\GASCompanionEditor\Private\Templates">
+      <UniqueIdentifier>{10C68BA4-3699-3D9B-9A66-E526901E5F30}</UniqueIdentifier>
+    </Filter>
+    <ClCompile Include="..\..\Plugins\GASCompanion\Source\GASCompanionEditor\Private\Templates\GSCAttributeSetClassTemplate.cpp">
+      <Filter>Plugins\GASCompanion\Source\GASCompanionEditor\Private\Templates</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Plugins\GASCompanion\Source\GASCompanionEditor\Private\Templates\GSCTemplateProjectUtils.cpp">
+      <Filter>Plugins\GASCompanion\Source\GASCompanionEditor\Private\Templates</Filter>
+    </ClCompile>
+    <Filter Include="Plugins\GASCompanion\Source\GASCompanionEditor\Private\Tests">
+      <UniqueIdentifier>{CDFBE465-B84E-344E-9A80-4BF0CFCCA222}</UniqueIdentifier>
+    </Filter>
+    <ClCompile Include="..\..\Plugins\GASCompanion\Source\GASCompanionEditor\Private\Tests\GSCCreationMenu.spec.cpp">
+      <Filter>Plugins\GASCompanion\Source\GASCompanionEditor\Private\Tests</Filter>
+    </ClCompile>
+    <Filter Include="Plugins\GASCompanion\Source\GASCompanionEditor\Private\UI">
+      <UniqueIdentifier>{C6BFBE29-5801-3F6F-A293-1C539342E9D9}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Plugins\GASCompanion\Source\GASCompanionEditor\Private\UI\Styling">
+      <UniqueIdentifier>{5C005B1C-8222-33AF-A268-CE9B84D91DB0}</UniqueIdentifier>
+    </Filter>
+    <ClCompile Include="..\..\Plugins\GASCompanion\Source\GASCompanionEditor\Private\UI\Styling\GSCEditorStyle.cpp">
+      <Filter>Plugins\GASCompanion\Source\GASCompanionEditor\Private\UI\Styling</Filter>
+    </ClCompile>
+    <Filter Include="Plugins\GASCompanion\Source\GASCompanionEditor\Private\UI\Widgets">
+      <UniqueIdentifier>{1F719739-799C-3280-BD1C-8BB07ED7DBDD}</UniqueIdentifier>
+    </Filter>
+    <ClCompile Include="..\..\Plugins\GASCompanion\Source\GASCompanionEditor\Private\UI\Widgets\SGSCAttributeListReferenceViewer.cpp">
+      <Filter>Plugins\GASCompanion\Source\GASCompanionEditor\Private\UI\Widgets</Filter>
+    </ClCompile>
+    <ClInclude Include="..\..\Plugins\GASCompanion\Source\GASCompanionEditor\Private\UI\Widgets\SGSCAttributeListReferenceViewer.h">
+      <Filter>Plugins\GASCompanion\Source\GASCompanionEditor\Private\UI\Widgets</Filter>
+    </ClInclude>
+    <ClCompile Include="..\..\Plugins\GASCompanion\Source\GASCompanionEditor\Private\UI\Widgets\SGSCNewAttributeSetClassDialog.cpp">
+      <Filter>Plugins\GASCompanion\Source\GASCompanionEditor\Private\UI\Widgets</Filter>
+    </ClCompile>
+    <Filter Include="Plugins\GASCompanion\Source\GASCompanionEditor\Public">
+      <UniqueIdentifier>{BCD01658-E01B-3D15-9259-5943F4BA2776}</UniqueIdentifier>
+    </Filter>
+    <ClInclude Include="..\..\Plugins\GASCompanion\Source\GASCompanionEditor\Public\GASCompanionEditorModule.h">
+      <Filter>Plugins\GASCompanion\Source\GASCompanionEditor\Public</Filter>
+    </ClInclude>
+    <Filter Include="Plugins\GASCompanion\Source\GASCompanionEditor\Public\Core">
+      <UniqueIdentifier>{A543BBBB-E0C2-396B-8B37-8A4C461BD2B5}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Plugins\GASCompanion\Source\GASCompanionEditor\Public\Core\Common">
+      <UniqueIdentifier>{142D6683-987E-3176-AC64-160F781A3AB0}</UniqueIdentifier>
+    </Filter>
+    <ClInclude Include="..\..\Plugins\GASCompanion\Source\GASCompanionEditor\Public\Core\Common\GSCAttributesGenSettings.h">
+      <Filter>Plugins\GASCompanion\Source\GASCompanionEditor\Public\Core\Common</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Plugins\GASCompanion\Source\GASCompanionEditor\Public\Core\Common\GSCAttributesWizardCommands.h">
+      <Filter>Plugins\GASCompanion\Source\GASCompanionEditor\Public\Core\Common</Filter>
+    </ClInclude>
+    <Filter Include="Plugins\GASCompanion\Source\GASCompanionEditor\Public\Core\Logging">
+      <UniqueIdentifier>{24ADC2F4-8404-3332-B315-FE950CEDA79C}</UniqueIdentifier>
+    </Filter>
+    <ClInclude Include="..\..\Plugins\GASCompanion\Source\GASCompanionEditor\Public\Core\Logging\GASCompanionEditorLog.h">
+      <Filter>Plugins\GASCompanion\Source\GASCompanionEditor\Public\Core\Logging</Filter>
+    </ClInclude>
+    <Filter Include="Plugins\GASCompanion\Source\GASCompanionEditor\Public\CreationMenu">
+      <UniqueIdentifier>{91775026-CE34-35B8-9CF9-C904CE997A50}</UniqueIdentifier>
+    </Filter>
+    <ClInclude Include="..\..\Plugins\GASCompanion\Source\GASCompanionEditor\Public\CreationMenu\GSCCreationMenu.h">
+      <Filter>Plugins\GASCompanion\Source\GASCompanionEditor\Public\CreationMenu</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Plugins\GASCompanion\Source\GASCompanionEditor\Public\CreationMenu\GSCGameplayAbilityCreationMenu.h">
+      <Filter>Plugins\GASCompanion\Source\GASCompanionEditor\Public\CreationMenu</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Plugins\GASCompanion\Source\GASCompanionEditor\Public\CreationMenu\GSCGameplayEffectCreationMenu.h">
+      <Filter>Plugins\GASCompanion\Source\GASCompanionEditor\Public\CreationMenu</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Plugins\GASCompanion\Source\GASCompanionEditor\Public\CreationMenu\GSCGameplayEffectTemplateDetails.h">
+      <Filter>Plugins\GASCompanion\Source\GASCompanionEditor\Public\CreationMenu</Filter>
+    </ClInclude>
+    <Filter Include="Plugins\GASCompanion\Source\GASCompanionEditor\Public\Templates">
+      <UniqueIdentifier>{84748576-A4DA-3965-A13C-BBE6C47896E4}</UniqueIdentifier>
+    </Filter>
+    <ClInclude Include="..\..\Plugins\GASCompanion\Source\GASCompanionEditor\Public\Templates\GSCAttributeSetClassTemplate.h">
+      <Filter>Plugins\GASCompanion\Source\GASCompanionEditor\Public\Templates</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Plugins\GASCompanion\Source\GASCompanionEditor\Public\Templates\GSCTemplateProjectUtils.h">
+      <Filter>Plugins\GASCompanion\Source\GASCompanionEditor\Public\Templates</Filter>
+    </ClInclude>
+    <Filter Include="Plugins\GASCompanion\Source\GASCompanionEditor\Public\UI">
+      <UniqueIdentifier>{685B7892-7444-30AE-839A-DED80C6EC566}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Plugins\GASCompanion\Source\GASCompanionEditor\Public\UI\Styling">
+      <UniqueIdentifier>{0D2108D3-F801-3A80-84DA-B823EB631C09}</UniqueIdentifier>
+    </Filter>
+    <ClInclude Include="..\..\Plugins\GASCompanion\Source\GASCompanionEditor\Public\UI\Styling\GSCEditorStyle.h">
+      <Filter>Plugins\GASCompanion\Source\GASCompanionEditor\Public\UI\Styling</Filter>
+    </ClInclude>
+    <Filter Include="Plugins\GASCompanion\Source\GASCompanionEditor\Public\UI\Widgets">
+      <UniqueIdentifier>{50A1807D-E3CD-3C1D-8E7B-606DDDEBC543}</UniqueIdentifier>
+    </Filter>
+    <ClInclude Include="..\..\Plugins\GASCompanion\Source\GASCompanionEditor\Public\UI\Widgets\SGSCNewAttributeSetClassDialog.h">
+      <Filter>Plugins\GASCompanion\Source\GASCompanionEditor\Public\UI\Widgets</Filter>
+    </ClInclude>
+    <Filter Include="Plugins\GASCompanion\Source\GASCompanion">
+      <UniqueIdentifier>{80BBEDD5-E596-398D-B0E2-2B1E77B18BCE}</UniqueIdentifier>
+    </Filter>
+    <None Include="..\..\Plugins\GASCompanion\Source\GASCompanion\GASCompanion.Build.cs">
+      <Filter>Plugins\GASCompanion\Source\GASCompanion</Filter>
+    </None>
+    <Filter Include="Plugins\GASCompanion\Source\GASCompanion\Private">
+      <UniqueIdentifier>{F54595C5-35E4-39E4-8556-DEDB3C27FE9C}</UniqueIdentifier>
+    </Filter>
+    <ClCompile Include="..\..\Plugins\GASCompanion\Source\GASCompanion\Private\GSC.cpp">
+      <Filter>Plugins\GASCompanion\Source\GASCompanion\Private</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Plugins\GASCompanion\Source\GASCompanion\Private\GSCAssetManager.cpp">
+      <Filter>Plugins\GASCompanion\Source\GASCompanion\Private</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Plugins\GASCompanion\Source\GASCompanion\Private\GSCDelegates.cpp">
+      <Filter>Plugins\GASCompanion\Source\GASCompanion\Private</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Plugins\GASCompanion\Source\GASCompanion\Private\GSCLog.cpp">
+      <Filter>Plugins\GASCompanion\Source\GASCompanion\Private</Filter>
+    </ClCompile>
+    <Filter Include="Plugins\GASCompanion\Source\GASCompanion\Private\Abilities">
+      <UniqueIdentifier>{B0FE83B0-3111-3424-95A8-BE4E7733DA32}</UniqueIdentifier>
+    </Filter>
+    <ClCompile Include="..\..\Plugins\GASCompanion\Source\GASCompanion\Private\Abilities\GSCAbilitySet.cpp">
+      <Filter>Plugins\GASCompanion\Source\GASCompanion\Private\Abilities</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Plugins\GASCompanion\Source\GASCompanion\Private\Abilities\GSCAbilitySystemComponent.cpp">
+      <Filter>Plugins\GASCompanion\Source\GASCompanion\Private\Abilities</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Plugins\GASCompanion\Source\GASCompanion\Private\Abilities\GSCAbilitySystemUtils.cpp">
+      <Filter>Plugins\GASCompanion\Source\GASCompanion\Private\Abilities</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Plugins\GASCompanion\Source\GASCompanion\Private\Abilities\GSCBlueprintFunctionLibrary.cpp">
+      <Filter>Plugins\GASCompanion\Source\GASCompanion\Private\Abilities</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Plugins\GASCompanion\Source\GASCompanion\Private\Abilities\GSCGameplayAbility.cpp">
+      <Filter>Plugins\GASCompanion\Source\GASCompanion\Private\Abilities</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Plugins\GASCompanion\Source\GASCompanion\Private\Abilities\GSCGameplayAbility_MeleeBase.cpp">
+      <Filter>Plugins\GASCompanion\Source\GASCompanion\Private\Abilities</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Plugins\GASCompanion\Source\GASCompanion\Private\Abilities\GSCTargetType.cpp">
+      <Filter>Plugins\GASCompanion\Source\GASCompanion\Private\Abilities</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Plugins\GASCompanion\Source\GASCompanion\Private\Abilities\GSCTypes.cpp">
+      <Filter>Plugins\GASCompanion\Source\GASCompanion\Private\Abilities</Filter>
+    </ClCompile>
+    <Filter Include="Plugins\GASCompanion\Source\GASCompanion\Private\Abilities\Attributes">
+      <UniqueIdentifier>{373A8DE1-56E5-3A9F-A8E6-564DABC7A6C0}</UniqueIdentifier>
+    </Filter>
+    <ClCompile Include="..\..\Plugins\GASCompanion\Source\GASCompanion\Private\Abilities\Attributes\GSCAttributeSet.cpp">
+      <Filter>Plugins\GASCompanion\Source\GASCompanion\Private\Abilities\Attributes</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Plugins\GASCompanion\Source\GASCompanion\Private\Abilities\Attributes\GSCAttributeSetBase.cpp">
+      <Filter>Plugins\GASCompanion\Source\GASCompanion\Private\Abilities\Attributes</Filter>
+    </ClCompile>
+    <Filter Include="Plugins\GASCompanion\Source\GASCompanion\Private\Abilities\TargetTypes">
+      <UniqueIdentifier>{30128A59-B2D9-3E0F-B3F8-DFCF200813D4}</UniqueIdentifier>
+    </Filter>
+    <ClCompile Include="..\..\Plugins\GASCompanion\Source\GASCompanion\Private\Abilities\TargetTypes\GSCTargetTypeUseEventData.cpp">
+      <Filter>Plugins\GASCompanion\Source\GASCompanion\Private\Abilities\TargetTypes</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Plugins\GASCompanion\Source\GASCompanion\Private\Abilities\TargetTypes\GSCTargetTypeUseOwner.cpp">
+      <Filter>Plugins\GASCompanion\Source\GASCompanion\Private\Abilities\TargetTypes</Filter>
+    </ClCompile>
+    <Filter Include="Plugins\GASCompanion\Source\GASCompanion\Private\Abilities\Tasks">
+      <UniqueIdentifier>{119A13F1-532E-33FE-8A45-9FC1D77884C7}</UniqueIdentifier>
+    </Filter>
+    <ClCompile Include="..\..\Plugins\GASCompanion\Source\GASCompanion\Private\Abilities\Tasks\GSCAbilityTask_NetworkSyncPoint.cpp">
+      <Filter>Plugins\GASCompanion\Source\GASCompanion\Private\Abilities\Tasks</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Plugins\GASCompanion\Source\GASCompanion\Private\Abilities\Tasks\GSCTask_PlayMontageWaitForEvent.cpp">
+      <Filter>Plugins\GASCompanion\Source\GASCompanion\Private\Abilities\Tasks</Filter>
+    </ClCompile>
+    <Filter Include="Plugins\GASCompanion\Source\GASCompanion\Private\AI">
+      <UniqueIdentifier>{D0E84512-819C-3664-8ED6-3F4E3DAAC305}</UniqueIdentifier>
+    </Filter>
+    <ClCompile Include="..\..\Plugins\GASCompanion\Source\GASCompanion\Private\AI\GSCBTTask_BlueprintBase.cpp">
+      <Filter>Plugins\GASCompanion\Source\GASCompanion\Private\AI</Filter>
+    </ClCompile>
+    <Filter Include="Plugins\GASCompanion\Source\GASCompanion\Private\Animations">
+      <UniqueIdentifier>{E4FCBDEE-2294-3147-8FDB-3EA0E4748F0F}</UniqueIdentifier>
+    </Filter>
+    <ClCompile Include="..\..\Plugins\GASCompanion\Source\GASCompanion\Private\Animations\GSCAbilityQueueNotifyState.cpp">
+      <Filter>Plugins\GASCompanion\Source\GASCompanion\Private\Animations</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Plugins\GASCompanion\Source\GASCompanion\Private\Animations\GSCComboWindowNotifyState.cpp">
+      <Filter>Plugins\GASCompanion\Source\GASCompanion\Private\Animations</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Plugins\GASCompanion\Source\GASCompanion\Private\Animations\GSCNativeAnimInstance.cpp">
+      <Filter>Plugins\GASCompanion\Source\GASCompanion\Private\Animations</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Plugins\GASCompanion\Source\GASCompanion\Private\Animations\GSCNativeAnimInstanceInterface.cpp">
+      <Filter>Plugins\GASCompanion\Source\GASCompanion\Private\Animations</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Plugins\GASCompanion\Source\GASCompanion\Private\Animations\GSCTriggerComboNotify.cpp">
+      <Filter>Plugins\GASCompanion\Source\GASCompanion\Private\Animations</Filter>
+    </ClCompile>
+    <Filter Include="Plugins\GASCompanion\Source\GASCompanion\Private\Components">
+      <UniqueIdentifier>{C0F13AA5-0AB7-3ED0-9DDD-448A3749A681}</UniqueIdentifier>
+    </Filter>
+    <ClCompile Include="..\..\Plugins\GASCompanion\Source\GASCompanion\Private\Components\GSCAbilityInputBindingComponent.cpp">
+      <Filter>Plugins\GASCompanion\Source\GASCompanion\Private\Components</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Plugins\GASCompanion\Source\GASCompanion\Private\Components\GSCAbilityQueueComponent.cpp">
+      <Filter>Plugins\GASCompanion\Source\GASCompanion\Private\Components</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Plugins\GASCompanion\Source\GASCompanion\Private\Components\GSCComboManagerComponent.cpp">
+      <Filter>Plugins\GASCompanion\Source\GASCompanion\Private\Components</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Plugins\GASCompanion\Source\GASCompanion\Private\Components\GSCCoreComponent.cpp">
+      <Filter>Plugins\GASCompanion\Source\GASCompanion\Private\Components</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Plugins\GASCompanion\Source\GASCompanion\Private\Components\GSCLinkAnimLayersComponent.cpp">
+      <Filter>Plugins\GASCompanion\Source\GASCompanion\Private\Components</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Plugins\GASCompanion\Source\GASCompanion\Private\Components\GSCPlayerControlsComponent.cpp">
+      <Filter>Plugins\GASCompanion\Source\GASCompanion\Private\Components</Filter>
+    </ClCompile>
+    <Filter Include="Plugins\GASCompanion\Source\GASCompanion\Private\Core">
+      <UniqueIdentifier>{CF37D612-0A57-331D-B5EA-5670899353A8}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Plugins\GASCompanion\Source\GASCompanion\Private\Core\Settings">
+      <UniqueIdentifier>{E307A3BF-FFB5-3474-8C20-1041368C1B0F}</UniqueIdentifier>
+    </Filter>
+    <ClCompile Include="..\..\Plugins\GASCompanion\Source\GASCompanion\Private\Core\Settings\GSCDeveloperSettings.cpp">
+      <Filter>Plugins\GASCompanion\Source\GASCompanion\Private\Core\Settings</Filter>
+    </ClCompile>
+    <Filter Include="Plugins\GASCompanion\Source\GASCompanion\Private\GameFeatures">
+      <UniqueIdentifier>{00E2DE94-9803-382B-B520-17404815E2C6}</UniqueIdentifier>
+    </Filter>
+    <ClCompile Include="..\..\Plugins\GASCompanion\Source\GASCompanion\Private\GameFeatures\GSCGameFeatureTypes.cpp">
+      <Filter>Plugins\GASCompanion\Source\GASCompanion\Private\GameFeatures</Filter>
+    </ClCompile>
+    <Filter Include="Plugins\GASCompanion\Source\GASCompanion\Private\GameFeatures\Actions">
+      <UniqueIdentifier>{8AA76470-CB61-3E8B-8223-F2A28C6D2DB8}</UniqueIdentifier>
+    </Filter>
+    <ClCompile Include="..\..\Plugins\GASCompanion\Source\GASCompanion\Private\GameFeatures\Actions\GSCGameFeatureAction_AddAbilities.cpp">
+      <Filter>Plugins\GASCompanion\Source\GASCompanion\Private\GameFeatures\Actions</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Plugins\GASCompanion\Source\GASCompanion\Private\GameFeatures\Actions\GSCGameFeatureAction_AddAnimLayers.cpp">
+      <Filter>Plugins\GASCompanion\Source\GASCompanion\Private\GameFeatures\Actions</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Plugins\GASCompanion\Source\GASCompanion\Private\GameFeatures\Actions\GSCGameFeatureAction_AddInputMappingContext.cpp">
+      <Filter>Plugins\GASCompanion\Source\GASCompanion\Private\GameFeatures\Actions</Filter>
+    </ClCompile>
+    <Filter Include="Plugins\GASCompanion\Source\GASCompanion\Private\ModularGameplayActors">
+      <UniqueIdentifier>{E009C99A-3224-3370-A5CD-20165930ED37}</UniqueIdentifier>
+    </Filter>
+    <ClCompile Include="..\..\Plugins\GASCompanion\Source\GASCompanion\Private\ModularGameplayActors\GSCModularActor.cpp">
+      <Filter>Plugins\GASCompanion\Source\GASCompanion\Private\ModularGameplayActors</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Plugins\GASCompanion\Source\GASCompanion\Private\ModularGameplayActors\GSCModularAIController.cpp">
+      <Filter>Plugins\GASCompanion\Source\GASCompanion\Private\ModularGameplayActors</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Plugins\GASCompanion\Source\GASCompanion\Private\ModularGameplayActors\GSCModularCharacter.cpp">
+      <Filter>Plugins\GASCompanion\Source\GASCompanion\Private\ModularGameplayActors</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Plugins\GASCompanion\Source\GASCompanion\Private\ModularGameplayActors\GSCModularDefaultPawn.cpp">
+      <Filter>Plugins\GASCompanion\Source\GASCompanion\Private\ModularGameplayActors</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Plugins\GASCompanion\Source\GASCompanion\Private\ModularGameplayActors\GSCModularGameMode.cpp">
+      <Filter>Plugins\GASCompanion\Source\GASCompanion\Private\ModularGameplayActors</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Plugins\GASCompanion\Source\GASCompanion\Private\ModularGameplayActors\GSCModularGameState.cpp">
+      <Filter>Plugins\GASCompanion\Source\GASCompanion\Private\ModularGameplayActors</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Plugins\GASCompanion\Source\GASCompanion\Private\ModularGameplayActors\GSCModularPawn.cpp">
+      <Filter>Plugins\GASCompanion\Source\GASCompanion\Private\ModularGameplayActors</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Plugins\GASCompanion\Source\GASCompanion\Private\ModularGameplayActors\GSCModularPlayerController.cpp">
+      <Filter>Plugins\GASCompanion\Source\GASCompanion\Private\ModularGameplayActors</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Plugins\GASCompanion\Source\GASCompanion\Private\ModularGameplayActors\GSCModularPlayerState.cpp">
+      <Filter>Plugins\GASCompanion\Source\GASCompanion\Private\ModularGameplayActors</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Plugins\GASCompanion\Source\GASCompanion\Private\ModularGameplayActors\GSCModularPlayerStateCharacter.cpp">
+      <Filter>Plugins\GASCompanion\Source\GASCompanion\Private\ModularGameplayActors</Filter>
+    </ClCompile>
+    <Filter Include="Plugins\GASCompanion\Source\GASCompanion\Private\Subsystems">
+      <UniqueIdentifier>{F1E1EE11-C217-33F6-B73C-C29421E915B8}</UniqueIdentifier>
+    </Filter>
+    <ClCompile Include="..\..\Plugins\GASCompanion\Source\GASCompanion\Private\Subsystems\GSCConsoleManagerSubsystem.cpp">
+      <Filter>Plugins\GASCompanion\Source\GASCompanion\Private\Subsystems</Filter>
+    </ClCompile>
+    <Filter Include="Plugins\GASCompanion\Source\GASCompanion\Private\Templates">
+      <UniqueIdentifier>{0107C107-20E7-3DFB-BC6A-21D0FA616352}</UniqueIdentifier>
+    </Filter>
+    <ClCompile Include="..\..\Plugins\GASCompanion\Source\GASCompanion\Private\Templates\GSCTemplate_GameplayEffectDefinition.cpp">
+      <Filter>Plugins\GASCompanion\Source\GASCompanion\Private\Templates</Filter>
+    </ClCompile>
+    <Filter Include="Plugins\GASCompanion\Source\GASCompanion\Private\UI">
+      <UniqueIdentifier>{0F814BBC-9F09-3A7C-8819-F333CA0DDD1A}</UniqueIdentifier>
+    </Filter>
+    <ClCompile Include="..\..\Plugins\GASCompanion\Source\GASCompanion\Private\UI\GSCUserWidget.cpp">
+      <Filter>Plugins\GASCompanion\Source\GASCompanion\Private\UI</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Plugins\GASCompanion\Source\GASCompanion\Private\UI\GSCUWDebugAbilityQueue.cpp">
+      <Filter>Plugins\GASCompanion\Source\GASCompanion\Private\UI</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Plugins\GASCompanion\Source\GASCompanion\Private\UI\GSCUWDebugComboWidget.cpp">
+      <Filter>Plugins\GASCompanion\Source\GASCompanion\Private\UI</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Plugins\GASCompanion\Source\GASCompanion\Private\UI\GSCUWHud.cpp">
+      <Filter>Plugins\GASCompanion\Source\GASCompanion\Private\UI</Filter>
+    </ClCompile>
+    <Filter Include="Plugins\GASCompanion\Source\GASCompanion\Public">
+      <UniqueIdentifier>{8A867087-3A6C-3368-B792-73558F2C6496}</UniqueIdentifier>
+    </Filter>
+    <ClInclude Include="..\..\Plugins\GASCompanion\Source\GASCompanion\Public\GSC.h">
+      <Filter>Plugins\GASCompanion\Source\GASCompanion\Public</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Plugins\GASCompanion\Source\GASCompanion\Public\GSCAssetManager.h">
+      <Filter>Plugins\GASCompanion\Source\GASCompanion\Public</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Plugins\GASCompanion\Source\GASCompanion\Public\GSCDelegates.h">
+      <Filter>Plugins\GASCompanion\Source\GASCompanion\Public</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Plugins\GASCompanion\Source\GASCompanion\Public\GSCLog.h">
+      <Filter>Plugins\GASCompanion\Source\GASCompanion\Public</Filter>
+    </ClInclude>
+    <Filter Include="Plugins\GASCompanion\Source\GASCompanion\Public\Abilities">
+      <UniqueIdentifier>{2A8A2839-FDFD-3336-BD7B-926F054C120A}</UniqueIdentifier>
+    </Filter>
+    <ClInclude Include="..\..\Plugins\GASCompanion\Source\GASCompanion\Public\Abilities\GSCAbilitySet.h">
+      <Filter>Plugins\GASCompanion\Source\GASCompanion\Public\Abilities</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Plugins\GASCompanion\Source\GASCompanion\Public\Abilities\GSCAbilitySystemComponent.h">
+      <Filter>Plugins\GASCompanion\Source\GASCompanion\Public\Abilities</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Plugins\GASCompanion\Source\GASCompanion\Public\Abilities\GSCAbilitySystemUtils.h">
+      <Filter>Plugins\GASCompanion\Source\GASCompanion\Public\Abilities</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Plugins\GASCompanion\Source\GASCompanion\Public\Abilities\GSCBlueprintFunctionLibrary.h">
+      <Filter>Plugins\GASCompanion\Source\GASCompanion\Public\Abilities</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Plugins\GASCompanion\Source\GASCompanion\Public\Abilities\GSCGameplayAbility.h">
+      <Filter>Plugins\GASCompanion\Source\GASCompanion\Public\Abilities</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Plugins\GASCompanion\Source\GASCompanion\Public\Abilities\GSCGameplayAbility_MeleeBase.h">
+      <Filter>Plugins\GASCompanion\Source\GASCompanion\Public\Abilities</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Plugins\GASCompanion\Source\GASCompanion\Public\Abilities\GSCTargetType.h">
+      <Filter>Plugins\GASCompanion\Source\GASCompanion\Public\Abilities</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Plugins\GASCompanion\Source\GASCompanion\Public\Abilities\GSCTypes.h">
+      <Filter>Plugins\GASCompanion\Source\GASCompanion\Public\Abilities</Filter>
+    </ClInclude>
+    <Filter Include="Plugins\GASCompanion\Source\GASCompanion\Public\Abilities\Attributes">
+      <UniqueIdentifier>{B8EB5FEC-4D0F-3DD4-A286-19BCFC379AA1}</UniqueIdentifier>
+    </Filter>
+    <ClInclude Include="..\..\Plugins\GASCompanion\Source\GASCompanion\Public\Abilities\Attributes\GSCAttributeSet.h">
+      <Filter>Plugins\GASCompanion\Source\GASCompanion\Public\Abilities\Attributes</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Plugins\GASCompanion\Source\GASCompanion\Public\Abilities\Attributes\GSCAttributeSetBase.h">
+      <Filter>Plugins\GASCompanion\Source\GASCompanion\Public\Abilities\Attributes</Filter>
+    </ClInclude>
+    <Filter Include="Plugins\GASCompanion\Source\GASCompanion\Public\Abilities\TargetTypes">
+      <UniqueIdentifier>{D66F930F-21D9-3A01-88DE-4F155198BC85}</UniqueIdentifier>
+    </Filter>
+    <ClInclude Include="..\..\Plugins\GASCompanion\Source\GASCompanion\Public\Abilities\TargetTypes\GSCTargetTypeUseEventData.h">
+      <Filter>Plugins\GASCompanion\Source\GASCompanion\Public\Abilities\TargetTypes</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Plugins\GASCompanion\Source\GASCompanion\Public\Abilities\TargetTypes\GSCTargetTypeUseOwner.h">
+      <Filter>Plugins\GASCompanion\Source\GASCompanion\Public\Abilities\TargetTypes</Filter>
+    </ClInclude>
+    <Filter Include="Plugins\GASCompanion\Source\GASCompanion\Public\Abilities\Tasks">
+      <UniqueIdentifier>{8AF291C8-F546-3A68-BABE-676CD3DF1EF9}</UniqueIdentifier>
+    </Filter>
+    <ClInclude Include="..\..\Plugins\GASCompanion\Source\GASCompanion\Public\Abilities\Tasks\GSCAbilityTask_NetworkSyncPoint.h">
+      <Filter>Plugins\GASCompanion\Source\GASCompanion\Public\Abilities\Tasks</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Plugins\GASCompanion\Source\GASCompanion\Public\Abilities\Tasks\GSCTask_PlayMontageWaitForEvent.h">
+      <Filter>Plugins\GASCompanion\Source\GASCompanion\Public\Abilities\Tasks</Filter>
+    </ClInclude>
+    <Filter Include="Plugins\GASCompanion\Source\GASCompanion\Public\AI">
+      <UniqueIdentifier>{7751E57A-D2EF-3BB6-B181-44954BD2BFA2}</UniqueIdentifier>
+    </Filter>
+    <ClInclude Include="..\..\Plugins\GASCompanion\Source\GASCompanion\Public\AI\GSCBTTask_BlueprintBase.h">
+      <Filter>Plugins\GASCompanion\Source\GASCompanion\Public\AI</Filter>
+    </ClInclude>
+    <Filter Include="Plugins\GASCompanion\Source\GASCompanion\Public\Animations">
+      <UniqueIdentifier>{D0079C68-C0AE-309D-BC42-0EC6ABFDBB00}</UniqueIdentifier>
+    </Filter>
+    <ClInclude Include="..\..\Plugins\GASCompanion\Source\GASCompanion\Public\Animations\GSCAbilityQueueNotifyState.h">
+      <Filter>Plugins\GASCompanion\Source\GASCompanion\Public\Animations</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Plugins\GASCompanion\Source\GASCompanion\Public\Animations\GSCComboWindowNotifyState.h">
+      <Filter>Plugins\GASCompanion\Source\GASCompanion\Public\Animations</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Plugins\GASCompanion\Source\GASCompanion\Public\Animations\GSCNativeAnimInstance.h">
+      <Filter>Plugins\GASCompanion\Source\GASCompanion\Public\Animations</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Plugins\GASCompanion\Source\GASCompanion\Public\Animations\GSCNativeAnimInstanceInterface.h">
+      <Filter>Plugins\GASCompanion\Source\GASCompanion\Public\Animations</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Plugins\GASCompanion\Source\GASCompanion\Public\Animations\GSCTriggerComboNotify.h">
+      <Filter>Plugins\GASCompanion\Source\GASCompanion\Public\Animations</Filter>
+    </ClInclude>
+    <Filter Include="Plugins\GASCompanion\Source\GASCompanion\Public\Components">
+      <UniqueIdentifier>{461D30A3-C63D-3D09-943D-F49317F33FF9}</UniqueIdentifier>
+    </Filter>
+    <ClInclude Include="..\..\Plugins\GASCompanion\Source\GASCompanion\Public\Components\GSCAbilityInputBindingComponent.h">
+      <Filter>Plugins\GASCompanion\Source\GASCompanion\Public\Components</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Plugins\GASCompanion\Source\GASCompanion\Public\Components\GSCAbilityQueueComponent.h">
+      <Filter>Plugins\GASCompanion\Source\GASCompanion\Public\Components</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Plugins\GASCompanion\Source\GASCompanion\Public\Components\GSCComboManagerComponent.h">
+      <Filter>Plugins\GASCompanion\Source\GASCompanion\Public\Components</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Plugins\GASCompanion\Source\GASCompanion\Public\Components\GSCCoreComponent.h">
+      <Filter>Plugins\GASCompanion\Source\GASCompanion\Public\Components</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Plugins\GASCompanion\Source\GASCompanion\Public\Components\GSCLinkAnimLayersComponent.h">
+      <Filter>Plugins\GASCompanion\Source\GASCompanion\Public\Components</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Plugins\GASCompanion\Source\GASCompanion\Public\Components\GSCPlayerControlsComponent.h">
+      <Filter>Plugins\GASCompanion\Source\GASCompanion\Public\Components</Filter>
+    </ClInclude>
+    <Filter Include="Plugins\GASCompanion\Source\GASCompanion\Public\Core">
+      <UniqueIdentifier>{A7D32DED-436E-3C79-AACE-FB636C690F05}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Plugins\GASCompanion\Source\GASCompanion\Public\Core\Settings">
+      <UniqueIdentifier>{1A729E9B-8723-3B2F-9B1F-89E2B7AD2C81}</UniqueIdentifier>
+    </Filter>
+    <ClInclude Include="..\..\Plugins\GASCompanion\Source\GASCompanion\Public\Core\Settings\GSCDeveloperSettings.h">
+      <Filter>Plugins\GASCompanion\Source\GASCompanion\Public\Core\Settings</Filter>
+    </ClInclude>
+    <Filter Include="Plugins\GASCompanion\Source\GASCompanion\Public\GameFeatures">
+      <UniqueIdentifier>{1EC4D9CB-CA99-34FA-B6D8-26221C49A1AA}</UniqueIdentifier>
+    </Filter>
+    <ClInclude Include="..\..\Plugins\GASCompanion\Source\GASCompanion\Public\GameFeatures\GSCGameFeatureTypes.h">
+      <Filter>Plugins\GASCompanion\Source\GASCompanion\Public\GameFeatures</Filter>
+    </ClInclude>
+    <Filter Include="Plugins\GASCompanion\Source\GASCompanion\Public\GameFeatures\Actions">
+      <UniqueIdentifier>{48FFD1FE-CC7E-327D-8E69-CF85BE65B108}</UniqueIdentifier>
+    </Filter>
+    <ClInclude Include="..\..\Plugins\GASCompanion\Source\GASCompanion\Public\GameFeatures\Actions\GSCGameFeatureAction_AddAbilities.h">
+      <Filter>Plugins\GASCompanion\Source\GASCompanion\Public\GameFeatures\Actions</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Plugins\GASCompanion\Source\GASCompanion\Public\GameFeatures\Actions\GSCGameFeatureAction_AddAnimLayers.h">
+      <Filter>Plugins\GASCompanion\Source\GASCompanion\Public\GameFeatures\Actions</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Plugins\GASCompanion\Source\GASCompanion\Public\GameFeatures\Actions\GSCGameFeatureAction_AddInputMappingContext.h">
+      <Filter>Plugins\GASCompanion\Source\GASCompanion\Public\GameFeatures\Actions</Filter>
+    </ClInclude>
+    <Filter Include="Plugins\GASCompanion\Source\GASCompanion\Public\ModularGameplayActors">
+      <UniqueIdentifier>{8BC9639C-B036-31A3-B603-623D1DE3E6EC}</UniqueIdentifier>
+    </Filter>
+    <ClInclude Include="..\..\Plugins\GASCompanion\Source\GASCompanion\Public\ModularGameplayActors\GSCModularActor.h">
+      <Filter>Plugins\GASCompanion\Source\GASCompanion\Public\ModularGameplayActors</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Plugins\GASCompanion\Source\GASCompanion\Public\ModularGameplayActors\GSCModularAIController.h">
+      <Filter>Plugins\GASCompanion\Source\GASCompanion\Public\ModularGameplayActors</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Plugins\GASCompanion\Source\GASCompanion\Public\ModularGameplayActors\GSCModularCharacter.h">
+      <Filter>Plugins\GASCompanion\Source\GASCompanion\Public\ModularGameplayActors</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Plugins\GASCompanion\Source\GASCompanion\Public\ModularGameplayActors\GSCModularDefaultPawn.h">
+      <Filter>Plugins\GASCompanion\Source\GASCompanion\Public\ModularGameplayActors</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Plugins\GASCompanion\Source\GASCompanion\Public\ModularGameplayActors\GSCModularGameMode.h">
+      <Filter>Plugins\GASCompanion\Source\GASCompanion\Public\ModularGameplayActors</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Plugins\GASCompanion\Source\GASCompanion\Public\ModularGameplayActors\GSCModularGameState.h">
+      <Filter>Plugins\GASCompanion\Source\GASCompanion\Public\ModularGameplayActors</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Plugins\GASCompanion\Source\GASCompanion\Public\ModularGameplayActors\GSCModularPawn.h">
+      <Filter>Plugins\GASCompanion\Source\GASCompanion\Public\ModularGameplayActors</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Plugins\GASCompanion\Source\GASCompanion\Public\ModularGameplayActors\GSCModularPlayerController.h">
+      <Filter>Plugins\GASCompanion\Source\GASCompanion\Public\ModularGameplayActors</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Plugins\GASCompanion\Source\GASCompanion\Public\ModularGameplayActors\GSCModularPlayerState.h">
+      <Filter>Plugins\GASCompanion\Source\GASCompanion\Public\ModularGameplayActors</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Plugins\GASCompanion\Source\GASCompanion\Public\ModularGameplayActors\GSCModularPlayerStateCharacter.h">
+      <Filter>Plugins\GASCompanion\Source\GASCompanion\Public\ModularGameplayActors</Filter>
+    </ClInclude>
+    <Filter Include="Plugins\GASCompanion\Source\GASCompanion\Public\Subsystems">
+      <UniqueIdentifier>{B3520BF2-B901-3F13-B33F-0A0D9E0CEF4F}</UniqueIdentifier>
+    </Filter>
+    <ClInclude Include="..\..\Plugins\GASCompanion\Source\GASCompanion\Public\Subsystems\GSCConsoleManagerSubsystem.h">
+      <Filter>Plugins\GASCompanion\Source\GASCompanion\Public\Subsystems</Filter>
+    </ClInclude>
+    <Filter Include="Plugins\GASCompanion\Source\GASCompanion\Public\Templates">
+      <UniqueIdentifier>{3625D1BA-F4CA-3C89-8594-648AB522C374}</UniqueIdentifier>
+    </Filter>
+    <ClInclude Include="..\..\Plugins\GASCompanion\Source\GASCompanion\Public\Templates\GSCTemplate_GameplayEffectDefinition.h">
+      <Filter>Plugins\GASCompanion\Source\GASCompanion\Public\Templates</Filter>
+    </ClInclude>
+    <Filter Include="Plugins\GASCompanion\Source\GASCompanion\Public\UI">
+      <UniqueIdentifier>{7D74B482-FDCB-3247-A1F8-0472C2C8A543}</UniqueIdentifier>
+    </Filter>
+    <ClInclude Include="..\..\Plugins\GASCompanion\Source\GASCompanion\Public\UI\GSCUserWidget.h">
+      <Filter>Plugins\GASCompanion\Source\GASCompanion\Public\UI</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Plugins\GASCompanion\Source\GASCompanion\Public\UI\GSCUWDebugAbilityQueue.h">
+      <Filter>Plugins\GASCompanion\Source\GASCompanion\Public\UI</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Plugins\GASCompanion\Source\GASCompanion\Public\UI\GSCUWDebugComboWidget.h">
+      <Filter>Plugins\GASCompanion\Source\GASCompanion\Public\UI</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Plugins\GASCompanion\Source\GASCompanion\Public\UI\GSCUWHud.h">
+      <Filter>Plugins\GASCompanion\Source\GASCompanion\Public\UI</Filter>
+    </ClInclude>
     <Filter Include="Plugins\IconCreator\Source">
       <UniqueIdentifier>{218B9AC6-97A8-3223-BBE2-E98B29AE5A85}</UniqueIdentifier>
     </Filter>
@@ -74,15 +743,6 @@
     <ClInclude Include="..\..\Plugins\IconCreator\Source\IconCreator\Public\IconCreator.h">
       <Filter>Plugins\IconCreator\Source\IconCreator\Public</Filter>
     </ClInclude>
-    <None Include="..\..\Plugins\IconCreator\IconCreator.uplugin">
-      <Filter>Plugins\IconCreator</Filter>
-    </None>
-    <Filter Include="Plugins\IconCreator\Resources">
-      <UniqueIdentifier>{9489CC6A-F554-316D-AA93-65FD45B760A6}</UniqueIdentifier>
-    </Filter>
-    <None Include="..\..\Plugins\IconCreator\Resources\Icon128.png">
-      <Filter>Plugins\IconCreator\Resources</Filter>
-    </None>
     <Filter Include="Source\RPGSystem">
       <UniqueIdentifier>{364D9E12-5BE4-34C9-8BE3-605AD439EFF5}</UniqueIdentifier>
     </Filter>

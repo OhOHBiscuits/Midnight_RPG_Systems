@@ -93,3 +93,16 @@ int32 UProgressionBlueprintLibrary::ApplySkillXP_Bundle(AActor* Instigator,
 	}
 	return Applied;
 }
+
+void UProgressionBlueprintLibrary::InitSkillXPToNext(UAbilitySystemComponent* ASC, const USkillProgressionData* Skill)
+{
+	if (!ASC || !Skill) return;
+
+	const int32 Level = FMath::FloorToInt(ASC->GetNumericAttribute(Skill->LevelAttribute));
+	const float Threshold = Skill->ComputeXPToNext(Level);
+
+	if (Skill->XPToNextAttribute.IsValid())
+	{
+		ASC->SetNumericAttributeBase(Skill->XPToNextAttribute, Threshold);
+	}
+}

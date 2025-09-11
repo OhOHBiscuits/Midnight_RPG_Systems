@@ -1,31 +1,12 @@
-// ExecCalc_AddSkillXP.h
+// Copyright ...
 #pragma once
 
 #include "CoreMinimal.h"
 #include "GameplayEffectExecutionCalculation.h"
-#include "GameplayTagContainer.h"
 #include "ExecCalc_AddSkillXP.generated.h"
 
-/** Which SetByCaller tags this calc reads. */
-USTRUCT(BlueprintType)
-struct FAddSkillXPCalcConfig
-{
-	GENERATED_BODY()
+class USkillProgressionData;
 
-	/** SetByCaller: how much XP to add (float). Default tag: Data.XPDelta */
-	UPROPERTY(EditDefaultsOnly, Category="SetByCaller")
-	FGameplayTag XPDeltaTag;
-
-	/** Which stat to add XP into (gameplay tag that identifies your XP stat). */
-	UPROPERTY(EditDefaultsOnly, Category="SetByCaller")
-	FGameplayTag SkillStatTag;
-
-	FAddSkillXPCalcConfig()
-	{
-		XPDeltaTag   = FGameplayTag::RequestGameplayTag(FName(TEXT("Data.XPDelta")), /*ErrorIfNotFound*/false);
-		SkillStatTag = FGameplayTag(); // set on the calculation asset
-	}
-};
 
 UCLASS()
 class RPGSYSTEM_API UExecCalc_AddSkillXP : public UGameplayEffectExecutionCalculation
@@ -35,10 +16,9 @@ class RPGSYSTEM_API UExecCalc_AddSkillXP : public UGameplayEffectExecutionCalcul
 public:
 	UExecCalc_AddSkillXP();
 
-	UPROPERTY(EditDefaultsOnly, Category="Config")
-	FAddSkillXPCalcConfig SBC;
+	virtual void Execute_Implementation(const FGameplayEffectCustomExecutionParameters& ExecutionParams,
+										FGameplayEffectCustomExecutionOutput& OutExecutionOutput) const override;
 
-	virtual void Execute_Implementation(
-		const FGameplayEffectCustomExecutionParameters& ExecutionParams,
-		FGameplayEffectCustomExecutionOutput& OutExecutionOutput) const override;
+private:
+	static float GetNumeric(const UAbilitySystemComponent* ASC, const FGameplayAttribute& Attr);
 };

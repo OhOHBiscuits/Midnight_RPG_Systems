@@ -129,8 +129,9 @@ public:
 	void RebuildCaches();
 
 	/** Re/initializes from InitialStatSets. bClearExisting: wipe before apply. */
-	UFUNCTION(BlueprintCallable, Category="Stats")
-	void InitializeFromStatSets(bool bClearExisting = true);
+	UFUNCTION(BlueprintCallable, Category="Stats|Setup")
+	void InitializeFromStatSets(bool bClearExisting);
+
 
 	// ---- IStatProviderInterface (BlueprintNativeEvent) ----
 	virtual float GetStat_Implementation(FGameplayTag Tag, float DefaultValue) const override;
@@ -146,6 +147,18 @@ public:
 	UPROPERTY(BlueprintAssignable) FOnSkillChanged  OnSkillChanged;
 
 protected:
+	/** If true (default), the component will automatically call InitializeFromStatSets() at BeginPlay when it has valid StatSets. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Stats|Setup")
+	bool bAutoInitializeFromSets = true;
+
+	/** If Auto Initialize is enabled, pass this flag to InitializeFromStatSets(). */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Stats|Setup", meta=(EditCondition="bAutoInitializeFromSets"))
+	bool bClearExistingOnAutoInit = true;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Stats|Setup")
+	TArray<TObjectPtr<UStatSetDataAsset>> StatSets;
+	
+	virtual void BeginPlay() override;
 	// ---- Replicated data ----
 	UPROPERTY(Replicated) FRPGScalarList ScalarStats;
 	UPROPERTY(Replicated) FRPGVitalList  Vitals;

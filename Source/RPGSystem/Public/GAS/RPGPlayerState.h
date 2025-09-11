@@ -6,8 +6,12 @@
 #include "RPGPlayerState.generated.h"
 
 class URPGAbilitySystemComponent;
+class URPGStatComponent;
 
-/** PlayerState that owns the ASC (recommended GAS pattern) */
+/**
+ * PlayerState that owns the RPG ASC (and optionally our Stat component).
+ * Keeps things Blueprint-friendly for quick iteration.
+ */
 UCLASS()
 class RPGSYSTEM_API ARPGPlayerState : public APlayerState, public IAbilitySystemInterface
 {
@@ -16,15 +20,23 @@ class RPGSYSTEM_API ARPGPlayerState : public APlayerState, public IAbilitySystem
 public:
 	ARPGPlayerState(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get());
 
-	// IAbilitySystemInterface
+	/** IAbilitySystemInterface */
 	virtual UAbilitySystemComponent* GetAbilitySystemComponent() const override;
 
-	/** Direct typed access in C++/BP */
+	/** Direct typed accessor for convenience in C++/BP */
 	UFUNCTION(BlueprintPure, Category="RPG|ASC")
 	URPGAbilitySystemComponent* GetRPGASC() const { return AbilitySystem; }
 
+	/** Optional: expose stats provider if you’re attaching it here */
+	UFUNCTION(BlueprintPure, Category="RPG|Stats")
+	URPGStatComponent* GetStatComponent() const { return StatComponent; }
+
 protected:
-	/** The authoritative ASC for this player */
+	/** Our ASC lives on PlayerState so it’s always around for possessed/unpossessed swaps */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="RPG|ASC")
-	URPGAbilitySystemComponent* AbilitySystem;
+	TObjectPtr<URPGAbilitySystemComponent> AbilitySystem;
+
+	/** Optional: if you want the stat component on PS (can also live on Pawn/Controller) */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="RPG|Stats")
+	TObjectPtr<URPGStatComponent> StatComponent;
 };

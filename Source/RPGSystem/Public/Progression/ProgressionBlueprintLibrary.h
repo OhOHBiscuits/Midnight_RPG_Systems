@@ -33,6 +33,9 @@ public:
 									 TSubclassOf<UGameplayEffect> AddXPEffectClass,
 									 UXPGrantBundle* Bundle);
 
+	UFUNCTION(BlueprintCallable, Category="Skill|Progression")
+	static void InitSkillXPToNext(UAbilitySystemComponent* ASC, const USkillProgressionData* Skill);
+
 private:
 	/** Resolves the ASC from Actor / PlayerState / Pawn / Controller. */
 	static UAbilitySystemComponent* ResolveASCFromActor(AActor* Actor);

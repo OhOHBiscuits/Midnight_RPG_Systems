@@ -6,7 +6,10 @@
 
 class URPGAbilitySystemComponent;
 
-/** Minimal Character base with a helper to fetch the ASC from PlayerState */
+/**
+ * Minimal Character base that pulls the ASC from the PlayerState and initializes it.
+ * Works whether PS is spawned first (server) or replicated later (client).
+ */
 UCLASS()
 class RPGSYSTEM_API ARPGCharacterBase : public ACharacter
 {
@@ -20,8 +23,10 @@ public:
 	URPGAbilitySystemComponent* GetRPGASC() const;
 
 protected:
-	// Client re-bind when PS finishes replicating
+	// Server: when we are possessed
 	virtual void PossessedBy(AController* NewController) override;
+
+	// Client: when PlayerState replicates
 	virtual void OnRep_PlayerState() override;
 
 private:

@@ -1,29 +1,42 @@
-﻿#pragma once
+﻿#include "GAS/RPGCharacterBase.h" // MUST be first include for IWYU
 
-#include "CoreMinimal.h"
-#include "GameFramework/Character.h"
-#include "RPGCharacterBase.generated.h"
+#include "GAS/RPGPlayerState.h"
+#include "GAS/RPGAbilitySystemComponent.h"
+#include "GameFramework/Controller.h"
 
-class URPGAbilitySystemComponent;
-
-/** Minimal Character base with a helper to fetch the ASC from PlayerState */
-UCLASS()
-class RPGSYSTEM_API ARPGCharacterBase : public ACharacter
+ARPGCharacterBase::ARPGCharacterBase(const FObjectInitializer& ObjectInitializer)
+	: Super(ObjectInitializer)
 {
-	GENERATED_BODY()
+}
 
-public:
-	ARPGCharacterBase(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get());
+URPGAbilitySystemComponent* ARPGCharacterBase::GetRPGASC() const
+{
+	if (const ARPGPlayerState* PS = Cast<ARPGPlayerState>(GetPlayerState()))
+	{
+		return PS->GetRPGASC();
+	}
+	return nullptr;
+}
 
-	/** Get the owner's RPG ASC (assumes it lives on PlayerState) */
-	UFUNCTION(BlueprintPure, Category="RPG|ASC")
-	URPGAbilitySystemComponent* GetRPGASC() const;
+void ARPGCharacterBase::PossessedBy(AController* NewController)
+{
+	Super::PossessedBy(NewController);
+	EnsureASCInitialized(); // server
+}
 
-protected:
-	// Client re-bind when PS finishes replicating
-	virtual void PossessedBy(AController* NewController) override;
-	virtual void OnRep_PlayerState() override;
+void ARPGCharacterBase::OnRep_PlayerState()
+{
+	Super::OnRep_PlayerState();
+	EnsureASCInitialized(); // client
+}
 
-private:
-	void EnsureASCInitialized();
-};
+void ARPGCharacterBase::EnsureASCInitialized()
+{
+	if (ARPGPlayerState* PS = Cast<ARPGPlayerState>(GetPlayerState()))
+	{
+		if (URPGAbilitySystemComponent* ASC = PS->GetRPGASC())
+		{
+			ASC->InitializeForActor(PS, this);
+		}
+	}
+}

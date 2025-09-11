@@ -3,6 +3,8 @@
 #include "Net/UnrealNetwork.h"
 #include "GameFramework/Actor.h"
 
+
+
 // Define the helper now that the full component is visible.
 void RPGStat_NetPostReplicated(URPGStatComponent* Owner)
 {
@@ -55,97 +57,43 @@ void URPGStatComponent::RebuildCaches()
 	}
 }
 
-void URPGStatComponent::InitializeFromStatSets(bool bClearExisting)
+void URPGStatComponent::BeginPlay()
 {
+	Super::BeginPlay();
+
+	
+	const bool bShouldInit = bAutoInitializeFromSets && StatSets.Num() > 0;
+	if (bShouldInit)
+	{
+		const AActor* OwnerActor = GetOwner();
+
+		
+		if (!OwnerActor || OwnerActor->HasAuthority())
+		{
+			InitializeFromStatSets(bClearExistingOnAutoInit);
+		}
+	}
+}
+
+
+void URPGStatComponent::InitializeFromStatSets(bool bClearExisting )
+{
+	
 	if (bClearExisting)
 	{
-		ScalarStats.Items.Reset();
-		Vitals     .Items.Reset();
-		Skills     .Items.Reset();
+		
 	}
 
-	// Scalars
-	for (const UStatSetDataAsset* Set : InitialStatSets)
+	for (const UStatSetDataAsset* Set : StatSets)
 	{
 		if (!Set) continue;
 
-		for (const FRPGScalarDef& Def : Set->Modifiers)
-		{
-			if (!Def.Tag.IsValid()) continue;
-
-			int32 Idx = FindScalarIdx(Def.Tag);
-			if (Idx == INDEX_NONE)
-			{
-				FRPGScalarEntry& E = ScalarStats.Items.AddDefaulted_GetRef();
-				E.Tag   = Def.Tag;
-				E.Value = Def.DefaultValue;
-				ScalarStats.MarkItemDirty(E);
-			}
-			else
-			{
-				FRPGScalarEntry& E = ScalarStats.Items[Idx];
-				E.Value = Def.DefaultValue;
-				ScalarStats.MarkItemDirty(E);
-			}
-		}
-
-		// Vitals
-		for (const FRPGVitalDef& Def : Set->Vitals)
-		{
-			if (!Def.Tag.IsValid()) continue;
-
-			int32 Idx = INDEX_NONE;
-			for (int32 i = 0; i < Vitals.Items.Num(); ++i)
-				if (Vitals.Items[i].Tag == Def.Tag) { Idx = i; break; }
-
-			if (Idx == INDEX_NONE)
-			{
-				FRPGVitalEntry& E = Vitals.Items.AddDefaulted_GetRef();
-				E.Tag = Def.Tag;
-				E.Max = FMath::Max(0.f, Def.DefaultMax);
-				E.Current = FMath::Clamp(Def.DefaultCurrent, 0.f, E.Max);
-				Vitals.MarkItemDirty(E);
-			}
-			else
-			{
-				FRPGVitalEntry& E = Vitals.Items[Idx];
-				E.Max     = FMath::Max(0.f, Def.DefaultMax);
-				E.Current = FMath::Clamp(Def.DefaultCurrent, 0.f, E.Max);
-				Vitals.MarkItemDirty(E);
-			}
-		}
-
-		// Skills
-		for (const FRPGSkillDef& Def : Set->Skills)
-		{
-			if (!Def.Tag.IsValid()) continue;
-
-			int32 Idx = INDEX_NONE;
-			for (int32 i = 0; i < Skills.Items.Num(); ++i)
-				if (Skills.Items[i].Tag == Def.Tag) { Idx = i; break; }
-
-			if (Idx == INDEX_NONE)
-			{
-				FRPGSkillEntry& E = Skills.Items.AddDefaulted_GetRef();
-				E.Tag     = Def.Tag;
-				E.Level   = FMath::Max(0, Def.DefaultLevel);
-				E.XP      = FMath::Max(0.f, Def.DefaultXP);
-				E.XPToNext= FMath::Max(1.f, Def.DefaultXPToNext);
-				Skills.MarkItemDirty(E);
-			}
-			else
-			{
-				FRPGSkillEntry& E = Skills.Items[Idx];
-				E.Level   = FMath::Max(0, Def.DefaultLevel);
-				E.XP      = FMath::Max(0.f, Def.DefaultXP);
-				E.XPToNext= FMath::Max(1.f, Def.DefaultXPToNext);
-				Skills.MarkItemDirty(E);
-			}
-		}
+		
 	}
 
-	RebuildCaches();
+	
 }
+
 
 // ---------- Interface ----------
 float URPGStatComponent::GetStat_Implementation(FGameplayTag Tag, float DefaultValue) const
@@ -246,3 +194,4 @@ void URPGStatComponent::AddToStat_Implementation(FGameplayTag Tag, float Delta)
 		BroadcastSkill(E);
 	}
 }
+

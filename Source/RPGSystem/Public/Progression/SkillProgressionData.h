@@ -1,58 +1,54 @@
-﻿// Source/RPGSystem/Public/Progression/SkillProgressionData.h
+﻿// Copyright ...
 #pragma once
 
 #include "CoreMinimal.h"
 #include "Engine/DataAsset.h"
 #include "GameplayTagContainer.h"
-// (Optional GAS bits you already had)
 #include "GameplayEffectTypes.h"
+#include "Curves/CurveFloat.h"
 #include "SkillProgressionData.generated.h"
 
-/**
- * Data-driven skill definition that can plug into either your Stat System
- * (via GameplayTags) or, later, GAS (via GameplayAttributes).
- *
- * For maximum moddability, the bridge in this drop reads/writes using the Tag fields.
- */
 UCLASS(BlueprintType)
 class RPGSYSTEM_API USkillProgressionData : public UDataAsset
 {
 	GENERATED_BODY()
 
 public:
-	/** Optional label or “group” tag (e.g., Skill.Crafting) */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="1_Progression|Skill")
-	FGameplayTag SkillTag;
-
-	/** Stat System mapping (used by the bridge below) */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="1_Progression|StatTags")
-	FGameplayTag LevelTag;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="1_Progression|StatTags")
-	FGameplayTag XPTag;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="1_Progression|StatTags")
-	FGameplayTag XPToNextTag;
-
-	/** Base XP needed for the *next* level (simple linear model: Next = BaseIncrementPerLevel * NewLevel) */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="1_Progression|Rules")
-	float BaseIncrementPerLevel = 1000.f;
-
-	/** If true, leftover XP carries to the next level-up; otherwise XP resets to 0 on level up */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="1_Progression|Rules")
-	bool bCarryRemainder = false;
-
-	/** Friendly name for UI (optional) */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="1_Progression|UI")
-	FText DisplayName;
-
-	// ---------------- Optional: keep your original GAS fields for future use ----------------
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="(Optional) GAS")
-	FGameplayAttribute XPAttribute;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="(Optional) GAS")
+	/** Attribute that stores the current Skill Level (integer stored as float). */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Skill|Attributes")
 	FGameplayAttribute LevelAttribute;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="(Optional) GAS")
+	/** Attribute that stores the current Skill XP accumulated towards next level. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Skill|Attributes")
+	FGameplayAttribute XPAttribute;
+
+	/** Attribute that stores the current XP threshold to reach the next level. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Skill|Attributes")
 	FGameplayAttribute XPToNextAttribute;
+
+	/** Curve mapping Level -> XP needed to reach next Level (X = Level, Y = required XP). */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Skill|Progression")
+	TObjectPtr<UCurveFloat> XPThresholdCurve = nullptr;
+
+	/** SetByCaller tag used by the granting GameplayEffect to pass the XP delta (default: Data.XPDelta). */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Skill|Granting")
+	FGameplayTag XPDeltaSetByCallerTag;
+
+	/** Optional floor/ceiling for levels (inclusive). LevelUp logic clamps to this range. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Skill|Progression", meta=(ClampMin="0", UIMin="0"))
+	int32 MinLevel = 0;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Skill|Progression", meta=(ClampMin="0", UIMin="0"))
+	int32 MaxLevel = 100;
+
+public:
+	USkillProgressionData();
+
+	/** Returns the XP required to go from Level -> Level+1. */
+	UFUNCTION(BlueprintCallable, Category="Skill|Progression")
+	float GetThresholdForLevel(int32 Level) const;
+
+	/** Convenience: (re)initialize XPToNext for a given level from the curve; if curve missing returns 0. */
+	UFUNCTION(BlueprintCallable, Category="Skill|Progression")
+	float ComputeXPToNext(int32 Level) const;
 };
