@@ -1,28 +1,68 @@
 ﻿#include "Inventory/ItemDataAsset.h"
-#include "Engine/StreamableManager.h"
-#include "Engine/AssetManager.h"
 
-// Optional async example kept (safe in PIE; in cooked prefer the sync helpers above)
-void LoadMeshAsync(UItemDataAsset* ItemData, TFunction<void(UStaticMesh*)> OnLoaded)
+static const FItemAction GNullItemAction; // fallback
+
+const FItemAction* UItemDataAsset::FindAction(const FGameplayTag& ActionTag) const
 {
-	if (!ItemData || (!ItemData->WorldMesh.IsValid() && !ItemData->WorldMesh.ToSoftObjectPath().IsValid()))
+	if (!ActionTag.IsValid()) return nullptr;
+
+	for (const FItemAction& A : ActionDefinitions)
 	{
-		OnLoaded(nullptr);
-		return;
+		if (A.ActionTag == ActionTag)
+		{
+			return &A;
+		}
 	}
+	return nullptr;
+}
 
-	FStreamableManager& Streamable = UAssetManager::GetStreamableManager();
-	const FSoftObjectPath& MeshPath = ItemData->WorldMesh.ToSoftObjectPath();
+bool UItemDataAsset::HasAction(const FGameplayTag& ActionTag) const
+{
+	if (FindAction(ActionTag)) return true;
 
-	if (ItemData->WorldMesh.IsValid())
+	// Legacy compatibility: AllowedActions still counts as “has action”
+	for (const FGameplayTag& T : AllowedActions)
 	{
-		OnLoaded(ItemData->WorldMesh.Get());
-		return;
+		if (T == ActionTag) return true;
 	}
+	return false;
+}
 
-	Streamable.RequestAsyncLoad(MeshPath, [ItemData, OnLoaded]()
+const FItemAction& UItemDataAsset::GetActionOrDefault(const FGameplayTag& ActionTag, bool& bFound) const
+{
+	if (const FItemAction* A = FindAction(ActionTag))
 	{
-		UStaticMesh* Mesh = ItemData->WorldMesh.Get();
-		OnLoaded(Mesh);
-	});
+		bFound = true;
+		return *A;
+	}
+	bFound = false;
+	return GNullItemAction;
+}
+
+void UItemDataAsset::GetActionTags(TArray<FGameplayTag>& OutTags) const
+{
+	OutTags.Reset();
+
+	// Prefer rich definitions if present
+	if (ActionDefinitions.Num() > 0)
+	{
+		for (const FItemAction& A : ActionDefinitions)
+		{
+			if (A.ActionTag.IsValid())
+			{
+				OutTags.Add(A.ActionTag);
+			}
+		}
+	}
+	else
+	{
+		// Legacy path
+		for (const FGameplayTag& T : AllowedActions)
+		{
+			if (T.IsValid())
+			{
+				OutTags.Add(T);
+			}
+		}
+	}
 }

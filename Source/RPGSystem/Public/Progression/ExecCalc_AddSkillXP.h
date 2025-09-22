@@ -1,24 +1,25 @@
-// Copyright ...
 #pragma once
 
 #include "CoreMinimal.h"
-#include "GameplayEffectExecutionCalculation.h"
+#include "GameplayModMagnitudeCalculation.h"
 #include "ExecCalc_AddSkillXP.generated.h"
 
-class USkillProgressionData;
-
-
+/**
+ * Returns the amount of XP to add as a magnitude, pulled from a SetByCaller tag.
+ * Use this inside a GameplayEffect modifier (e.g., Add to Attribute: Skills.XP)
+ */
 UCLASS()
-class RPGSYSTEM_API UExecCalc_AddSkillXP : public UGameplayEffectExecutionCalculation
+class RPGSYSTEM_API UExecCalc_AddSkillXP : public UGameplayModMagnitudeCalculation
 {
 	GENERATED_BODY()
 
 public:
 	UExecCalc_AddSkillXP();
 
-	virtual void Execute_Implementation(const FGameplayEffectCustomExecutionParameters& ExecutionParams,
-										FGameplayEffectCustomExecutionOutput& OutExecutionOutput) const override;
+	/** Which SetByCaller tag to read from the effect spec. Default: Data.XP */
+	UPROPERTY(EditDefaultsOnly, Category="XP")
+	FGameplayTag XPSetByCallerTag;
 
-private:
-	static float GetNumeric(const UAbilitySystemComponent* ASC, const FGameplayAttribute& Attr);
+protected:
+	virtual float CalculateBaseMagnitude_Implementation(const FGameplayEffectSpec& Spec) const override;
 };

@@ -1,13 +1,19 @@
 ﻿#pragma once
 
 #include "CoreMinimal.h"
-#include "Engine/Texture2D.h"
-#include "Engine/StaticMesh.h"
 #include "Engine/DataAsset.h"
 #include "GameplayTagContainer.h"
 #include "ItemDataAsset.generated.h"
 
-/** Optional byproduct definition for fuels (kept from your current system) */
+// Forward decls
+class AActor;
+class UStaticMesh;
+class UTexture2D;
+class UAnimMontage;
+class UUserWidget;
+class UGameplayEffect;
+
+/** Optional byproduct definition for fuels (kept from your version) */
 USTRUCT(BlueprintType)
 struct FFuelByproduct
 {
@@ -20,47 +26,73 @@ struct FFuelByproduct
 	int32 Amount = 1;
 };
 
-/** Crafting: a station (and optional tier) that can craft this item */
 USTRUCT(BlueprintType)
 struct FCraftingStationRequirement
 {
 	GENERATED_BODY()
 
-	/** e.g. Station.Forge, Station.Workbench, Station.Fabricator */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Crafting")
 	FGameplayTag StationTag;
 
-	/** Optional: require a minimum station tier/quality */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Crafting", meta=(ClampMin="0"))
 	int32 MinStationTier = 0;
 };
 
-/** Crafting: skill gate (works nicely with GAS Companion attributes/sets) */
 USTRUCT(BlueprintType)
 struct FSkillRequirement
 {
 	GENERATED_BODY()
 
-	/** e.g. Skill.Blacksmithing, Skill.Carpentry */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Crafting")
 	FGameplayTag SkillTag;
 
-	/** Minimum level in that skill to craft */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Crafting", meta=(ClampMin="0"))
 	int32 MinLevel = 0;
 };
 
-/** Optional unlocks granted to the crafter on first craft (tags make this GAS-friendly) */
 USTRUCT(BlueprintType)
 struct FCraftingUnlock
 {
 	GENERATED_BODY()
 
-	/** e.g. Recipe.Sword.Fine, Schematic.Armor.Plates.Iron, Emote.CraftsmanPose */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Crafting")
 	FGameplayTag UnlockTag;
 };
 
+/** NEW: richer UI/logic action definition (replaces bare AllowedActions) */
+USTRUCT(BlueprintType)
+struct FItemAction
+{
+	GENERATED_BODY()
+
+	/** Tag you’ll key from code, e.g. Action.Use, Action.Equip */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Action")
+	FGameplayTag ActionTag;
+
+	/** Player-facing button name (“Eat”, “Equip”, …) */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Action")
+	FText DisplayName;
+
+	/** Optional montage to play for UX */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Action")
+	TSoftObjectPtr<UAnimMontage> Montage;
+
+	/** If true, you intend to apply effects directly when this action triggers */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Action")
+	bool bApplyEffectsDirectly = false;
+
+	/** Your own tag→effect mapping */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Action", meta=(EditCondition="bApplyEffectsDirectly"))
+	TArray<FGameplayTag> EffectTags;
+
+	/** Optional GAS effects (soft class). Only add GameplayAbilities module if you actually use these. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Action", meta=(EditCondition="bApplyEffectsDirectly"))
+	TArray<TSoftClassPtr<UGameplayEffect>> GameplayEffects;
+};
+
+/**
+ * Base item data (parent of everything).
+ */
 UCLASS(BlueprintType)
 class RPGSYSTEM_API UItemDataAsset : public UDataAsset
 {
@@ -102,19 +134,15 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Decay")
 	bool bCanDecay = false;
 
-	/** (legacy scalar retained) */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Decay", meta=(EditCondition="bCanDecay"))
 	float DecayRate = 0.f;
 
-	/** Inventory item result after decay (optional) */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Decay", meta=(EditCondition="bCanDecay"))
 	TSoftObjectPtr<UItemDataAsset> DecaysInto;
 
-	/** World actor class to spawn after decay (compat with PickupItemActor) */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Decay", meta=(EditCondition="bCanDecay"))
 	TSoftClassPtr<AActor> DecaysIntoActorClass;
 
-	/** Explicit decay duration parts */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Decay", meta=(EditCondition="bCanDecay", ClampMin="0.0"))
 	float DecayDays = 0.0f;
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Decay", meta=(EditCondition="bCanDecay", ClampMin="0.0"))
@@ -154,7 +182,7 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="World")
 	TSoftObjectPtr<UStaticMesh> WorldMesh;
 
-	// --- Tags ---
+	// --- Tags (legacy) ---
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Tags")
 	FGameplayTag ItemType;
 
@@ -168,10 +196,15 @@ public:
 	FGameplayTag Rarity;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Tags")
+	TArray<FGameplayTag> AdditionalTags;
+
+	/** Legacy, kept for compatibility */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Tags")
 	TArray<FGameplayTag> AllowedActions;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Tags")
-	TArray<FGameplayTag> AdditionalTags;
+	// --- NEW: Rich action definitions ---
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Actions")
+	TArray<FItemAction> ActionDefinitions;
 
 	// --- Misc ---
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="ItemData")
@@ -193,83 +226,82 @@ public:
 		return BurnDays * 86400.0f + BurnHours * 3600.0f + BurnMinutes * 60.0f + BurnSeconds;
 	}
 
-	// --- Crafting (New) ---
-	/** Can this item be crafted at all (via any station/recipe)? */
+	// --- Crafting (kept) ---
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Crafting")
 	bool bCraftable = false;
 
-	/** Primary crafting area/skill (e.g. Skill.Blacksmithing). Used for XP + gating. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Crafting", meta=(EditCondition="bCraftable"))
 	FGameplayTag PrimaryCraftSkillTag;
 
-	/** Optional: how hard this is to craft. Use to scale XP and/or failure chances. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Crafting", meta=(EditCondition="bCraftable", ClampMin="0.0"))
 	float CraftDifficulty = 1.0f;
 
-	/** Base time to craft (seconds), tweaked by station efficiency, perks, etc. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Crafting", meta=(EditCondition="bCraftable", ClampMin="0.0"))
 	float CraftTimeSeconds = 3.0f;
 
-	/** Minimum skill level(s) required to craft this item. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Crafting", meta=(EditCondition="bCraftable"))
 	TArray<FSkillRequirement> RequiredSkills;
 
-	/** Station(s) that can craft this item. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Crafting", meta=(EditCondition="bCraftable"))
 	TArray<FCraftingStationRequirement> RequiredStations;
 
-	/** Optional: recipe identifier(s) that produce this item (if you keep recipes as tags). */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Crafting", meta=(EditCondition="bCraftable"))
 	TArray<FGameplayTag> RecipeTags;
 
-	/** XP the crafter earns for a successful craft (before modifiers). */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Crafting", meta=(EditCondition="bCraftable", ClampMin="0"))
 	int32 BaseCraftXP = 10;
 
-	/** Optional unlocks granted upon first successful craft. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Crafting", meta=(EditCondition="bCraftable"))
 	TArray<FCraftingUnlock> FirstCraftUnlocks;
 
-	// --- Heirloom rules (New) ---
-	/** If true, this item may be crafted as a one-of-a-kind Heirloom. */
+	// --- Heirloom rules (kept) ---
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Heirloom")
 	bool bHeirloomEligible = false;
 
-	/** When crafted as heirloom, bind the instance to the crafter’s account/ID. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Heirloom", meta=(EditCondition="bHeirloomEligible"))
 	bool bBindOnCraft = true;
 
-	/** Heirloom instances cannot be traded between players. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Heirloom", meta=(EditCondition="bHeirloomEligible"))
 	bool bNonTradeableIfHeirloom = true;
 
-	/** Heirloom instances cannot be destroyed/dropped (soft-protect). */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Heirloom", meta=(EditCondition="bHeirloomEligible"))
 	bool bNonDestructibleIfHeirloom = true;
 
-	/** Require a unique custom name when crafting as heirloom. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Heirloom", meta=(EditCondition="bHeirloomEligible"))
 	bool bUniqueNameRequiredForHeirloom = true;
 
-	/** Optional prefix/suffix shown when naming heirlooms (UX sugar only). */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Heirloom", meta=(EditCondition="bHeirloomEligible"))
 	FText HeirloomNameHint;
 
-	// --- Crafting metadata for UI (kept from previous pass) ---
+	// --- Crafting metadata for UI (kept) ---
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="1_Inventory|Crafting")
 	bool bCraftingEnabled = false;
 
-	// --- Cook-safe sync helpers ---
+	// --- Cook-safe sync helpers (kept) ---
 	UFUNCTION(BlueprintCallable, Category="1_Inventory|ItemData")
 	UStaticMesh* GetWorldMeshSync() const { return WorldMesh.IsNull() ? nullptr : WorldMesh.LoadSynchronous(); }
 
 	UFUNCTION(BlueprintCallable, Category="1_Inventory|ItemData")
 	UTexture2D* GetIconSync() const { return Icon.IsNull() ? nullptr : Icon.LoadSynchronous(); }
 
-	// --- Helper queries ---
+	// --- Queries (kept) ---
 	UFUNCTION(BlueprintCallable, BlueprintPure, Category="Heirloom")
 	bool IsHeirloomEligible() const { return bHeirloomEligible; }
 
 	UFUNCTION(BlueprintCallable, BlueprintPure, Category="Crafting")
 	bool RequiresAnyStation() const { return bCraftable && RequiredStations.Num() > 0; }
+
+	// --- NEW: Actions API ---
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category="Actions")
+	bool HasAction(const FGameplayTag& ActionTag) const;
+
+	/** Returns found action or a static empty action; bFound says if it matched. */
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category="Actions")
+	const FItemAction& GetActionOrDefault(const FGameplayTag& ActionTag, bool& bFound) const;
+
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category="Actions")
+	void GetActionTags(TArray<FGameplayTag>& OutTags) const;
+
+protected:
+	const FItemAction* FindAction(const FGameplayTag& ActionTag) const;
 };

@@ -1,112 +1,157 @@
 // RPGAbilitySystemComponent.cpp
 
 #include "GAS/RPGAbilitySystemComponent.h"
-#include "Progression/StatProgressionBridge.h"
+#include "AbilitySystemGlobals.h"
+#include "GameplayEffect.h"
 #include "GameFramework/Actor.h"
 
 URPGAbilitySystemComponent::URPGAbilitySystemComponent(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)
 {
-	SetIsReplicatedByDefault(true);
 }
 
-void URPGAbilitySystemComponent::InitializeForActor(AActor* InOwnerActor, AActor* InAvatarActor)
+URPGAbilitySystemComponent* URPGAbilitySystemComponent::AddTo(AActor* Owner, FName ComponentName)
 {
-	if (!InOwnerActor)
-	{
-		UE_LOG(LogTemp, Warning, TEXT("InitializeForActor called with null Owner"));
-		return;
-	}
-	AActor* AvatarToUse = InAvatarActor ? InAvatarActor : InOwnerActor;
-	InitAbilityActorInfo(InOwnerActor, AvatarToUse);
-}
+	if (!Owner) return nullptr;
 
-URPGAbilitySystemComponent* URPGAbilitySystemComponent::AddTo(AActor* Target)
-{
-	if (!Target) return nullptr;
-
-	if (URPGAbilitySystemComponent* Existing = Target->FindComponentByClass<URPGAbilitySystemComponent>())
+	if (URPGAbilitySystemComponent* Existing = Owner->FindComponentByClass<URPGAbilitySystemComponent>())
 	{
 		return Existing;
 	}
 
-	URPGAbilitySystemComponent* NewASC =
-		NewObject<URPGAbilitySystemComponent>(Target, URPGAbilitySystemComponent::StaticClass(), TEXT("RPGAbilitySystemComponent"));
-	if (NewASC)
-	{
-		NewASC->RegisterComponent();
-		NewASC->OnComponentCreated();
-		NewASC->InitializeForActor(Target, Target);
-	}
-	return NewASC;
+	// Create a runtime component and register it
+	URPGAbilitySystemComponent* ASC = NewObject<URPGAbilitySystemComponent>(Owner, ComponentName);
+	if (!ASC) return nullptr;
+
+	ASC->SetIsReplicated(true);
+
+	// Make sure the Actor actually owns and registers the component properly
+	Owner->AddOwnedComponent(ASC);
+	ASC->OnComponentCreated();
+	ASC->RegisterComponent();
+
+	return ASC;
 }
 
-bool URPGAbilitySystemComponent::HasRPGASC(const AActor* Target)
+void URPGAbilitySystemComponent::InitializeForActor(AActor* InOwnerActor, AActor* InAvatarActor)
 {
-	return Target && Target->FindComponentByClass<URPGAbilitySystemComponent>() != nullptr;
+	// Safe no-ops if nulls
+	if (!InOwnerActor)
+	{
+		InOwnerActor = GetOwner();
+	}
+	if (!InAvatarActor)
+	{
+		InAvatarActor = InOwnerActor;
+	}
+
+	InitAbilityActorInfo(InOwnerActor, InAvatarActor);
 }
 
-////
-
-float URPGAbilitySystemComponent::GetStat(const FGameplayTag& Tag, float DefaultValue) const
+FGameplayEffectContextHandle URPGAbilitySystemComponent::MakeEffectContextWithSourceObject(UObject* InSourceObject)
 {
-	if (!Tag.IsValid()) return DefaultValue;
-
-	if (const AActor* Avatar = GetAvatarActor())
+	FGameplayEffectContextHandle Ctx = MakeEffectContext();
+	if (AActor* Owner = GetOwnerActor())
 	{
-		if (UObject* P = UStatProgressionBridge::FindStatProviderOn(Avatar))
-		{
-			return UStatProgressionBridge::GetStat(P, Tag, DefaultValue);
-		}
+		Ctx.AddInstigator(Owner, GetAvatarActor());
 	}
-	if (const AActor* Owner = GetOwnerActor())
+	if (InSourceObject)
 	{
-		if (UObject* P = UStatProgressionBridge::FindStatProviderOn(Owner))
-		{
-			return UStatProgressionBridge::GetStat(P, Tag, DefaultValue);
-		}
+		Ctx.AddSourceObject(InSourceObject);
 	}
-	return DefaultValue;
+	return Ctx;
 }
 
-void URPGAbilitySystemComponent::SetStat(const FGameplayTag& Tag, float NewValue) const
+FActiveGameplayEffectHandle URPGAbilitySystemComponent::ApplyGEWithSetByCallerToSelf(
+	TSubclassOf<UGameplayEffect> EffectClass,
+	FGameplayTag                 SetByCallerTag,
+	float                        Magnitude,
+	float                        EffectLevel,
+	UObject*                     SourceObject,
+	int32                        Stacks)
 {
-	if (!Tag.IsValid()) return;
+	if (!EffectClass)
+	{
+		return FActiveGameplayEffectHandle();
+	}
 
-	if (const AActor* Avatar = GetAvatarActor())
+	FGameplayEffectContextHandle Ctx = MakeEffectContextWithSourceObject(SourceObject);
+
+	FGameplayEffectSpecHandle SpecHandle = MakeOutgoingSpec(EffectClass, EffectLevel, Ctx);
+	if (!SpecHandle.IsValid())
 	{
-		if (UObject* P = UStatProgressionBridge::FindStatProviderOn(Avatar))
-		{
-			UStatProgressionBridge::SetStat(P, Tag, NewValue);
-			return;
-		}
+		return FActiveGameplayEffectHandle();
 	}
-	if (const AActor* Owner = GetOwnerActor())
+
+	if (SetByCallerTag.IsValid())
 	{
-		if (UObject* P = UStatProgressionBridge::FindStatProviderOn(Owner))
-		{
-			UStatProgressionBridge::SetStat(P, Tag, NewValue);
-		}
+		SpecHandle.Data->SetSetByCallerMagnitude(SetByCallerTag, Magnitude);
 	}
+	// Fix deprecation: use SetStackCount instead of direct member
+	SpecHandle.Data->SetStackCount(FMath::Max(1, Stacks));
+
+	return ApplyGameplayEffectSpecToSelf(*SpecHandle.Data.Get());
 }
 
-void URPGAbilitySystemComponent::AddToStat(const FGameplayTag& Tag, float Delta) const
+FActiveGameplayEffectHandle URPGAbilitySystemComponent::ApplyGEWithSetByCallerToTarget(
+	AActor*                      TargetActor,
+	TSubclassOf<UGameplayEffect> EffectClass,
+	FGameplayTag                 SetByCallerTag,
+	float                        Magnitude,
+	float                        EffectLevel,
+	UObject*                     SourceObject,
+	int32                        Stacks,
+	AActor*                      Instigator,
+	AActor*                      EffectCauser)
 {
-	if (!Tag.IsValid()) return;
+	if (!TargetActor || !EffectClass)
+	{
+		return FActiveGameplayEffectHandle();
+	}
 
-	if (const AActor* Avatar = GetAvatarActor())
+	UAbilitySystemComponent* TargetASC = UAbilitySystemGlobals::GetAbilitySystemComponentFromActor(TargetActor);
+	if (!TargetASC)
 	{
-		if (UObject* P = UStatProgressionBridge::FindStatProviderOn(Avatar))
+		return FActiveGameplayEffectHandle();
+	}
+
+	// Use an ASC to author the spec: prefer Instigator's ASC, else Target ASC
+	UAbilitySystemComponent* SourceASC = nullptr;
+	if (Instigator)
+	{
+		SourceASC = UAbilitySystemGlobals::GetAbilitySystemComponentFromActor(Instigator);
+	}
+	if (!SourceASC)
+	{
+		SourceASC = TargetASC;
+	}
+
+	FGameplayEffectContextHandle Ctx = SourceASC->MakeEffectContext();
+	{
+		AActor* FinalInstigator = Instigator ? Instigator : SourceASC->GetOwnerActor();
+		AActor* FinalCauser     = EffectCauser ? EffectCauser : SourceASC->GetAvatarActor();
+		if (FinalInstigator)
 		{
-			UStatProgressionBridge::AddToStat(P, Tag, Delta);
-			return;
+			Ctx.AddInstigator(FinalInstigator, FinalCauser);
+		}
+		if (SourceObject)
+		{
+			Ctx.AddSourceObject(SourceObject);
 		}
 	}
-	if (const AActor* Owner = GetOwnerActor())
+
+	FGameplayEffectSpecHandle SpecHandle = SourceASC->MakeOutgoingSpec(EffectClass, EffectLevel, Ctx);
+	if (!SpecHandle.IsValid())
 	{
-		if (UObject* P = UStatProgressionBridge::FindStatProviderOn(Owner))
-		{
-			UStatProgressionBridge::AddToStat(P, Tag, Delta);
-		}
+		return FActiveGameplayEffectHandle();
 	}
+
+	if (SetByCallerTag.IsValid())
+	{
+		SpecHandle.Data->SetSetByCallerMagnitude(SetByCallerTag, Magnitude);
+	}
+	// Fix deprecation: use SetStackCount instead of direct member
+	SpecHandle.Data->SetStackCount(FMath::Max(1, Stacks));
+
+	return SourceASC->ApplyGameplayEffectSpecToTarget(*SpecHandle.Data.Get(), TargetASC);
 }

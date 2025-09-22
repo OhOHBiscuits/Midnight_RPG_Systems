@@ -11,6 +11,7 @@
     <None Include="..\..\Source\RPGSystemEditor.Target.cs">
       <Filter>Source</Filter>
     </None>
+    <None Include="..\..\.dvignore" />
     <None Include="..\..\.vsconfig" />
     <None Include="..\..\OwnIcon_V2.png" />
     <None Include="..\..\WinsomeGirl.png" />
@@ -782,6 +783,21 @@
     <ClCompile Include="..\..\Source\RPGSystem\Private\Actors\WorkstationActor.cpp">
       <Filter>Source\RPGSystem\Private\Actors</Filter>
     </ClCompile>
+    <Filter Include="Source\RPGSystem\Private\Actors\Weapons">
+      <UniqueIdentifier>{D734C37A-350D-315B-9BB6-D3958BB74FE5}</UniqueIdentifier>
+    </Filter>
+    <ClCompile Include="..\..\Source\RPGSystem\Private\Actors\Weapons\BaseWeaponActor.cpp">
+      <Filter>Source\RPGSystem\Private\Actors\Weapons</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\RPGSystem\Private\Actors\Weapons\MeleeWeaponActor.cpp">
+      <Filter>Source\RPGSystem\Private\Actors\Weapons</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\RPGSystem\Private\Actors\Weapons\ModularRangedWeapon.cpp">
+      <Filter>Source\RPGSystem\Private\Actors\Weapons</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\RPGSystem\Private\Actors\Weapons\RangedWeaponActor.cpp">
+      <Filter>Source\RPGSystem\Private\Actors\Weapons</Filter>
+    </ClCompile>
     <Filter Include="Source\RPGSystem\Private\Crafting">
       <UniqueIdentifier>{88280348-A95D-3C3A-91B0-2BE194C75074}</UniqueIdentifier>
     </Filter>
@@ -830,6 +846,21 @@
     <ClCompile Include="..\..\Source\RPGSystem\Private\GAS\RPGPlayerState.cpp">
       <Filter>Source\RPGSystem\Private\GAS</Filter>
     </ClCompile>
+    <Filter Include="Source\RPGSystem\Private\InteractionSystem">
+      <UniqueIdentifier>{0E9AF6D1-26EE-3404-85C2-56734F9BEE6D}</UniqueIdentifier>
+    </Filter>
+    <ClCompile Include="..\..\Source\RPGSystem\Private\InteractionSystem\InteractionSystemComponent.cpp">
+      <Filter>Source\RPGSystem\Private\InteractionSystem</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\RPGSystem\Private\InteractionSystem\InteractionSystemStatics.cpp">
+      <Filter>Source\RPGSystem\Private\InteractionSystem</Filter>
+    </ClCompile>
+    <Filter Include="Source\RPGSystem\Private\InteractionSystem\Interface">
+      <UniqueIdentifier>{92E44D19-68FF-33DD-ADB0-DDE02D0AB482}</UniqueIdentifier>
+    </Filter>
+    <ClCompile Include="..\..\Source\RPGSystem\Private\InteractionSystem\Interface\InteractionSystemInterface.cpp">
+      <Filter>Source\RPGSystem\Private\InteractionSystem\Interface</Filter>
+    </ClCompile>
     <Filter Include="Source\RPGSystem\Private\Interfaces">
       <UniqueIdentifier>{73EE105A-F299-3251-AD90-7B624ADB7DDD}</UniqueIdentifier>
     </Filter>
@@ -854,6 +885,24 @@
     <ClCompile Include="..\..\Source\RPGSystem\Private\Inventory\ItemDataAsset.cpp">
       <Filter>Source\RPGSystem\Private\Inventory</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Source\RPGSystem\Private\Inventory\MeleeWeaponItemDataAsset.cpp">
+      <Filter>Source\RPGSystem\Private\Inventory</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\RPGSystem\Private\Inventory\RangedWeaponItemDataAsset.cpp">
+      <Filter>Source\RPGSystem\Private\Inventory</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\RPGSystem\Private\Inventory\WeaponItemDataAsset.cpp">
+      <Filter>Source\RPGSystem\Private\Inventory</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\RPGSystem\Private\Inventory\WeaponModItemDataAsset.cpp">
+      <Filter>Source\RPGSystem\Private\Inventory</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\RPGSystem\Private\Inventory\WeaponStatComputeLibrary.cpp">
+      <Filter>Source\RPGSystem\Private\Inventory</Filter>
+    </ClCompile>
+    <ClInclude Include="..\..\Source\RPGSystem\Private\Inventory\WeaponStatComputeLibrary.h">
+      <Filter>Source\RPGSystem\Private\Inventory</Filter>
+    </ClInclude>
     <ClCompile Include="..\..\Source\RPGSystem\Private\Inventory\WorkstationDataAsset.cpp">
       <Filter>Source\RPGSystem\Private\Inventory</Filter>
     </ClCompile>
@@ -911,6 +960,18 @@
     <ClCompile Include="..\..\Source\RPGSystem\Private\Stats\StatSetDataAsset.cpp">
       <Filter>Source\RPGSystem\Private\Stats</Filter>
     </ClCompile>
+    <Filter Include="Source\RPGSystem\Private\WeaponSystem">
+      <UniqueIdentifier>{33677E03-DDFE-324F-991D-DA6C866DCD9D}</UniqueIdentifier>
+    </Filter>
+    <ClCompile Include="..\..\Source\RPGSystem\Private\WeaponSystem\WeaponAmmoComponent.cpp">
+      <Filter>Source\RPGSystem\Private\WeaponSystem</Filter>
+    </ClCompile>
+    <Filter Include="Source\RPGSystem\Private\WeaponSystem\Interface">
+      <UniqueIdentifier>{BF16DA40-7E98-36E1-8B1D-8DF7AA2DC6BA}</UniqueIdentifier>
+    </Filter>
+    <ClCompile Include="..\..\Source\RPGSystem\Private\WeaponSystem\Interface\WeaponHostInterface.cpp">
+      <Filter>Source\RPGSystem\Private\WeaponSystem\Interface</Filter>
+    </ClCompile>
     <Filter Include="Source\RPGSystem\Public">
       <UniqueIdentifier>{72AFB710-0C59-3767-A861-A9A44630F591}</UniqueIdentifier>
     </Filter>
@@ -937,6 +998,21 @@
     </ClInclude>
     <ClInclude Include="..\..\Source\RPGSystem\Public\Actors\WorkstationActor.h">
       <Filter>Source\RPGSystem\Public\Actors</Filter>
+    </ClInclude>
+    <Filter Include="Source\RPGSystem\Public\Actors\Weapons">
+      <UniqueIdentifier>{BCC47156-CDBB-31EE-A419-0089E2242026}</UniqueIdentifier>
+    </Filter>
+    <ClInclude Include="..\..\Source\RPGSystem\Public\Actors\Weapons\BaseWeaponActor.h">
+      <Filter>Source\RPGSystem\Public\Actors\Weapons</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\RPGSystem\Public\Actors\Weapons\MeleeWeaponActor.h">
+      <Filter>Source\RPGSystem\Public\Actors\Weapons</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\RPGSystem\Public\Actors\Weapons\ModularRangedWeapon.h">
+      <Filter>Source\RPGSystem\Public\Actors\Weapons</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\RPGSystem\Public\Actors\Weapons\RangedWeaponActor.h">
+      <Filter>Source\RPGSystem\Public\Actors\Weapons</Filter>
     </ClInclude>
     <Filter Include="Source\RPGSystem\Public\Crafting">
       <UniqueIdentifier>{EC3C9335-1DFE-36F9-8F7A-C24653692B3D}</UniqueIdentifier>
@@ -989,6 +1065,21 @@
     <ClInclude Include="..\..\Source\RPGSystem\Public\GAS\RPGPlayerState.h">
       <Filter>Source\RPGSystem\Public\GAS</Filter>
     </ClInclude>
+    <Filter Include="Source\RPGSystem\Public\InteractionSystem">
+      <UniqueIdentifier>{A3BF4FF7-AE20-3415-8A32-10FD0490A7A9}</UniqueIdentifier>
+    </Filter>
+    <ClInclude Include="..\..\Source\RPGSystem\Public\InteractionSystem\InteractionSystemComponent.h">
+      <Filter>Source\RPGSystem\Public\InteractionSystem</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\RPGSystem\Public\InteractionSystem\InteractionSystemStatics.h">
+      <Filter>Source\RPGSystem\Public\InteractionSystem</Filter>
+    </ClInclude>
+    <Filter Include="Source\RPGSystem\Public\InteractionSystem\Interface">
+      <UniqueIdentifier>{E02B6667-9359-30E5-BA76-48D3E18D4CC4}</UniqueIdentifier>
+    </Filter>
+    <ClInclude Include="..\..\Source\RPGSystem\Public\InteractionSystem\Interface\InteractionSystemInterface.h">
+      <Filter>Source\RPGSystem\Public\InteractionSystem\Interface</Filter>
+    </ClInclude>
     <Filter Include="Source\RPGSystem\Public\Interfaces">
       <UniqueIdentifier>{AD6C4ECA-D2BB-3746-9142-063D58BD753A}</UniqueIdentifier>
     </Filter>
@@ -1011,6 +1102,18 @@
       <Filter>Source\RPGSystem\Public\Inventory</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Source\RPGSystem\Public\Inventory\ItemDataAsset.h">
+      <Filter>Source\RPGSystem\Public\Inventory</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\RPGSystem\Public\Inventory\MeleeWeaponItemDataAsset.h">
+      <Filter>Source\RPGSystem\Public\Inventory</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\RPGSystem\Public\Inventory\RangedWeaponItemDataAsset.h">
+      <Filter>Source\RPGSystem\Public\Inventory</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\RPGSystem\Public\Inventory\WeaponItemDataAsset.h">
+      <Filter>Source\RPGSystem\Public\Inventory</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\RPGSystem\Public\Inventory\WeaponModItemDataAsset.h">
       <Filter>Source\RPGSystem\Public\Inventory</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Source\RPGSystem\Public\Inventory\WorkstationDataAsset.h">
@@ -1069,6 +1172,18 @@
     </ClInclude>
     <ClInclude Include="..\..\Source\RPGSystem\Public\Stats\StatSetDataAsset.h">
       <Filter>Source\RPGSystem\Public\Stats</Filter>
+    </ClInclude>
+    <Filter Include="Source\RPGSystem\Public\WeaponSystem">
+      <UniqueIdentifier>{713BC0D1-A00F-3BCC-A774-A2236FD78257}</UniqueIdentifier>
+    </Filter>
+    <ClInclude Include="..\..\Source\RPGSystem\Public\WeaponSystem\WeaponAmmoComponent.h">
+      <Filter>Source\RPGSystem\Public\WeaponSystem</Filter>
+    </ClInclude>
+    <Filter Include="Source\RPGSystem\Public\WeaponSystem\Interface">
+      <UniqueIdentifier>{502341AB-9610-39B2-9D65-5A96A6BA4E4E}</UniqueIdentifier>
+    </Filter>
+    <ClInclude Include="..\..\Source\RPGSystem\Public\WeaponSystem\Interface\WeaponHostInterface.h">
+      <Filter>Source\RPGSystem\Public\WeaponSystem\Interface</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

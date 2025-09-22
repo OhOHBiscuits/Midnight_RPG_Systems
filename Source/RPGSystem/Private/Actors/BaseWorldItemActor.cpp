@@ -1,5 +1,4 @@
-﻿// BaseWorldItemActor.cpp
-#include "Actors/BaseWorldItemActor.h"
+﻿#include "Actors/BaseWorldItemActor.h"
 #include "Inventory/ItemDataAsset.h"
 #include "Components/StaticMeshComponent.h"
 #include "Blueprint/UserWidget.h"
@@ -16,27 +15,26 @@ ABaseWorldItemActor::ABaseWorldItemActor()
 	Mesh->SetIsReplicated(true);
 }
 
-void ABaseWorldItemActor::GetLifetimeReplicatedProps(
-	TArray<FLifetimeProperty>& OutLifetimeProps) const
+void ABaseWorldItemActor::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
-
 	DOREPLIFETIME(ABaseWorldItemActor, ItemData);
 	DOREPLIFETIME(ABaseWorldItemActor, bUseEfficiency);
 	DOREPLIFETIME(ABaseWorldItemActor, EfficiencyRating);
 }
 
-void ABaseWorldItemActor::OnConstruction(const FTransform& Xform)
+void ABaseWorldItemActor::OnConstruction(const FTransform& Transform)
 {
-	Super::OnConstruction(Xform);
+	Super::OnConstruction(Transform);
 	ApplyItemDataVisuals();
 }
 
 #if WITH_EDITOR
-void ABaseWorldItemActor::PostEditChangeProperty(FPropertyChangedEvent& Event)
+void ABaseWorldItemActor::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)
 {
-	Super::PostEditChangeProperty(Event);
-	if (Event.Property && Event.Property->GetFName() == GET_MEMBER_NAME_CHECKED(ABaseWorldItemActor, ItemData))
+	Super::PostEditChangeProperty(PropertyChangedEvent);
+	if (PropertyChangedEvent.Property &&
+		PropertyChangedEvent.Property->GetFName() == GET_MEMBER_NAME_CHECKED(ABaseWorldItemActor, ItemData))
 	{
 		ApplyItemDataVisuals();
 	}
@@ -68,15 +66,15 @@ void ABaseWorldItemActor::ApplyItemDataVisuals()
 		{
 			Mesh->SetStaticMesh(nullptr);
 		}
-
-		// Optionally mirror a default efficiency from the data
-		EfficiencyRating = Data->EfficiencyRating;
+		if (bUseEfficiency)
+		{
+			EfficiencyRating = Data->EfficiencyRating;
+		}
 	}
 }
 
 void ABaseWorldItemActor::Interact_Implementation(AActor* Interactor)
 {
-	// Always route to the authoritative server
 	if (HasAuthority())
 	{
 		HandleInteract_Server(Interactor);
@@ -92,21 +90,36 @@ void ABaseWorldItemActor::Server_Interact_Implementation(AActor* Interactor)
 	HandleInteract_Server(Interactor);
 }
 
+void ABaseWorldItemActor::HandleInteract_Server(AActor* /*Interactor*/)
+{
+	// Base does nothing; override in children (pickup/storage/workstation/weapon)
+}
+
+void ABaseWorldItemActor::ResolveOwningPCForUI(AActor* Interactor, APlayerController*& OutPC) const
+{
+	OutPC = nullptr;
+
+	if (const APawn* Pawn = Cast<APawn>(Interactor))
+	{
+		OutPC = Cast<APlayerController>(Pawn->GetController());
+	}
+	else
+	{
+		OutPC = Cast<APlayerController>(Interactor);
+	}
+
+	if (!OutPC)
+	{
+		OutPC = UGameplayStatics::GetPlayerController(this, 0);
+	}
+}
+
 void ABaseWorldItemActor::Client_ShowWorldItemUI_Implementation(AActor* Interactor, TSubclassOf<UUserWidget> ClassToUse)
 {
 	if (!ClassToUse) return;
 
 	APlayerController* PC = nullptr;
-
-	if (APawn* Pawn = Cast<APawn>(Interactor))
-	{
-		PC = Cast<APlayerController>(Pawn->GetController());
-	}
-	else
-	{
-		PC = Cast<APlayerController>(Interactor);
-	}
-	if (!PC) PC = UGameplayStatics::GetPlayerController(this, 0);
+	ResolveOwningPCForUI(Interactor, PC);
 
 	if (PC && PC->IsLocalController())
 	{
@@ -121,20 +134,13 @@ void ABaseWorldItemActor::ShowWorldItemUI(AActor* Interactor, TSubclassOf<UUserW
 {
 	if (!ClassToUse) return;
 
-	if (GetLocalRole() == ROLE_Authority)
+	if (HasAuthority())
 	{
-		// make RPC reach the right client
-		if (APawn* Pawn = Cast<APawn>(Interactor))
-		{
-			if (AController* C = Pawn->GetController())
-			{
-				SetOwner(C);
-			}
-		}
-		else if (AController* AsCtrl = Cast<AController>(Interactor))
-		{
-			SetOwner(AsCtrl);
-		}
+		AController* OwnerCtrl = nullptr;
+		if (APawn* P = Cast<APawn>(Interactor)) OwnerCtrl = P->GetController();
+		if (!OwnerCtrl) OwnerCtrl = Cast<AController>(Interactor);
+		if (OwnerCtrl) { SetOwner(OwnerCtrl); }
+
 		Client_ShowWorldItemUI(Interactor, ClassToUse);
 	}
 	else

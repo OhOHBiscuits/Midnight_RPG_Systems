@@ -123,13 +123,13 @@ void APickupItemActor::HandleInteract_Server(AActor* Interactor)
 	{
 		if (Inv->TryAddItem(Data, Quantity))
 		{
-			ShowWorldItemUI(Interactor, PickupToastWidgetClass ? PickupToastWidgetClass : WidgetClass);
+			ShowWorldItemUI(Interactor, PickupToastWidgetClass);
 			Destroy();
 		}
 		else
 		{
 			// failed to add — could also show a "inventory full" toast
-			ShowWorldItemUI(Interactor, PickupToastWidgetClass ? PickupToastWidgetClass : WidgetClass);
+			ShowWorldItemUI(Interactor, PickupToastWidgetClass);
 		}
 	}
 }

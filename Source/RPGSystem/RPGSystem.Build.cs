@@ -8,7 +8,7 @@ public class RPGSystem : ModuleRules
 	{
 		PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
 	
-		PublicDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine", "InputCore", "GameplayTags" ,  "AssetRegistry" ,"GameplayAbilities", "GameplayTags", "GameplayTasks" , "GASCompanion" ,"NetCore"  });
+		PublicDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine", "InputCore", "GameplayTags" ,  "AssetRegistry" ,"GameplayAbilities", "GameplayTags", "GameplayTasks" , "GASCompanion" ,"NetCore" , "Niagara"   });
 
 		PrivateDependencyModuleNames.AddRange(new string[] {  "GameplayAbilities", "GameplayTasks","Slate", "SlateCore", "UMG" });
 

@@ -1,12 +1,20 @@
-﻿#include "GAS/RPGASCSetupLibrary.h"
+﻿// RPGASCSetupLibrary.cpp
+
+#include "GAS/RPGASCSetupLibrary.h"
 #include "GAS/RPGAbilitySystemComponent.h"
+#include "AbilitySystemGlobals.h"
 #include "GameFramework/PlayerState.h"
 #include "GameFramework/Pawn.h"
 
-URPGAbilitySystemComponent* URPGASCSetupLibrary::EnsureASCInitialized(AActor* Owner, AActor* Avatar)
+URPGAbilitySystemComponent* URPGASCSetupLibrary::EnsureASCOnActor(AActor* Owner, AActor* Avatar, FName ComponentName)
 {
 	if (!Owner) return nullptr;
-	URPGAbilitySystemComponent* ASC = URPGAbilitySystemComponent::AddTo(Owner);
+
+	URPGAbilitySystemComponent* ASC = Owner->FindComponentByClass<URPGAbilitySystemComponent>();
+	if (!ASC)
+	{
+		ASC = URPGAbilitySystemComponent::AddTo(Owner, ComponentName);
+	}
 	if (ASC)
 	{
 		ASC->InitializeForActor(Owner, Avatar ? Avatar : Owner);
@@ -14,17 +22,19 @@ URPGAbilitySystemComponent* URPGASCSetupLibrary::EnsureASCInitialized(AActor* Ow
 	return ASC;
 }
 
-URPGAbilitySystemComponent* URPGASCSetupLibrary::SetupFromPlayerState(APlayerState* PlayerState, APawn* Pawn)
+URPGAbilitySystemComponent* URPGASCSetupLibrary::EnsureASCOnPlayerState(APlayerState* PlayerState, APawn* Pawn, FName ComponentName)
 {
 	if (!PlayerState) return nullptr;
+
 	URPGAbilitySystemComponent* ASC = PlayerState->FindComponentByClass<URPGAbilitySystemComponent>();
 	if (!ASC)
 	{
-		ASC = URPGAbilitySystemComponent::AddTo(PlayerState);
+		ASC = URPGAbilitySystemComponent::AddTo(PlayerState, ComponentName);
 	}
 	if (ASC)
 	{
-		ASC->InitializeForActor(PlayerState, Pawn ? Pawn : PlayerState->GetPawn());
+		AActor* Avatar = Pawn ? static_cast<AActor*>(Pawn) : static_cast<AActor*>(PlayerState->GetPawn());
+		ASC->InitializeForActor(PlayerState, Avatar ? Avatar : static_cast<AActor*>(PlayerState));
 	}
 	return ASC;
 }

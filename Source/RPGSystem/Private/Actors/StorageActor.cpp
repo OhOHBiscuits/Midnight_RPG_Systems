@@ -18,7 +18,7 @@ void AStorageActor::BeginPlay()
 
 void AStorageActor::OpenStorageUIFor(AActor* Interactor)
 {
-	TSubclassOf<UUserWidget> ClassToUse = StorageWidgetClass ? StorageWidgetClass : WidgetClass;
+	TSubclassOf<UUserWidget> ClassToUse = StorageWidgetClass;
 	ShowWorldItemUI(Interactor, ClassToUse);
 }
 

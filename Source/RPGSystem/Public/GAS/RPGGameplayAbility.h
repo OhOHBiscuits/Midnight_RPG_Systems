@@ -3,25 +3,49 @@
 
 #include "CoreMinimal.h"
 #include "Abilities/GameplayAbility.h"
-#include "GameplayTagContainer.h"
 #include "RPGGameplayAbility.generated.h"
 
+class URPGAbilitySystemComponent;
+
+/**
+ * Clean GameplayAbility base with GAS-only helpers.
+ */
 UCLASS()
 class RPGSYSTEM_API URPGGameplayAbility : public UGameplayAbility
 {
 	GENERATED_BODY()
 
 public:
-	UFUNCTION(BlueprintCallable, Category="Stats")
-	float GetStatOnSelf(const FGameplayTag& Tag, float DefaultValue = 0.f) const;
+	URPGGameplayAbility();
 
-	UFUNCTION(BlueprintCallable, Category="Stats")
-	void SetStatOnSelf(const FGameplayTag& Tag, float NewValue, bool bClampToValidRange = true) const;
+	/** Typed accessor for our owning ASC. */
+	UFUNCTION(BlueprintPure, Category="GAS")
+	URPGAbilitySystemComponent* GetRPGASC() const;
 
-	UFUNCTION(BlueprintCallable, Category="Stats")
-	void AddToStatOnSelf(const FGameplayTag& Tag, float Delta, bool bClampToValidRange = true) const;
+	/**
+	 * Apply a GameplayEffect (that expects one SetByCaller float) to SELF.
+	 * (Uses our ASC from ActorInfo.)
+	 */
+	UFUNCTION(BlueprintCallable, Category="GAS")
+	FActiveGameplayEffectHandle ApplyGEToSelf_SetByCaller(
+		TSubclassOf<UGameplayEffect> EffectClass,
+		FGameplayTag                 SetByCallerTag,
+		float                        Magnitude,
+		float                        EffectLevel = 1.f,
+		UObject*                     SourceObject = nullptr,
+		int32                        Stacks = 1) const;
 
-protected:
-	/** Tries avatar, then owner, for a StatProvider (actor or component). */
-	UObject* FindProviderForSelf() const;
+	/**
+	 * Apply a GameplayEffect (that expects one SetByCaller float) to TARGET actor.
+	 * (Instigator/causer inferred from our Owner/Avatar.)
+	 */
+	UFUNCTION(BlueprintCallable, Category="GAS")
+	FActiveGameplayEffectHandle ApplyGEToTarget_SetByCaller(
+		AActor*                      TargetActor,
+		TSubclassOf<UGameplayEffect> EffectClass,
+		FGameplayTag                 SetByCallerTag,
+		float                        Magnitude,
+		float                        EffectLevel = 1.f,
+		UObject*                     SourceObject = nullptr,
+		int32                        Stacks = 1) const;
 };

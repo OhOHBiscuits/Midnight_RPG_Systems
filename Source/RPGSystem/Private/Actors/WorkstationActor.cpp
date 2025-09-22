@@ -43,7 +43,5 @@ bool AWorkstationActor::IsRecipeAllowed(const UCraftingRecipeDataAsset* Recipe) 
 
 void AWorkstationActor::OnInteract_Implementation(AActor* Interactor)
 {
-	// Reuse the base call that pushes a widget to the interactor’s screen.
-	// Your BaseWorldItemActor has the two-parameter version.
-	Client_ShowWorldItemUI(Interactor, WorkstationUIClass);
+		Client_ShowWorldItemUI(Interactor, WorkstationUIClass);
 }

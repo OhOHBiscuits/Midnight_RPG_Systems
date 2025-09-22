@@ -1,69 +1,61 @@
 ﻿// RPGGameplayAbility.cpp
 
 #include "GAS/RPGGameplayAbility.h"
-#include "AbilitySystemComponent.h"
-#include "GameFramework/Actor.h"
-#include "Progression/StatProgressionBridge.h"
+#include "GAS/RPGAbilitySystemComponent.h"
+#include "AbilitySystemGlobals.h"
+#include "GameplayEffect.h"
 
-float URPGGameplayAbility::GetStatOnSelf(const FGameplayTag& Tag, float DefaultValue) const
+URPGGameplayAbility::URPGGameplayAbility()
+	: Super()
 {
-	if (!Tag.IsValid())
-	{
-		return DefaultValue;
-	}
-
-	if (UObject* Provider = FindProviderForSelf())
-	{
-		return UStatProgressionBridge::GetStat(Provider, Tag, DefaultValue);
-	}
-
-	return DefaultValue;
+	// Nothing special; base class init.
 }
 
-void URPGGameplayAbility::SetStatOnSelf(const FGameplayTag& Tag, float NewValue, bool /*bClampToValidRange*/) const
+URPGAbilitySystemComponent* URPGGameplayAbility::GetRPGASC() const
 {
-	if (!Tag.IsValid())
-	{
-		return;
-	}
-
-	if (UObject* Provider = FindProviderForSelf())
-	{
-		UStatProgressionBridge::SetStat(Provider, Tag, NewValue);
-	}
+	return Cast<URPGAbilitySystemComponent>(GetAbilitySystemComponentFromActorInfo());
 }
 
-void URPGGameplayAbility::AddToStatOnSelf(const FGameplayTag& Tag, float Delta, bool /*bClampToValidRange*/) const
+FActiveGameplayEffectHandle URPGGameplayAbility::ApplyGEToSelf_SetByCaller(
+	TSubclassOf<UGameplayEffect> EffectClass,
+	FGameplayTag                 SetByCallerTag,
+	float                        Magnitude,
+	float                        EffectLevel,
+	UObject*                     SourceObject,
+	int32                        Stacks) const
 {
-	if (!Tag.IsValid())
+	if (!EffectClass)
 	{
-		return;
+		return FActiveGameplayEffectHandle();
 	}
 
-	if (UObject* Provider = FindProviderForSelf())
+	URPGAbilitySystemComponent* ASC = GetRPGASC();
+	if (!ASC)
 	{
-		UStatProgressionBridge::AddToStat(Provider, Tag, Delta);
+		return FActiveGameplayEffectHandle();
 	}
+
+	return ASC->ApplyGEWithSetByCallerToSelf(EffectClass, SetByCallerTag, Magnitude, EffectLevel, SourceObject, Stacks);
 }
 
-UObject* URPGGameplayAbility::FindProviderForSelf() const
+FActiveGameplayEffectHandle URPGGameplayAbility::ApplyGEToTarget_SetByCaller(
+	AActor*                      TargetActor,
+	TSubclassOf<UGameplayEffect> EffectClass,
+	FGameplayTag                 SetByCallerTag,
+	float                        Magnitude,
+	float                        EffectLevel,
+	UObject*                     SourceObject,
+	int32                        Stacks) const
 {
-	const UAbilitySystemComponent* ASC = GetAbilitySystemComponentFromActorInfo();
-	if (!ASC) return nullptr;
+	if (!EffectClass || !TargetActor)
+	{
+		return FActiveGameplayEffectHandle();
+	}
 
-	if (const AActor* Avatar = ASC->GetAvatarActor())
-	{
-		if (UObject* P = UStatProgressionBridge::FindStatProviderOn(Avatar))
-		{
-			return P;
-		}
-	}
-	if (const AActor* Owner = ASC->GetOwnerActor())
-	{
-		if (UObject* P = UStatProgressionBridge::FindStatProviderOn(Owner))
-		{
-			return P;
-		}
-	}
-	return nullptr;
+	// Pull reasonable instigator/causer from our current ability context.
+	AActor* Instigator  = GetOwningActorFromActorInfo();
+	AActor* EffectCauser = GetAvatarActorFromActorInfo();
+
+	return URPGAbilitySystemComponent::ApplyGEWithSetByCallerToTarget(
+		TargetActor, EffectClass, SetByCallerTag, Magnitude, EffectLevel, SourceObject, Stacks, Instigator, EffectCauser);
 }
