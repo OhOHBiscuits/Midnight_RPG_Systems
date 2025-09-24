@@ -8,12 +8,144 @@
 #include "AbilitySystemComponent.h"
 #include "GameplayTagContainer.h"
 
+#include "Inventory/InventoryComponent.h"
+#include "Inventory/InventoryHelpers.h"
+#include "Inventory/ItemDataAsset.h"
+
+#include "UObject/UnrealType.h"
+#include "TimerManager.h"
 #include "GameFramework/Pawn.h"
 #include "GameFramework/PlayerController.h"
 #include "GameFramework/PlayerState.h"
 
-// If you want to wire real movement, include your inventory classes and replace the stubs below.
-// #include "Inventory/InventoryComponent.h"
+namespace
+{
+	// Try to read float "CraftSeconds" from the recipe; default to a tiny value.
+	float GetRecipeDurationSeconds(const UCraftingRecipeDataAsset* Recipe, int32 Times)
+	{
+		if (!Recipe) return 0.01f;
+		if (const FProperty* Prop = Recipe->GetClass()->FindPropertyByName(TEXT("CraftSeconds")))
+		{
+			if (const FFloatProperty* FProp = CastField<FFloatProperty>(Prop))
+			{
+				const float* Ptr = FProp->ContainerPtrToValuePtr<float>(Recipe);
+				if (Ptr) return FMath::Max(0.01f, *Ptr) * FMath::Max(1, Times);
+			}
+		}
+		return 0.01f * FMath::Max(1, Times);
+	}
+
+	// Extract (Tag, Amount) pairs from an array property named "Inputs" or "Outputs".
+	TArray<TPair<FGameplayTag,int32>> ExtractTagAmountArray(const UObject* Obj, const TCHAR* ArrayPropName)
+	{
+		TArray<TPair<FGameplayTag,int32>> Pairs;
+		if (!Obj) return Pairs;
+
+		const FArrayProperty* ArrProp = FindFProperty<FArrayProperty>(Obj->GetClass(), ArrayPropName);
+		if (!ArrProp) return Pairs;
+
+		const void* ContainerPtr = ArrProp->ContainerPtrToValuePtr<void>(Obj);
+		FScriptArrayHelper Helper(ArrProp, ContainerPtr);
+		const FStructProperty* ElementStructProp = CastField<FStructProperty>(ArrProp->Inner);
+		if (!ElementStructProp) return Pairs;
+
+		UScriptStruct* SS = ElementStructProp->Struct;
+		if (!SS) return Pairs;
+
+		for (int32 i = 0; i < Helper.Num(); ++i)
+		{
+			void* ElemPtr = Helper.GetRawPtr(i);
+
+			FGameplayTag FoundTag;
+			int32 FoundAmount = 0;
+
+			for (TFieldIterator<FProperty> It(SS); It; ++It)
+			{
+				if (const FStructProperty* SProp = CastField<FStructProperty>(*It))
+				{
+					if (SProp->Struct == TBaseStructure<FGameplayTag>::Get())
+					{
+						const FGameplayTag* TPtr = SProp->ContainerPtrToValuePtr<FGameplayTag>(ElemPtr);
+						if (TPtr && TPtr->IsValid())
+						{
+							FoundTag = *TPtr;
+						}
+						continue;
+					}
+				}
+				if (const FIntProperty* IProp = CastField<FIntProperty>(*It))
+				{
+					const FString Name = It->GetName().ToLower();
+					if (Name.Contains(TEXT("amount")) || Name.Contains(TEXT("count")) || Name.Contains(TEXT("quantity")))
+					{
+						if (const int32* V = IProp->ContainerPtrToValuePtr<int32>(ElemPtr))
+						{
+							FoundAmount = *V;
+						}
+					}
+				}
+			}
+
+			if (FoundTag.IsValid() && FoundAmount > 0)
+			{
+				Pairs.Emplace(FoundTag, FoundAmount);
+			}
+		}
+
+		return Pairs;
+	}
+
+	int32 CountItemsByItemTag(const UInventoryComponent* Inv, const FGameplayTag& ItemTag)
+	{
+		if (!Inv || !ItemTag.IsValid()) return 0;
+		int32 Total = 0;
+		const TArray<FInventoryItem>& Items = Inv->GetItems();
+		for (const FInventoryItem& It : Items)
+		{
+			if (!It.IsValid()) continue;
+			if (const UItemDataAsset* Data = It.ResolveItemData())
+			{
+				if (Data->ItemIDTag == ItemTag)
+				{
+					Total += It.Quantity;
+				}
+			}
+		}
+		return Total;
+	}
+
+	bool RemoveAndStage(UInventoryComponent* Source, UInventoryComponent* Input, const FGameplayTag& ItemTag, int32 Required)
+	{
+		if (!Source || !Input || !ItemTag.IsValid() || Required <= 0) return false;
+
+		int32 Remaining = Required;
+
+		if (CountItemsByItemTag(Source, ItemTag) < Required)
+		{
+			return false;
+		}
+
+		const TArray<FInventoryItem>& Items = Source->GetItems();
+		for (int32 i = 0; i < Items.Num() && Remaining > 0; ++i)
+		{
+			const FInventoryItem& It = Items[i];
+			if (!It.IsValid()) continue;
+
+			UItemDataAsset* Data = It.ResolveItemData();
+			if (!Data || Data->ItemIDTag != ItemTag) continue;
+
+			const int32 Take = FMath::Min(It.Quantity, Remaining);
+
+			if (Source->TryRemoveItem(i, Take))
+			{
+				Input->TryAddItem(Data, Take);
+				Remaining -= Take;
+			}
+		}
+
+		return Remaining == 0;
+	}
+}
 
 UCraftingStationComponent::UCraftingStationComponent()
 {
@@ -30,39 +162,29 @@ void UCraftingStationComponent::GetLifetimeReplicatedProps(TArray<FLifetimePrope
 
 bool UCraftingStationComponent::StartCraftFromRecipe(AActor* InstigatorActor, const UCraftingRecipeDataAsset* Recipe, int32 Times)
 {
-	if (bIsCrafting || !Recipe || Times <= 0)
-	{
-		return false;
-	}
+	if (!HasAuth() || bIsCrafting || !Recipe || Times <= 0) return false;
+	if (!InputInventory || !OutputInventory) return false;
 
-	// Stage materials first so we fail early if not enough.
-	if (!MoveRequiredToInput(Recipe, Times))
-	{
-		return false;
-	}
+	if (!MoveRequiredToInput(Recipe, Times, InstigatorActor)) return false;
 
-	// Populate the job
 	ActiveJob = FCraftingJob{};
 	ActiveJob.Recipe     = const_cast<UCraftingRecipeDataAsset*>(Recipe);
 	ActiveJob.Instigator = InstigatorActor;
 	ActiveJob.Count      = Times;
 	ActiveJob.StartTime  = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.f;
 
-	// Use a per-recipe duration variable on your data asset (or a constant for now).
-	const float OneCraftDuration = 0.01f; // Replace with Recipe->CraftDurationSeconds if you have it
-	const float TotalDuration    = FMath::Max(0.01f, OneCraftDuration * Times);
-	ActiveJob.EndTime            = ActiveJob.StartTime + TotalDuration;
+	const float TotalDuration = GetRecipeDurationSeconds(Recipe, Times);
+	ActiveJob.EndTime         = ActiveJob.StartTime + TotalDuration;
 
 	bIsCrafting = true;
 	bIsPaused   = false;
 	OnCraftStarted.Broadcast(ActiveJob);
 
-	// Start timer to call FinishCraft_Internal once the batch completes.
 	GetWorld()->GetTimerManager().SetTimer(
 		CraftTimerHandle,
 		this, &UCraftingStationComponent::FinishCraft_Internal,
 		TotalDuration,
-		/*bLoop*/false
+		false
 	);
 
 	return true;
@@ -70,49 +192,43 @@ bool UCraftingStationComponent::StartCraftFromRecipe(AActor* InstigatorActor, co
 
 void UCraftingStationComponent::CancelCraft()
 {
-	if (!bIsCrafting)
-	{
-		return;
-	}
+	if (!HasAuth() || !bIsCrafting) return;
 
 	GetWorld()->GetTimerManager().ClearTimer(CraftTimerHandle);
-	// (Optional) Return staged materials from InputInventory here.
 	bIsCrafting = false;
 	bIsPaused   = false;
 
-	OnCraftFinished.Broadcast(ActiveJob, /*bSuccess*/false);
+	OnCraftFinished.Broadcast(ActiveJob, false);
 	ActiveJob = FCraftingJob{};
 }
 
 void UCraftingStationComponent::PauseCraft()
 {
-	if (!bIsCrafting || bIsPaused) return;
+	if (!HasAuth() || !bIsCrafting || bIsPaused) return;
 
 	bIsPaused = true;
 
-	// Save remaining time
 	const float Now = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.f;
 	const float Remaining = FMath::Max(0.f, ActiveJob.EndTime - Now);
-	ActiveJob.EndTime = Now + Remaining; // keep logical end for UI
+	ActiveJob.EndTime = Now + Remaining;
 
-	// Stop current countdown
 	GetWorld()->GetTimerManager().ClearTimer(CraftTimerHandle);
 }
 
 void UCraftingStationComponent::ResumeCraft()
 {
-	if (!bIsCrafting || !bIsPaused) return;
+	if (!HasAuth() || !bIsCrafting || !bIsPaused) return;
 
 	bIsPaused = false;
 
-	const float Now       = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.f;
-	const float TimeLeft  = FMath::Max(0.01f, ActiveJob.EndTime - Now);
+	const float Now      = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.f;
+	const float TimeLeft = FMath::Max(0.01f, ActiveJob.EndTime - Now);
 
 	GetWorld()->GetTimerManager().SetTimer(
 		CraftTimerHandle,
 		this, &UCraftingStationComponent::FinishCraft_Internal,
 		TimeLeft,
-		/*bLoop*/false
+		false
 	);
 }
 
@@ -133,27 +249,54 @@ void UCraftingStationComponent::FinishCraft_Internal()
 	ActiveJob   = FCraftingJob{};
 }
 
-bool UCraftingStationComponent::MoveRequiredToInput(const UCraftingRecipeDataAsset* /*Recipe*/, int32 /*Times*/)
+bool UCraftingStationComponent::MoveRequiredToInput(const UCraftingRecipeDataAsset* Recipe, int32 Times, AActor* InstigatorActor)
 {
-	// ---- Replace this stub with your inventory logic. ----
-	// The idea:
-	// 1) Locate source inventory (e.g., on Instigator or the owner).
-	// 2) Count if all required items (Times * each input) exist.
-	// 3) Move to InputInventory so they’re reserved for the craft.
-	//
-	// Returning true here keeps things compiling & unblocked.
+	if (!HasAuth() || !Recipe || Times <= 0 || !InputInventory) return false;
+
+	UInventoryComponent* Source = UInventoryHelpers::GetInventoryComponent(InstigatorActor ? InstigatorActor : GetOwner());
+	if (!Source) return false;
+
+	// Inputs expected to be an array of structs with a GameplayTag + Amount/Count/Quantity int field.
+	TArray<TPair<FGameplayTag,int32>> Req = ExtractTagAmountArray(Recipe, TEXT("Inputs"));
+	if (Req.Num() == 0) return true;
+
+	for (const auto& Pair : Req)
+	{
+		const FGameplayTag& Tag = Pair.Key;
+		const int32 Needed = Pair.Value * Times;
+		if (!RemoveAndStage(Source, InputInventory, Tag, Needed))
+		{
+			return false;
+		}
+	}
+
 	return true;
 }
 
-void UCraftingStationComponent::DeliverOutputs(const UCraftingRecipeDataAsset* /*Recipe*/)
+void UCraftingStationComponent::DeliverOutputs(const UCraftingRecipeDataAsset* Recipe)
 {
-	// ---- Replace with your real inventory "add" API. ----
-	// Iterate Recipe->Outputs and add items to OutputInventory.
+	if (!HasAuth() || !Recipe || !OutputInventory) return;
+
+	// Outputs expected to be an array of structs with a GameplayTag + Amount/Count/Quantity int field.
+	TArray<TPair<FGameplayTag,int32>> Outs = ExtractTagAmountArray(Recipe, TEXT("Outputs"));
+	if (Outs.Num() == 0) return;
+
+	for (const auto& Pair : Outs)
+	{
+		const FGameplayTag& Tag = Pair.Key;
+		const int32 Amount = Pair.Value;
+
+		if (!Tag.IsValid() || Amount <= 0) continue;
+
+		if (UItemDataAsset* Item = UInventoryHelpers::FindItemDataByTag(this, Tag))
+		{
+			OutputInventory->TryAddItem(Item, Amount);
+		}
+	}
 }
 
 void UCraftingStationComponent::GiveFinishXPIIfAny(const UCraftingRecipeDataAsset* /*Recipe*/, AActor* /*InstigatorActor*/, bool /*bSuccess*/)
 {
-	// Hook to GAS / XP system if desired.
 }
 
 void UCraftingStationComponent::GatherOwnedTagsFromActor(AActor* Viewer, FGameplayTagContainer& Out) const
@@ -161,13 +304,11 @@ void UCraftingStationComponent::GatherOwnedTagsFromActor(AActor* Viewer, FGamepl
 	Out.Reset();
 	if (!Viewer) return;
 
-	// 1) Viewer tags via interface
 	if (IGameplayTagAssetInterface* GTAI = Cast<IGameplayTagAssetInterface>(Viewer))
 	{
 		GTAI->GetOwnedGameplayTags(Out);
 	}
 
-	// 2) Viewer ASC
 	if (const IAbilitySystemInterface* ASI = Cast<IAbilitySystemInterface>(Viewer))
 	{
 		if (UAbilitySystemComponent* ASC = ASI->GetAbilitySystemComponent())
@@ -176,7 +317,6 @@ void UCraftingStationComponent::GatherOwnedTagsFromActor(AActor* Viewer, FGamepl
 		}
 	}
 
-	// 3) If pawn, also check PS + PC
 	if (const APawn* Pawn = Cast<APawn>(Viewer))
 	{
 		if (APlayerState* PS = Pawn->GetPlayerState())

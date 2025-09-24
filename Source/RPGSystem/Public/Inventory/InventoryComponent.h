@@ -28,64 +28,44 @@ class RPGSYSTEM_API UInventoryComponent : public UActorComponent
 public:
 	UInventoryComponent();
 
-	// Access / Permissions
+	// Access
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, ReplicatedUsing=OnRep_AccessTag, Category="1_Inventory|Access")
 	FGameplayTag AccessTag;
 
-	UFUNCTION()
-	void OnRep_AccessTag();
+	UFUNCTION() void OnRep_AccessTag();
+	UFUNCTION(BlueprintCallable, Category="1_Inventory|Access") void SetInventoryAccess(const FGameplayTag& NewAccessTag);
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category="1_Inventory|Access") FGameplayTag GetInventoryAccessTag() const { return AccessTag; }
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category="1_Inventory|Access") bool HasAccess_Public() const;
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category="1_Inventory|Access") bool HasAccess_ViewOnly() const;
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category="1_Inventory|Access") bool HasAccess_Private() const;
+	UFUNCTION(BlueprintCallable, Category="1_Inventory|Access") void AutoInitializeAccessFromArea(AActor* ContextActor);
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category="1_Inventory|Access") bool CanView(AActor* Requestor) const;
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category="1_Inventory|Access") bool CanModify(AActor* Requestor) const;
 
-	UFUNCTION(BlueprintCallable, Category="1_Inventory|Access")
-	void SetInventoryAccess(const FGameplayTag& NewAccessTag);
+	// Core actions (server-auth; clients use Try*)
+	UFUNCTION(BlueprintCallable, Category="1_Inventory|Actions") virtual bool AddItem(UItemDataAsset* ItemData, int32 Quantity, AActor* Requestor = nullptr);
+	UFUNCTION(BlueprintCallable, Category="1_Inventory|Actions") virtual bool RemoveItem(int32 SlotIndex, int32 Quantity, AActor* Requestor = nullptr);
+	UFUNCTION(BlueprintCallable, Category="1_Inventory|Actions") virtual bool RemoveItemByID(FGameplayTag ItemID, int32 Quantity, AActor* Requestor = nullptr);
+	UFUNCTION(BlueprintCallable, Category="1_Inventory|Actions") virtual bool MoveItem(int32 FromIndex, int32 ToIndex, AActor* Requestor = nullptr);
+	UFUNCTION(BlueprintCallable, Category="1_Inventory|Actions") virtual bool TransferItemToInventory(int32 FromIndex, UInventoryComponent* TargetInventory, AActor* Requestor = nullptr);
 
-	UFUNCTION(BlueprintCallable, BlueprintPure, Category="1_Inventory|Access")
-	FGameplayTag GetInventoryAccessTag() const { return AccessTag; }
-
-	UFUNCTION(BlueprintCallable, BlueprintPure, Category="1_Inventory|Access")
-	bool HasAccess_Public() const;
-
-	UFUNCTION(BlueprintCallable, BlueprintPure, Category="1_Inventory|Access")
-	bool HasAccess_ViewOnly() const;
-
-	UFUNCTION(BlueprintCallable, BlueprintPure, Category="1_Inventory|Access")
-	bool HasAccess_Private() const;
-
-	UFUNCTION(BlueprintCallable, Category="1_Inventory|Access")
-	void AutoInitializeAccessFromArea(AActor* ContextActor);
-
-	UFUNCTION(BlueprintCallable, BlueprintPure, Category="1_Inventory|Access")
-	bool CanView(AActor* Requestor) const;
-
-	UFUNCTION(BlueprintCallable, BlueprintPure, Category="1_Inventory|Access")
-	bool CanModify(AActor* Requestor) const;
-
-	// Core Actions (Server‑side; client uses Try* wrappers)
-	UFUNCTION(BlueprintCallable, Category="1_Inventory|Actions")
-	virtual bool AddItem(UItemDataAsset* ItemData, int32 Quantity, AActor* Requestor = nullptr);
-
-	UFUNCTION(BlueprintCallable, Category="1_Inventory|Actions")
-	virtual bool RemoveItem(int32 SlotIndex, int32 Quantity, AActor* Requestor = nullptr);
-
-	UFUNCTION(BlueprintCallable, Category="1_Inventory|Actions")
-	virtual bool RemoveItemByID(FGameplayTag ItemID, int32 Quantity, AActor* Requestor = nullptr);
-
-	UFUNCTION(BlueprintCallable, Category="1_Inventory|Actions")
-	virtual bool MoveItem(int32 FromIndex, int32 ToIndex, AActor* Requestor = nullptr);
-
-	UFUNCTION(BlueprintCallable, Category="1_Inventory|Actions")
-	virtual bool TransferItemToInventory(int32 FromIndex, UInventoryComponent* TargetInventory, AActor* Requestor = nullptr);
-
-	// Client helpers
+	// Client helpers (auto-RPC)
 	UFUNCTION(BlueprintCallable, Category="1_Inventory|Actions") virtual bool TryAddItem(UItemDataAsset* ItemData, int32 Quantity);
 	UFUNCTION(BlueprintCallable, Category="1_Inventory|Actions") virtual bool TryRemoveItem(int32 SlotIndex, int32 Quantity);
 	UFUNCTION(BlueprintCallable, Category="1_Inventory|Actions") virtual bool TryMoveItem(int32 FromIndex, int32 ToIndex);
 	UFUNCTION(BlueprintCallable, Category="1_Inventory|Actions") virtual bool TryTransferItem(int32 FromIndex, UInventoryComponent* TargetInventory);
-	UFUNCTION(BlueprintCallable, Category="1_Inventory|Actions") virtual bool RequestTransferItem(UInventoryComponent* SourceInventory, int32 SourceIndex, UInventoryComponent* TargetInventory, int32 TargetIndex);
+
+	// Split stack
 	UFUNCTION(BlueprintCallable, Category="1_Inventory|Actions") virtual bool SplitStack(int32 SlotIndex, int32 SplitQuantity, AActor* Requestor = nullptr);
 	UFUNCTION(Server, Reliable, WithValidation) void ServerSplitStack(int32 SlotIndex, int32 SplitQuantity, AController* Requestor);
 	UFUNCTION(BlueprintCallable, Category="1_Inventory|Actions") virtual bool TrySplitStack(int32 SlotIndex, int32 SplitQuantity);
 
-	// Sort
+	// Cross-inventory convenience
+	UFUNCTION(BlueprintCallable, Category="1_Inventory|Actions") bool PushToInventory(UInventoryComponent* TargetInventory, int32 FromIndex, int32 TargetIndex = -1);
+	UFUNCTION(BlueprintCallable, Category="1_Inventory|Actions") bool PullFromInventory(UInventoryComponent* SourceInventory, int32 SourceIndex, int32 TargetIndex = -1);
+	UFUNCTION(BlueprintCallable, Category="1_Inventory|Actions") bool RequestTransferItem(UInventoryComponent* SourceInventory, int32 SourceIndex, UInventoryComponent* TargetInventory, int32 TargetIndex = -1);
+
+	// Sorting
 	UFUNCTION(BlueprintCallable, Category="1_Inventory|Sort") void SortInventoryByName();
 	UFUNCTION(Server, Reliable, WithValidation) void ServerSortInventoryByName(AController* Requestor);
 	UFUNCTION(BlueprintCallable, Category="1_Inventory|Sort") void RequestSortInventoryByName();
@@ -115,9 +95,15 @@ public:
 	UFUNCTION(BlueprintCallable, Category="1_Inventory|Queries") virtual int32 GetNumItemsOfType(FGameplayTag ItemID) const;
 	UFUNCTION(BlueprintCallable, Category="1_Inventory|UI") int32 GetNumUISlots() const;
 	UFUNCTION(BlueprintCallable, Category="1_Inventory|UI") void GetUISlotInfo(TArray<int32>& OutSlotIndices, TArray<UItemDataAsset*>& OutItemData, TArray<int32>& OutQuantities) const;
+
+	// NOTE: Returning containers by ref isn’t BP-friendly; keep for C++ only.
 	UFUNCTION(BlueprintCallable, BlueprintPure, Category="1_Inventory|Queries")
-	const TArray<FInventoryItem>& GetItems() const { return Items; }	
+	const TArray<FInventoryItem>& GetItems() const { return Items; }
 	const TArray<FInventoryItem>& GetItem() const { return Items; }
+
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category="1_Inventory|Queries") bool IsEmpty() const { return GetNumOccupiedSlots() == 0; }
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category="1_Inventory|Queries") bool IsNotEmpty() const { return GetNumOccupiedSlots() > 0; }
+
 	// Filters
 	UFUNCTION(BlueprintCallable, BlueprintPure, Category="1_Inventory|Queries") TArray<FInventoryItem> FilterItemsByRarity(FGameplayTag RarityTag) const;
 	UFUNCTION(BlueprintCallable, BlueprintPure, Category="1_Inventory|Queries") TArray<FInventoryItem> FilterItemsByCategory(FGameplayTag CategoryTag) const;
@@ -146,6 +132,10 @@ public:
 	UFUNCTION(BlueprintCallable, Category="1_Inventory|Settings") virtual void SetMaxCarryVolume(float NewMaxVolume);
 	UFUNCTION(BlueprintCallable, Category="1_Inventory|Settings") void SetMaxSlots(int32 NewMaxSlots);
 
+	// State
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="1_Inventory|State") float CurrentWeight = 0.f;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="1_Inventory|State") float CurrentVolume = 0.f;
+
 	// Events
 	UPROPERTY(BlueprintAssignable, Category="1_Inventory|Events") FOnInventorySlotUpdated OnInventoryUpdated;
 	UPROPERTY(BlueprintAssignable, Category="1_Inventory|Events") FOnInventoryChanged OnInventoryChanged;
@@ -165,15 +155,16 @@ protected:
 	UPROPERTY(ReplicatedUsing=OnRep_InventoryItems, BlueprintReadOnly, Category="1_Inventory|Data")
 	TArray<FInventoryItem> Items;
 
-	UFUNCTION()
-	void OnRep_InventoryItems();
+	UFUNCTION() void OnRep_InventoryItems();
 
-	// Internals (no implementation in header)
 	void NotifySlotChanged(int32 SlotIndex);
 	void NotifyInventoryChanged();
 	void UpdateItemIndexes();
 	void AdjustSlotCountIfNeeded();
 	AController* ResolveRequestorController(AActor* ExplicitRequestor) const;
+	void RecalculateWeightAndVolume();
+
+	bool bWasFull = false;
 
 public:
 	// RPCs

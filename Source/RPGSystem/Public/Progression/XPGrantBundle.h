@@ -1,8 +1,9 @@
-﻿// Source/RPGSystem/Public/Progression/XPGrantBundle.h
+﻿// XPGrantBundle.h
 #pragma once
 
 #include "CoreMinimal.h"
 #include "Engine/DataAsset.h"
+#include "GameplayTagContainer.h"
 #include "XPGrantBundle.generated.h"
 
 class USkillProgressionData;
@@ -18,7 +19,6 @@ struct FSkillXPGrant
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	float XPGain = 0.f;
 
-	// Optional overrides (use defaults from the skill asset if negative/false)
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	float IncrementOverride = -1.f;
 
@@ -30,8 +30,11 @@ UCLASS(BlueprintType)
 class RPGSYSTEM_API UXPGrantBundle : public UDataAsset
 {
 	GENERATED_BODY()
-
 public:
+	/** NEW: searchable ID so we can load bundles by tag without loading the asset first */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="1_Progression-Base", meta=(AssetRegistrySearchable))
+	FGameplayTag BundleIDTag;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="1_Progression-Base")
 	TArray<FSkillXPGrant> Grants;
 };

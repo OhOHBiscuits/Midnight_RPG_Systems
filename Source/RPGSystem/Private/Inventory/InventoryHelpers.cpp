@@ -73,9 +73,21 @@ static UInventoryComponent* FindInvOnActor(const AActor* Actor)
 
 UInventoryComponent* UInventoryHelpers::GetInventoryComponent(AActor* Actor)
 {
-	return FindInvOnActor(Actor);
-}
+	if (!Actor) return nullptr;
+	if (UInventoryComponent* C = Actor->FindComponentByClass<UInventoryComponent>()) return C;
 
+	if (const APawn* P = Cast<APawn>(Actor))
+	{
+		if (AController* PC = P->GetController())
+		{
+			if (UInventoryComponent* C2 = PC->FindComponentByClass<UInventoryComponent>())
+			{
+				return C2;
+			}
+		}
+	}
+	return nullptr;
+}
 UInventoryComponent* UInventoryHelpers::GetInventoryComponentFromObject(const UObject* Object)
 {
 	if (!Object) return nullptr;
@@ -299,4 +311,18 @@ APlayerController* UInventoryHelpers::ResolvePlayerController(AActor* InActor)
 
 	// 5) Fallback: local player 0
 	return UGameplayStatics::GetPlayerController(InActor, 0);
+}
+
+bool UInventoryHelpers::ClientRequestTransfer(AActor* Requestor, UInventoryComponent* SourceInventory, int32 SourceIndex, UInventoryComponent* TargetInventory, int32 TargetIndex)
+{
+	if (!Requestor || !SourceInventory || !TargetInventory) return false;
+
+	// Always issue via an inventory the client owns (usually on the pawn or controller)
+	if (UInventoryComponent* OwnedInv = GetInventoryComponent(Requestor))
+	{
+		return OwnedInv->RequestTransferItem(SourceInventory, SourceIndex, TargetInventory, TargetIndex);
+	}
+
+	// If no owned inventory was found, we can’t safely RPC from client → server
+	return false;
 }

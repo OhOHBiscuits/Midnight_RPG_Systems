@@ -74,7 +74,6 @@ bool UFuelComponent::HasFuel() const
 	return false;
 }
 
-// Key fix: only keep burning if we have fuel AND (either we're not auto-idle-gating OR crafting is active)
 bool UFuelComponent::ShouldKeepBurning() const
 {
 	const bool bHasFuel = HasFuel();
@@ -107,7 +106,6 @@ void UFuelComponent::TryStartNextFuel()
 		}
 	}
 
-	// No next fuel found — ensure a clean stop
 	TotalBurnTime = 0.0f;
 	RemainingBurnTime = 0.0f;
 
@@ -115,7 +113,7 @@ void UFuelComponent::TryStartNextFuel()
 	{
 		W->GetTimerManager().ClearTimer(BurnFuelTimer);
 	}
-	DoAutoStop(); // sets bIsBurning=false, broadcasts OnBurnStopped
+	DoAutoStop();
 }
 
 void UFuelComponent::BurnTimerTick()
@@ -157,7 +155,6 @@ void UFuelComponent::BurnTimerTick()
 	}
 	else
 	{
-		// Safety path if tick fires with zero remaining
 		if (UWorld* W = GetWorld())
 		{
 			W->GetTimerManager().ClearTimer(BurnFuelTimer);
@@ -185,7 +182,12 @@ void UFuelComponent::BurnFuelOnce()
 				{
 					if (By.ByproductItemID.IsValid() && By.Amount > 0)
 					{
-						if (UItemDataAsset* ByAsset = UInventoryHelpers::FindItemDataByTag(this, By.ByproductItemID))
+						UItemDataAsset* ByAsset = nullptr;
+						if (bResolveByproductByTag)
+						{
+							ByAsset = UInventoryHelpers::FindItemDataByTag(this, By.ByproductItemID);
+						}
+						if (ByAsset)
 						{
 							ByproductInventory->TryAddItem(ByAsset, By.Amount);
 						}
@@ -200,17 +202,15 @@ void UFuelComponent::BurnFuelOnce()
 
 void UFuelComponent::NotifyFuelStateChanged()
 {
-	// Reserved for UI/GAS hooks
 }
 
 void UFuelComponent::OnCraftingActivated()
 {
-	// Expansion point
 }
 
 void UFuelComponent::DoAutoStop()
 {
-	if (!bIsBurning) // prevent double-broadcast if multiple paths hit
+	if (!bIsBurning)
 	{
 		TotalBurnTime = 0.0f;
 		RemainingBurnTime = 0.0f;

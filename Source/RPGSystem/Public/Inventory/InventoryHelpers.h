@@ -52,6 +52,9 @@ public:
 	
 	UFUNCTION(BlueprintCallable, Category="Inventory|Helpers")
 	static APlayerController* ResolvePlayerController(AActor* Actor);
+
+	UFUNCTION(BlueprintCallable, Category="1_Inventory|Helpers")
+	static bool ClientRequestTransfer(AActor* Requestor, UInventoryComponent* SourceInventory, int32 SourceIndex, UInventoryComponent* TargetInventory, int32 TargetIndex = -1);
 	
 	
 	

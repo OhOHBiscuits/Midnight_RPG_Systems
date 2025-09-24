@@ -813,6 +813,15 @@
     <ClCompile Include="..\..\Source\RPGSystem\Private\DecaySystem\DecayComponent.cpp">
       <Filter>Source\RPGSystem\Private\DecaySystem</Filter>
     </ClCompile>
+    <Filter Include="Source\RPGSystem\Private\EquipmentSystem">
+      <UniqueIdentifier>{30F47F25-675A-38DF-9351-0E8B216484BB}</UniqueIdentifier>
+    </Filter>
+    <ClCompile Include="..\..\Source\RPGSystem\Private\EquipmentSystem\DynamicToolbarComponent.cpp">
+      <Filter>Source\RPGSystem\Private\EquipmentSystem</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\RPGSystem\Private\EquipmentSystem\EquipmentComponent.cpp">
+      <Filter>Source\RPGSystem\Private\EquipmentSystem</Filter>
+    </ClCompile>
     <Filter Include="Source\RPGSystem\Private\FuelSystem">
       <UniqueIdentifier>{A34B957B-61AF-3B41-BED2-F216427B4D85}</UniqueIdentifier>
     </Filter>
@@ -1031,6 +1040,15 @@
     </Filter>
     <ClInclude Include="..\..\Source\RPGSystem\Public\DecaySystem\DecayComponent.h">
       <Filter>Source\RPGSystem\Public\DecaySystem</Filter>
+    </ClInclude>
+    <Filter Include="Source\RPGSystem\Public\EquipmentSystem">
+      <UniqueIdentifier>{6A864B11-B0FC-3783-A687-90099E7A0DC1}</UniqueIdentifier>
+    </Filter>
+    <ClInclude Include="..\..\Source\RPGSystem\Public\EquipmentSystem\DynamicToolbarComponent.h">
+      <Filter>Source\RPGSystem\Public\EquipmentSystem</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\RPGSystem\Public\EquipmentSystem\EquipmentComponent.h">
+      <Filter>Source\RPGSystem\Public\EquipmentSystem</Filter>
     </ClInclude>
     <Filter Include="Source\RPGSystem\Public\FuelSystem">
       <UniqueIdentifier>{6211DA44-B824-39AB-9B9E-970C33ECFA79}</UniqueIdentifier>
