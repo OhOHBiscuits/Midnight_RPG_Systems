@@ -12,6 +12,7 @@
       <Filter>Source</Filter>
     </None>
     <None Include="..\..\.dvignore" />
+    <None Include="..\..\.gitignore" />
     <None Include="..\..\.vsconfig" />
     <None Include="..\..\OwnIcon_V2.png" />
     <None Include="..\..\WinsomeGirl.png" />
@@ -972,6 +973,21 @@
     <ClCompile Include="..\..\Source\RPGSystem\Private\Stats\StatSetDataAsset.cpp">
       <Filter>Source\RPGSystem\Private\Stats</Filter>
     </ClCompile>
+    <Filter Include="Source\RPGSystem\Private\UI">
+      <UniqueIdentifier>{BD8A85D2-1FCF-3DAE-90B4-D1ABAD310B40}</UniqueIdentifier>
+    </Filter>
+    <ClCompile Include="..\..\Source\RPGSystem\Private\UI\InventoryDragDropOp.cpp">
+      <Filter>Source\RPGSystem\Private\UI</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\RPGSystem\Private\UI\InventoryItemSlotWidget.cpp">
+      <Filter>Source\RPGSystem\Private\UI</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\RPGSystem\Private\UI\InventoryPanelWidget.cpp">
+      <Filter>Source\RPGSystem\Private\UI</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\RPGSystem\Private\UI\InventoryUiBindingLibrary.cpp">
+      <Filter>Source\RPGSystem\Private\UI</Filter>
+    </ClCompile>
     <Filter Include="Source\RPGSystem\Private\WeaponSystem">
       <UniqueIdentifier>{33677E03-DDFE-324F-991D-DA6C866DCD9D}</UniqueIdentifier>
     </Filter>
@@ -1208,6 +1224,21 @@
     </ClInclude>
     <ClInclude Include="..\..\Source\RPGSystem\Public\Stats\StatSetDataAsset.h">
       <Filter>Source\RPGSystem\Public\Stats</Filter>
+    </ClInclude>
+    <Filter Include="Source\RPGSystem\Public\UI">
+      <UniqueIdentifier>{A5D3789A-FDCE-3A9A-A3A0-1834986E66F3}</UniqueIdentifier>
+    </Filter>
+    <ClInclude Include="..\..\Source\RPGSystem\Public\UI\InventoryDragDropOp.h">
+      <Filter>Source\RPGSystem\Public\UI</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\RPGSystem\Public\UI\InventoryItemSlotWidget.h">
+      <Filter>Source\RPGSystem\Public\UI</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\RPGSystem\Public\UI\InventoryPanelWidget.h">
+      <Filter>Source\RPGSystem\Public\UI</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\RPGSystem\Public\UI\InventoryUiBindingLibrary.h">
+      <Filter>Source\RPGSystem\Public\UI</Filter>
     </ClInclude>
     <Filter Include="Source\RPGSystem\Public\WeaponSystem">
       <UniqueIdentifier>{713BC0D1-A00F-3BCC-A774-A2236FD78257}</UniqueIdentifier>

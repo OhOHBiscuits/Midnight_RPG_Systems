@@ -716,6 +716,7 @@
     <None Include="..\..\Source\RPGSystem.Target.cs"/>
     <None Include="..\..\Source\RPGSystemEditor.Target.cs"/>
     <None Include="..\..\.dvignore"/>
+    <None Include="..\..\.gitignore"/>
     <None Include="..\..\.vsconfig"/>
     <None Include="..\..\OwnIcon_V2.png"/>
     <None Include="..\..\WinsomeGirl.png"/>
@@ -1336,6 +1337,22 @@
       <AdditionalIncludeDirectories>$(ClCompile_AdditionalIncludeDirectories_4)</AdditionalIncludeDirectories>
       <ForcedIncludeFiles>$(ClCompile_ForcedIncludeFiles_4)</ForcedIncludeFiles>
     </ClCompile>
+    <ClCompile Include="..\..\Source\RPGSystem\Private\UI\InventoryDragDropOp.cpp">
+      <AdditionalIncludeDirectories>$(ClCompile_AdditionalIncludeDirectories_4)</AdditionalIncludeDirectories>
+      <ForcedIncludeFiles>$(ClCompile_ForcedIncludeFiles_4)</ForcedIncludeFiles>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\RPGSystem\Private\UI\InventoryItemSlotWidget.cpp">
+      <AdditionalIncludeDirectories>$(ClCompile_AdditionalIncludeDirectories_4)</AdditionalIncludeDirectories>
+      <ForcedIncludeFiles>$(ClCompile_ForcedIncludeFiles_4)</ForcedIncludeFiles>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\RPGSystem\Private\UI\InventoryPanelWidget.cpp">
+      <AdditionalIncludeDirectories>$(ClCompile_AdditionalIncludeDirectories_4)</AdditionalIncludeDirectories>
+      <ForcedIncludeFiles>$(ClCompile_ForcedIncludeFiles_4)</ForcedIncludeFiles>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\RPGSystem\Private\UI\InventoryUiBindingLibrary.cpp">
+      <AdditionalIncludeDirectories>$(ClCompile_AdditionalIncludeDirectories_4)</AdditionalIncludeDirectories>
+      <ForcedIncludeFiles>$(ClCompile_ForcedIncludeFiles_4)</ForcedIncludeFiles>
+    </ClCompile>
     <ClCompile Include="..\..\Source\RPGSystem\Private\WeaponSystem\WeaponAmmoComponent.cpp">
       <AdditionalIncludeDirectories>$(ClCompile_AdditionalIncludeDirectories_4)</AdditionalIncludeDirectories>
       <ForcedIncludeFiles>$(ClCompile_ForcedIncludeFiles_4)</ForcedIncludeFiles>
@@ -1414,6 +1431,10 @@
     <ClInclude Include="..\..\Source\RPGSystem\Public\Stats\StatBlueprintLibrary.h"/>
     <ClInclude Include="..\..\Source\RPGSystem\Public\Stats\StatProviderInterface.h"/>
     <ClInclude Include="..\..\Source\RPGSystem\Public\Stats\StatSetDataAsset.h"/>
+    <ClInclude Include="..\..\Source\RPGSystem\Public\UI\InventoryDragDropOp.h"/>
+    <ClInclude Include="..\..\Source\RPGSystem\Public\UI\InventoryItemSlotWidget.h"/>
+    <ClInclude Include="..\..\Source\RPGSystem\Public\UI\InventoryPanelWidget.h"/>
+    <ClInclude Include="..\..\Source\RPGSystem\Public\UI\InventoryUiBindingLibrary.h"/>
     <ClInclude Include="..\..\Source\RPGSystem\Public\WeaponSystem\WeaponAmmoComponent.h"/>
     <ClInclude Include="..\..\Source\RPGSystem\Public\WeaponSystem\Interface\WeaponHostInterface.h"/>
     <ClInclude Include="..\..\Source\RPGSystem\Public\Zone\SmartZoneComponent.h"/>

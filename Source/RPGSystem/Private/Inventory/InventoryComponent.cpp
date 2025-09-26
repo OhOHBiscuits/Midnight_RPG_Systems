@@ -1,43 +1,39 @@
 ﻿// InventoryComponent.cpp
-
+//
 #include "Inventory/InventoryComponent.h"
 #include "GameFramework/Controller.h"
 #include "GameFramework/Pawn.h"
 #include "Net/UnrealNetwork.h"
 #include "Inventory/ItemDataAsset.h"
-
+//
 static FGameplayTag GT_Public()   { return FGameplayTag::RequestGameplayTag(TEXT("Inventory.Access.Public"),   false); }
 static FGameplayTag GT_ViewOnly() { return FGameplayTag::RequestGameplayTag(TEXT("Inventory.Access.ViewOnly"), false); }
 static FGameplayTag GT_Private()  { return FGameplayTag::RequestGameplayTag(TEXT("Inventory.Access.Private"),  false); }
-
+//
 UInventoryComponent::UInventoryComponent()
 {
 	PrimaryComponentTick.bCanEverTick = false;
 	SetIsReplicatedByDefault(true);
 }
-
 void UInventoryComponent::BeginPlay()
 {
 	Super::BeginPlay();
 	AdjustSlotCountIfNeeded();
 	RecalculateWeightAndVolume();
 }
-
 void UInventoryComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME(UInventoryComponent, Items);
 	DOREPLIFETIME(UInventoryComponent, AccessTag);
 }
-
 void UInventoryComponent::OnRep_InventoryItems()
 {
+	OnInventoryChanged.Broadcast();
 	RecalculateWeightAndVolume();
 	NotifyInventoryChanged();
 }
-
 void UInventoryComponent::OnRep_AccessTag(){}
-
 void UInventoryComponent::SetInventoryAccess(const FGameplayTag& NewAccessTag)
 {
 	if (AActor* O = GetOwner())
@@ -49,13 +45,10 @@ void UInventoryComponent::SetInventoryAccess(const FGameplayTag& NewAccessTag)
 		}
 	}
 }
-
 bool UInventoryComponent::HasAccess_Public()   const { return AccessTag == GT_Public(); }
 bool UInventoryComponent::HasAccess_ViewOnly() const { return AccessTag == GT_ViewOnly(); }
 bool UInventoryComponent::HasAccess_Private()  const { return AccessTag == GT_Private(); }
-
 void UInventoryComponent::AutoInitializeAccessFromArea(AActor*){}
-
 AController* UInventoryComponent::ResolveRequestorController(AActor* ExplicitRequestor) const
 {
 	if (ExplicitRequestor)
@@ -71,7 +64,6 @@ AController* UInventoryComponent::ResolveRequestorController(AActor* ExplicitReq
 	}
 	return nullptr;
 }
-
 bool UInventoryComponent::CanView(AActor* Requestor) const
 {
 	if (HasAccess_Public() || HasAccess_ViewOnly()) return true;
@@ -83,7 +75,6 @@ bool UInventoryComponent::CanView(AActor* Requestor) const
 	}
 	return true;
 }
-
 bool UInventoryComponent::CanModify(AActor* Requestor) const
 {
 	if (HasAccess_Public()) return true;
@@ -96,12 +87,10 @@ bool UInventoryComponent::CanModify(AActor* Requestor) const
 	}
 	return true;
 }
-
 void UInventoryComponent::NotifySlotChanged(int32 SlotIndex)
 {
 	OnInventoryUpdated.Broadcast(SlotIndex);
 }
-
 void UInventoryComponent::NotifyInventoryChanged()
 {
 	const bool PrevFull = bWasFull;
@@ -116,12 +105,10 @@ void UInventoryComponent::NotifyInventoryChanged()
 
 	OnInventoryChanged.Broadcast();
 }
-
 void UInventoryComponent::UpdateItemIndexes()
 {
 	for (int32 i = 0; i < Items.Num(); ++i) Items[i].Index = i;
 }
-
 void UInventoryComponent::AdjustSlotCountIfNeeded()
 {
 	MaxSlots = FMath::Max(0, MaxSlots);
@@ -131,7 +118,6 @@ void UInventoryComponent::AdjustSlotCountIfNeeded()
 		UpdateItemIndexes();
 	}
 }
-
 void UInventoryComponent::SetMaxCarryWeight(float NewMaxWeight) { MaxCarryWeight = FMath::Max(0.f, NewMaxWeight); }
 void UInventoryComponent::SetMaxCarryVolume(float NewMaxVolume) { MaxCarryVolume = FMath::Max(0.f, NewMaxVolume); }
 void UInventoryComponent::SetMaxSlots(int32 NewMaxSlots)
@@ -140,8 +126,7 @@ void UInventoryComponent::SetMaxSlots(int32 NewMaxSlots)
 	AdjustSlotCountIfNeeded();
 	NotifyInventoryChanged();
 }
-
-// Queries
+// Queries//
 bool UInventoryComponent::IsInventoryFull() const { return GetNumOccupiedSlots() >= MaxSlots; }
 float UInventoryComponent::GetCurrentWeight() const { return CurrentWeight; }
 float UInventoryComponent::GetCurrentVolume() const { return CurrentVolume; }
@@ -177,8 +162,7 @@ void UInventoryComponent::GetUISlotInfo(TArray<int32>& OutIdx, TArray<UItemDataA
 	OutIdx.Reset(); OutData.Reset(); OutQty.Reset();
 	for(int32 i=0;i<Items.Num();++i){ const FInventoryItem& S=Items[i]; if(!S.IsValid()) continue; OutIdx.Add(i); OutData.Add(S.ItemData.Get()); OutQty.Add(S.Quantity); }
 }
-
-// Filters
+// Filters//
 TArray<FInventoryItem> UInventoryComponent::FilterItemsByRarity(FGameplayTag RarityTag) const
 {
 	TArray<FInventoryItem> Out; if(!RarityTag.IsValid()) return Out;
@@ -214,7 +198,6 @@ TArray<FInventoryItem> UInventoryComponent::FilterItemsByTags(FGameplayTagContai
 	}
 	return Out;
 }
-
 bool UInventoryComponent::CanAcceptItem(UItemDataAsset* ItemData) const
 {
 	if(!ItemData) return false;
@@ -222,8 +205,7 @@ bool UInventoryComponent::CanAcceptItem(UItemDataAsset* ItemData) const
 	for(const FGameplayTag& T:AllowedItemIDs) if(T.IsValid() && T==ItemData->ItemIDTag) return true;
 	return false;
 }
-
-// Core actions
+// Core actions//
 bool UInventoryComponent::AddItem(UItemDataAsset* ItemData, int32 Quantity, AActor* Requestor)
 {
 	if(!ItemData || Quantity<=0) return false;
@@ -242,7 +224,6 @@ bool UInventoryComponent::AddItem(UItemDataAsset* ItemData, int32 Quantity, AAct
 	FInventoryItem NewI; NewI.ItemData=ItemData; NewI.Quantity=Quantity; NewI.Index=Free;
 	Items[Free]=NewI; NotifySlotChanged(Free); OnItemAdded.Broadcast(NewI,Quantity); NotifyInventoryChanged(); return true;
 }
-
 bool UInventoryComponent::RemoveItem(int32 SlotIndex, int32 Quantity, AActor* Requestor)
 {
 	if(Quantity<=0 || !Items.IsValidIndex(SlotIndex)) return false;
@@ -256,14 +237,12 @@ bool UInventoryComponent::RemoveItem(int32 SlotIndex, int32 Quantity, AActor* Re
 	S.Quantity -= Quantity; if(S.Quantity<=0) S = FInventoryItem();
 	NotifySlotChanged(SlotIndex); OnItemRemoved.Broadcast(Removed); NotifyInventoryChanged(); return true;
 }
-
 bool UInventoryComponent::RemoveItemByID(FGameplayTag ItemID, int32 Quantity, AActor* Requestor)
 {
 	if(!ItemID.IsValid()||Quantity<=0) return false;
 	const int32 SlotIndex=FindSlotWithItemID(ItemID);
 	return RemoveItem(SlotIndex,Quantity,Requestor);
 }
-
 bool UInventoryComponent::MoveItem(int32 FromIndex, int32 ToIndex, AActor* Requestor)
 {
 	if(!Items.IsValidIndex(FromIndex) || !Items.IsValidIndex(ToIndex) || FromIndex==ToIndex) return false;
@@ -278,9 +257,7 @@ bool UInventoryComponent::MoveItem(int32 FromIndex, int32 ToIndex, AActor* Reque
 
 	NotifySlotChanged(FromIndex); NotifySlotChanged(ToIndex); NotifyInventoryChanged(); return true;
 }
-
 bool UInventoryComponent::SwapItems(int32 IndexA, int32 IndexB, AActor* Requestor) { return MoveItem(IndexA, IndexB, Requestor); }
-
 bool UInventoryComponent::TransferItemToInventory(int32 FromIndex, UInventoryComponent* TargetInventory, AActor* Requestor)
 {
 	if(!TargetInventory) return false;
@@ -309,8 +286,7 @@ bool UInventoryComponent::TransferItemToInventory(int32 FromIndex, UInventoryCom
 	NotifyInventoryChanged(); TargetInventory->NotifyInventoryChanged(); OnItemTransferSuccess.Broadcast(Moved);
 	return true;
 }
-
-// Split Stack
+// Split Stack//
 bool UInventoryComponent::SplitStack(int32 SlotIndex, int32 SplitQuantity, AActor* Requestor)
 {
 	if(AActor* O=GetOwner()){ if(!O->HasAuthority()) return TrySplitStack(SlotIndex,SplitQuantity); }
@@ -326,7 +302,6 @@ bool UInventoryComponent::SplitStack(int32 SlotIndex, int32 SplitQuantity, AActo
 
 	NotifySlotChanged(SlotIndex); NotifySlotChanged(TargetIndex); OnItemAdded.Broadcast(NewStack,NewStack.Quantity); NotifyInventoryChanged(); return true;
 }
-
 // High-level push/pull
 bool UInventoryComponent::PushToInventory(UInventoryComponent* TargetInventory, int32 FromIndex, int32 TargetIndex /*= -1*/)
 {
@@ -342,7 +317,6 @@ bool UInventoryComponent::PushToInventory(UInventoryComponent* TargetInventory, 
 	}
 	return false;
 }
-
 bool UInventoryComponent::PullFromInventory(UInventoryComponent* SourceInventory, int32 SourceIndex, int32 TargetIndex /*= -1*/)
 {
 	if (!SourceInventory) return false;
@@ -352,7 +326,6 @@ bool UInventoryComponent::PullFromInventory(UInventoryComponent* SourceInventory
 	}
 	return false;
 }
-
 bool UInventoryComponent::RequestTransferItem(UInventoryComponent* SourceInventory, int32 SourceIndex, UInventoryComponent* TargetInventory, int32 TargetIndex /*= -1*/)
 {
 	if (!SourceInventory || !TargetInventory) return false;
@@ -390,7 +363,6 @@ bool UInventoryComponent::RequestTransferItem(UInventoryComponent* SourceInvento
 	}
 	return false;
 }
-
 // Client helpers
 bool UInventoryComponent::TryAddItem(UItemDataAsset* ItemData,int32 Quantity)
 {
@@ -424,8 +396,7 @@ bool UInventoryComponent::TrySplitStack(int32 SlotIndex,int32 SplitQuantity)
 		ServerSplitStack(SlotIndex,SplitQuantity,ResolveRequestorController(O)); return true; }
 	return false;
 }
-
-// Sorting
+// Sorting//
 void UInventoryComponent::SortInventoryByName()
 {
 	Items.Sort([](const FInventoryItem& A,const FInventoryItem& B){
@@ -437,7 +408,6 @@ void UInventoryComponent::SortInventoryByName()
 void UInventoryComponent::ServerSortInventoryByName_Implementation(AController*){ SortInventoryByName(); }
 bool UInventoryComponent::ServerSortInventoryByName_Validate(AController*){ return true; }
 void UInventoryComponent::RequestSortInventoryByName(){ if (AActor* O=GetOwner()) if(!O->HasAuthority()) ServerSortInventoryByName(ResolveRequestorController(O)); else SortInventoryByName(); }
-
 void UInventoryComponent::SortInventoryByRarity()
 {
 	Items.Sort([](const FInventoryItem& A,const FInventoryItem& B){
@@ -450,7 +420,6 @@ void UInventoryComponent::SortInventoryByRarity()
 void UInventoryComponent::ServerSortInventoryByRarity_Implementation(AController*){ SortInventoryByRarity(); }
 bool UInventoryComponent::ServerSortInventoryByRarity_Validate(AController*){ return true; }
 void UInventoryComponent::RequestSortInventoryByRarity(){ if (AActor* O=GetOwner()) if(!O->HasAuthority()) ServerSortInventoryByRarity(ResolveRequestorController(O)); else SortInventoryByRarity(); }
-
 void UInventoryComponent::SortInventoryByType()
 {
 	Items.Sort([](const FInventoryItem& A,const FInventoryItem& B){
@@ -462,7 +431,6 @@ void UInventoryComponent::SortInventoryByType()
 void UInventoryComponent::ServerSortInventoryByType_Implementation(AController*){ SortInventoryByType(); }
 bool UInventoryComponent::ServerSortInventoryByType_Validate(AController*){ return true; }
 void UInventoryComponent::RequestSortInventoryByType(){ if (AActor* O=GetOwner()) if(!O->HasAuthority()) ServerSortInventoryByType(ResolveRequestorController(O)); else SortInventoryByType(); }
-
 void UInventoryComponent::SortInventoryByCategory()
 {
 	Items.Sort([](const FInventoryItem& A,const FInventoryItem& B){
@@ -474,28 +442,21 @@ void UInventoryComponent::SortInventoryByCategory()
 void UInventoryComponent::ServerSortInventoryByCategory_Implementation(AController*){ SortInventoryByCategory(); }
 bool UInventoryComponent::ServerSortInventoryByCategory_Validate(AController*){ return true; }
 void UInventoryComponent::RequestSortInventoryByCategory(){ if (AActor* O=GetOwner()) if(!O->HasAuthority()) ServerSortInventoryByCategory(ResolveRequestorController(O)); else SortInventoryByCategory(); }
-
-// RPCs
+// RPCs//
 void UInventoryComponent::ServerAddItem_Implementation(UItemDataAsset* ItemData,int32 Quantity,AController* Requestor){ AddItem(ItemData,Quantity,Requestor); }
 bool UInventoryComponent::ServerAddItem_Validate(UItemDataAsset* ItemData,int32 Quantity,AController*){ return ItemData!=nullptr && Quantity>0; }
 void UInventoryComponent::ClientAddItemResponse_Implementation(bool /*bSuccess*/){}
-
 void UInventoryComponent::ServerRemoveItem_Implementation(int32 SlotIndex,int32 Quantity,AController* Requestor){ RemoveItem(SlotIndex,Quantity,Requestor); }
 bool UInventoryComponent::ServerRemoveItem_Validate(int32 SlotIndex,int32 Quantity,AController*){ return SlotIndex>=0 && Quantity>0; }
-
 void UInventoryComponent::ServerRemoveItemByID_Implementation(FGameplayTag ItemID,int32 Quantity,AController* Requestor){ RemoveItemByID(ItemID,Quantity,Requestor); }
 bool UInventoryComponent::ServerRemoveItemByID_Validate(FGameplayTag ItemID,int32 Quantity,AController*){ return ItemID.IsValid() && Quantity>0; }
-
 void UInventoryComponent::ServerMoveItem_Implementation(int32 FromIndex,int32 ToIndex,AController* Requestor){ MoveItem(FromIndex,ToIndex,Requestor); }
 bool UInventoryComponent::ServerMoveItem_Validate(int32 FromIndex,int32 ToIndex,AController*){ return FromIndex>=0 && ToIndex>=0 && FromIndex!=ToIndex; }
-
 void UInventoryComponent::ServerTransferItem_Implementation(int32 FromIndex,UInventoryComponent* Target,AController* Requestor){ TransferItemToInventory(FromIndex,Target,Requestor); }
 bool UInventoryComponent::ServerTransferItem_Validate(int32 FromIndex,UInventoryComponent* Target,AController*){ return FromIndex>=0 && Target!=nullptr; }
-
 void UInventoryComponent::ServerPullItem_Implementation(int32 FromIndex,UInventoryComponent* Source,AController* Requestor)
 { if (Source) Source->TransferItemToInventory(FromIndex,this,Requestor); }
 bool UInventoryComponent::ServerPullItem_Validate(int32 FromIndex,UInventoryComponent* Source,AController*){ return FromIndex>=0 && Source!=nullptr; }
-
 void UInventoryComponent::Server_TransferItem_Implementation(UInventoryComponent* Source,int32 SourceIdx,UInventoryComponent* Target,int32 TargetIdx,AController*)
 {
 	if(!Source||!Target) return;
@@ -522,11 +483,10 @@ void UInventoryComponent::Server_TransferItem_Implementation(UInventoryComponent
 	Target->NotifyInventoryChanged();
 }
 bool UInventoryComponent::Server_TransferItem_Validate(UInventoryComponent* Source,int32 SourceIdx,UInventoryComponent* Target,int32 /*TargetIdx*/,AController*){ return Source!=nullptr && Target!=nullptr && SourceIdx>=0; }
-
 bool UInventoryComponent::ServerSplitStack_Validate(int32 SlotIndex, int32 SplitQuantity, AController*){ return SlotIndex >= 0 && SplitQuantity > 0; }
 void UInventoryComponent::ServerSplitStack_Implementation(int32 SlotIndex, int32 SplitQuantity, AController* Requestor){ SplitStack(SlotIndex, SplitQuantity, Requestor); }
 
-// Derived state
+// Derived state//
 void UInventoryComponent::RecalculateWeightAndVolume()
 {
 	float NewWeight=0.f, NewVolume=0.f;
@@ -543,3 +503,4 @@ void UInventoryComponent::RecalculateWeightAndVolume()
 	if(FMath::Abs(NewWeight-CurrentWeight)>Eps){ CurrentWeight=NewWeight; OnWeightChanged.Broadcast(CurrentWeight); }
 	if(FMath::Abs(NewVolume-CurrentVolume)>Eps){ CurrentVolume=NewVolume; OnVolumeChanged.Broadcast(CurrentVolume); }
 }
+

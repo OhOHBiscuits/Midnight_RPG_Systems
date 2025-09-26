@@ -119,7 +119,6 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category="1_Inventory|Container")
 	virtual bool CanAcceptItem(UItemDataAsset* ItemData) const;
-
 	// Settings
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="1_Inventory|Settings") int32 MaxSlots = 20;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="1_Inventory|Settings") float MaxCarryWeight = 100.f;
@@ -127,11 +126,9 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="1_Inventory|Settings") FGameplayTag InventoryTypeTag;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="1_Inventory|Settings") FGameplayTag InventoryBehaviorTag;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="1_Inventory|Settings") bool bAutoSort = false;
-
 	UFUNCTION(BlueprintCallable, Category="1_Inventory|Settings") virtual void SetMaxCarryWeight(float NewMaxWeight);
 	UFUNCTION(BlueprintCallable, Category="1_Inventory|Settings") virtual void SetMaxCarryVolume(float NewMaxVolume);
 	UFUNCTION(BlueprintCallable, Category="1_Inventory|Settings") void SetMaxSlots(int32 NewMaxSlots);
-
 	// State
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="1_Inventory|State") float CurrentWeight = 0.f;
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="1_Inventory|State") float CurrentVolume = 0.f;
