@@ -16,7 +16,8 @@ class RPGSYSTEM_API UInventoryPanelWidget : public UUserWidget
 	GENERATED_BODY()
 
 public:
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="1_Inventory-UI|Setup")
+	/** The inventory shown by this panel. Exposed on spawn + BP getter/setter nodes. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="1_Inventory-UI|Setup", meta=(ExposeOnSpawn="true"))
 	TObjectPtr<UInventoryComponent> InventoryRef = nullptr;
 
 	/** Container the panel will populate with slot widgets (WrapBox/UniformGrid/etc.). */
@@ -34,6 +35,13 @@ public:
 	/** Optional throttle; if false, we rebuild immediately when counts change. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="1_Inventory-UI|Perf")
 	bool bDeferFullRebuild = false;
+
+	// ----- Blueprint accessors (show up as nodes) -----
+	UFUNCTION(BlueprintGetter, Category="1_Inventory-UI|Setup")
+	UInventoryComponent* GetInventoryRef() const { return InventoryRef; }
+
+	UFUNCTION(BlueprintSetter, Category="1_Inventory-UI|Setup")
+	void SetInventoryRef(UInventoryComponent* InInventory) { InitializeWithInventory(InInventory); }
 
 	// ----- External API -----
 	UFUNCTION(BlueprintCallable, Category="1_Inventory-UI|Setup")
@@ -70,7 +78,7 @@ private:
 	void BindInventory(UInventoryComponent* InInventory);
 	void UnbindInventory();
 
-	/** Ensures SlotContainer has exactly N children; spawns as needed (and binds each). */
+	/** Ensures SlotContainer has exactly N children; spawns & binds each BEFORE Construct. */
 	void EnsureSlotWidgets(int32 DesiredCount);
 
 	/** Returns (ItemData, Qty) for a slot; null if empty. */

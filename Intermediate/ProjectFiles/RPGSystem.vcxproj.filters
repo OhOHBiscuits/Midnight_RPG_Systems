@@ -15,6 +15,7 @@
     <None Include="..\..\.gitignore" />
     <None Include="..\..\.vsconfig" />
     <None Include="..\..\OwnIcon_V2.png" />
+    <None Include="..\..\RPGSystem.sln.DotSettings.user" />
     <None Include="..\..\WinsomeGirl.png" />
     <Filter Include="Config">
       <UniqueIdentifier>{FA535FFB-25E1-3D20-B416-52F9BE21E06E}</UniqueIdentifier>

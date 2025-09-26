@@ -75,16 +75,18 @@ void UInventoryPanelWidget::EnsureSlotWidgets(int32 DesiredCount)
 		SlotContainer->RemoveChildAt(i);
 	}
 
-	// Add missing and bind immediately
+	// Add missing and bind BEFORE adding to container so InventoryRef is valid in Construct()
 	for (int32 i = Current; i < DesiredCount; ++i)
 	{
 		UInventoryItemSlotWidget* SlotW = CreateWidget<UInventoryItemSlotWidget>(this, SlotWidgetClass);
-		SlotContainer->AddChild(SlotW);
 
 		if (InventoryRef)
 		{
+			// Bind now: Construct on add will see InventoryRef/SlotIndex already set
 			SlotW->BindToInventory(InventoryRef, i);
 		}
+
+		SlotContainer->AddChild(SlotW);
 	}
 
 	// Re-bind any existing children to ensure they’re connected after size changes
@@ -160,16 +162,7 @@ void UInventoryPanelWidget::RefreshSlot(int32 SlotIndex)
 	}
 }
 
-void UInventoryPanelWidget::HandleSlotUpdated(int32 SlotIndex)
-{
-	RefreshSlot(SlotIndex);
-}
-
-void UInventoryPanelWidget::HandleInventoryChanged()
-{
-	if (bDeferFullRebuild) return;
-	RefreshAll();
-}
-
-void UInventoryPanelWidget::HandleWeightChanged(float /*NewW*/) { }
-void UInventoryPanelWidget::HandleVolumeChanged(float /*NewV*/) { }
+void UInventoryPanelWidget::HandleSlotUpdated(int32 SlotIndex)   { RefreshSlot(SlotIndex); }
+void UInventoryPanelWidget::HandleInventoryChanged()              { if (!bDeferFullRebuild) RefreshAll(); }
+void UInventoryPanelWidget::HandleWeightChanged(float)            { /* optional BP label update */ }
+void UInventoryPanelWidget::HandleVolumeChanged(float)            { /* optional BP label update */ }

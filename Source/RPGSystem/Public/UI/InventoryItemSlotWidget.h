@@ -16,30 +16,42 @@ class RPGSYSTEM_API UInventoryItemSlotWidget : public UUserWidget
 	GENERATED_BODY()
 
 public:
-	UPROPERTY(BlueprintReadOnly, Category="1_Inventory-UI|State")
+	/** Allow overriding from BP when you manually create a slot (optional). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="1_Inventory-UI|Setup", meta=(ExposeOnSpawn="true"))
 	TObjectPtr<UInventoryComponent> InventoryRef = nullptr;
 
-	UPROPERTY(BlueprintReadOnly, Category="1_Inventory-UI|State")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="1_Inventory-UI|Setup", meta=(ExposeOnSpawn="true"))
 	int32 SlotIndex = INDEX_NONE;
 
+	// Current slot state (read-only for your visuals)
 	UPROPERTY(BlueprintReadOnly, Category="1_Inventory-UI|State")
 	TObjectPtr<UItemDataAsset> ItemData = nullptr;
 
 	UPROPERTY(BlueprintReadOnly, Category="1_Inventory-UI|State")
 	int32 Quantity = 0;
 
+	// ---- BP accessors ----
+	UFUNCTION(BlueprintPure, Category="1_Inventory-UI|State") UInventoryComponent* GetSlotInventory() const { return InventoryRef; }
+	UFUNCTION(BlueprintPure, Category="1_Inventory-UI|State") int32 GetSlotIndex() const { return SlotIndex; }
+	UFUNCTION(BlueprintPure, Category="1_Inventory-UI|State") UItemDataAsset* GetSlotItemData() const { return ItemData; }
+	UFUNCTION(BlueprintPure, Category="1_Inventory-UI|State") int32 GetSlotQuantity() const { return Quantity; }
+
 	/** Paint your icon/stack/etc. in BP after the data changes. */
 	UFUNCTION(BlueprintImplementableEvent, Category="1_Inventory-UI|Events")
 	void OnSlotVisualsChanged();
 
-	/** Panel calls this to wire the slot to a specific inventory/index. */
+	/** Panel or BP calls this to wire the slot to a specific inventory/index. */
 	UFUNCTION(BlueprintCallable, Category="1_Inventory-UI|Setup")
 	void BindToInventory(UInventoryComponent* InInv, int32 InIndex);
 
 	UFUNCTION(BlueprintCallable, Category="1_Inventory-UI|Setup")
 	void UnbindFromInventory();
 
-	/** Useful for previews in BP if needed. Also used internally after queries. */
+	/** Force a re-query + repaint (handy to call from BP after custom logic). */
+	UFUNCTION(BlueprintCallable, Category="1_Inventory-UI|Refresh")
+	void UpdateSlotFromInventory();
+
+	/** Also useful for previews and internal updates. */
 	UFUNCTION(BlueprintCallable, Category="1_Inventory-UI|State")
 	void SetSlotData(UInventoryComponent* InInv, int32 InIndex, UItemDataAsset* InData, int32 InQty)
 	{
@@ -48,6 +60,7 @@ public:
 	}
 
 protected:
+	virtual void NativeOnInitialized() override;   // bind early if ExposeOnSpawn was used
 	virtual void NativeDestruct() override;
 	virtual bool NativeOnDrop(const FGeometry& InGeometry, const FDragDropEvent& InDragDropEvent, UDragDropOperation* InOperation) override;
 	virtual void NativeOnDragDetected(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent, UDragDropOperation*& OutOperation) override;

@@ -1,4 +1,3 @@
-// Source/RPGSystem/Private/UI/InventoryItemSlotWidget.cpp
 #include "UI/InventoryItemSlotWidget.h"
 #include "UI/InventoryPanelWidget.h"
 #include "UI/InventoryDragDropOp.h"
@@ -8,6 +7,18 @@
 #include "Inventory/ItemDataAsset.h"
 
 #include "Blueprint/WidgetBlueprintLibrary.h"
+
+void UInventoryItemSlotWidget::NativeOnInitialized()
+{
+	Super::NativeOnInitialized();
+
+	// If the slot was created from BP and ExposeOnSpawn set these,
+	// bind now so Construct() already sees a valid InventoryRef.
+	if (InventoryRef && SlotIndex >= 0)
+	{
+		BindToInventory(InventoryRef, SlotIndex);
+	}
+}
 
 void UInventoryItemSlotWidget::BindToInventory(UInventoryComponent* InInv, int32 InIndex)
 {
@@ -50,6 +61,11 @@ void UInventoryItemSlotWidget::NativeDestruct()
 	Super::NativeDestruct();
 }
 
+void UInventoryItemSlotWidget::UpdateSlotFromInventory()
+{
+	UpdateFromInventory();
+}
+
 void UInventoryItemSlotWidget::HandleInvSlotUpdated(int32 UpdatedIndex)
 {
 	if (UpdatedIndex == SlotIndex)
@@ -76,7 +92,7 @@ UItemDataAsset* UInventoryItemSlotWidget::ResolveItemData() const
 		return Already;
 	}
 	TSoftObjectPtr<UItemDataAsset> Soft = Item.ItemData;
-	return Soft.LoadSynchronous(); // PIE + Standalone safe (occasional UI use)
+	return Soft.LoadSynchronous(); // safe for occasional UI use
 }
 
 void UInventoryItemSlotWidget::UpdateFromInventory()
@@ -102,9 +118,6 @@ bool UInventoryItemSlotWidget::NativeOnDrop(const FGeometry& Geom, const FDragDr
 	{
 		if (!CanAcceptDrop(Drag)) return false;
 
-		APlayerController* PC = GetOwningPlayer();
-		AActor* Requestor = PC ? static_cast<AActor*>(PC) : nullptr; // kept in case your InventoryComponent uses it internally
-
 		bool bSuccess = false;
 
 		if (Drag->SourceInventory == InventoryRef)
@@ -120,7 +133,7 @@ bool UInventoryItemSlotWidget::NativeOnDrop(const FGeometry& Geom, const FDragDr
 		}
 		else
 		{
-			// ✨ FIX: call the component version, not a Helpers function
+			// Use component API (handles server routing)
 			bSuccess = InventoryRef->RequestTransferItem(Drag->SourceInventory, Drag->FromIndex, InventoryRef, SlotIndex);
 
 			// Fast local refresh of the target slot; source panel refreshes via its own delegate
