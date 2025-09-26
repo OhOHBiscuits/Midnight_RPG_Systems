@@ -822,6 +822,15 @@
     <ClCompile Include="..\..\Source\RPGSystem\Private\EquipmentSystem\EquipmentComponent.cpp">
       <Filter>Source\RPGSystem\Private\EquipmentSystem</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Source\RPGSystem\Private\EquipmentSystem\EquipmentHelperLibrary.cpp">
+      <Filter>Source\RPGSystem\Private\EquipmentSystem</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\RPGSystem\Private\EquipmentSystem\EquipmentSystemInterface.cpp">
+      <Filter>Source\RPGSystem\Private\EquipmentSystem</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\RPGSystem\Private\EquipmentSystem\WieldComponent.cpp">
+      <Filter>Source\RPGSystem\Private\EquipmentSystem</Filter>
+    </ClCompile>
     <Filter Include="Source\RPGSystem\Private\FuelSystem">
       <UniqueIdentifier>{A34B957B-61AF-3B41-BED2-F216427B4D85}</UniqueIdentifier>
     </Filter>
@@ -869,12 +878,6 @@
     </Filter>
     <ClCompile Include="..\..\Source\RPGSystem\Private\InteractionSystem\Interface\InteractionSystemInterface.cpp">
       <Filter>Source\RPGSystem\Private\InteractionSystem\Interface</Filter>
-    </ClCompile>
-    <Filter Include="Source\RPGSystem\Private\Interfaces">
-      <UniqueIdentifier>{73EE105A-F299-3251-AD90-7B624ADB7DDD}</UniqueIdentifier>
-    </Filter>
-    <ClCompile Include="..\..\Source\RPGSystem\Private\Interfaces\InteractionInterface.cpp">
-      <Filter>Source\RPGSystem\Private\Interfaces</Filter>
     </ClCompile>
     <Filter Include="Source\RPGSystem\Private\Inventory">
       <UniqueIdentifier>{16CFF35D-1FEE-3E97-8492-8048F682A26D}</UniqueIdentifier>
@@ -981,6 +984,18 @@
     <ClCompile Include="..\..\Source\RPGSystem\Private\WeaponSystem\Interface\WeaponHostInterface.cpp">
       <Filter>Source\RPGSystem\Private\WeaponSystem\Interface</Filter>
     </ClCompile>
+    <Filter Include="Source\RPGSystem\Private\Zone">
+      <UniqueIdentifier>{97833C09-696C-3916-911C-88EBBA7D73F3}</UniqueIdentifier>
+    </Filter>
+    <ClCompile Include="..\..\Source\RPGSystem\Private\Zone\SmartZoneComponent.cpp">
+      <Filter>Source\RPGSystem\Private\Zone</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\RPGSystem\Private\Zone\ZoneControlComponent.cpp">
+      <Filter>Source\RPGSystem\Private\Zone</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\RPGSystem\Private\Zone\ZoneVolumeActor.cpp">
+      <Filter>Source\RPGSystem\Private\Zone</Filter>
+    </ClCompile>
     <Filter Include="Source\RPGSystem\Public">
       <UniqueIdentifier>{72AFB710-0C59-3767-A861-A9A44630F591}</UniqueIdentifier>
     </Filter>
@@ -1050,6 +1065,15 @@
     <ClInclude Include="..\..\Source\RPGSystem\Public\EquipmentSystem\EquipmentComponent.h">
       <Filter>Source\RPGSystem\Public\EquipmentSystem</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Source\RPGSystem\Public\EquipmentSystem\EquipmentHelperLibrary.h">
+      <Filter>Source\RPGSystem\Public\EquipmentSystem</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\RPGSystem\Public\EquipmentSystem\EquipmentSystemInterface.h">
+      <Filter>Source\RPGSystem\Public\EquipmentSystem</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\RPGSystem\Public\EquipmentSystem\WieldComponent.h">
+      <Filter>Source\RPGSystem\Public\EquipmentSystem</Filter>
+    </ClInclude>
     <Filter Include="Source\RPGSystem\Public\FuelSystem">
       <UniqueIdentifier>{6211DA44-B824-39AB-9B9E-970C33ECFA79}</UniqueIdentifier>
     </Filter>
@@ -1097,12 +1121,6 @@
     </Filter>
     <ClInclude Include="..\..\Source\RPGSystem\Public\InteractionSystem\Interface\InteractionSystemInterface.h">
       <Filter>Source\RPGSystem\Public\InteractionSystem\Interface</Filter>
-    </ClInclude>
-    <Filter Include="Source\RPGSystem\Public\Interfaces">
-      <UniqueIdentifier>{AD6C4ECA-D2BB-3746-9142-063D58BD753A}</UniqueIdentifier>
-    </Filter>
-    <ClInclude Include="..\..\Source\RPGSystem\Public\Interfaces\InteractionInterface.h">
-      <Filter>Source\RPGSystem\Public\Interfaces</Filter>
     </ClInclude>
     <Filter Include="Source\RPGSystem\Public\Inventory">
       <UniqueIdentifier>{AACC8D47-4B4F-35C2-B87B-2201633FFFD8}</UniqueIdentifier>
@@ -1202,6 +1220,18 @@
     </Filter>
     <ClInclude Include="..\..\Source\RPGSystem\Public\WeaponSystem\Interface\WeaponHostInterface.h">
       <Filter>Source\RPGSystem\Public\WeaponSystem\Interface</Filter>
+    </ClInclude>
+    <Filter Include="Source\RPGSystem\Public\Zone">
+      <UniqueIdentifier>{324D1C46-F57F-3539-9C5D-42655A4C5091}</UniqueIdentifier>
+    </Filter>
+    <ClInclude Include="..\..\Source\RPGSystem\Public\Zone\SmartZoneComponent.h">
+      <Filter>Source\RPGSystem\Public\Zone</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\RPGSystem\Public\Zone\ZoneControlComponent.h">
+      <Filter>Source\RPGSystem\Public\Zone</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\RPGSystem\Public\Zone\ZoneVolumeActor.h">
+      <Filter>Source\RPGSystem\Public\Zone</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>
