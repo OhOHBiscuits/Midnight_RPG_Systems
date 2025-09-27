@@ -9,45 +9,44 @@ class UInventoryComponent;
 class UItemDataAsset;
 class UInventoryItemSlotWidget;
 
-/** Reusable inventory view. Only rebuild/refresh on change. */
+/** Reusable inventory view; spawns/binds slot widgets and listens for component events. */
 UCLASS(Blueprintable)
 class RPGSYSTEM_API UInventoryPanelWidget : public UUserWidget
 {
 	GENERATED_BODY()
 
 public:
-	/** The inventory shown by this panel. Exposed on spawn + BP getter/setter nodes. */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="1_Inventory-UI|Setup", meta=(ExposeOnSpawn="true"))
+	/** Expose on spawn + getter/setter nodes for BP. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, BlueprintGetter=GetInventoryRef, BlueprintSetter=SetInventoryRef, Category="1_Inventory-UI|Setup", meta=(ExposeOnSpawn="true"))
 	TObjectPtr<UInventoryComponent> InventoryRef = nullptr;
 
-	/** Container the panel will populate with slot widgets (WrapBox/UniformGrid/etc.). */
 	UPROPERTY(meta=(BindWidgetOptional), BlueprintReadOnly, Category="1_Inventory-UI|Setup")
 	TObjectPtr<UPanelWidget> SlotContainer = nullptr;
 
-	/** Slot widget class to spawn for each slot. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="1_Inventory-UI|Setup")
 	TSubclassOf<UInventoryItemSlotWidget> SlotWidgetClass;
 
-	/** Rebuild all on Construct if InventoryRef is set. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="1_Inventory-UI|Setup")
 	bool bAutoBindOnConstruct = true;
 
-	/** Optional throttle; if false, we rebuild immediately when counts change. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="1_Inventory-UI|Perf")
 	bool bDeferFullRebuild = false;
 
-	// ----- Blueprint accessors (show up as nodes) -----
+	/** Drop onto empty panel area to auto-place (stack first, then empty). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="1_Inventory-UI|Input")
+	bool bAcceptDropsOnPanel = true;
+
+	// Getter/Setter for BP nodes
 	UFUNCTION(BlueprintGetter, Category="1_Inventory-UI|Setup")
 	UInventoryComponent* GetInventoryRef() const { return InventoryRef; }
 
 	UFUNCTION(BlueprintSetter, Category="1_Inventory-UI|Setup")
 	void SetInventoryRef(UInventoryComponent* InInventory) { InitializeWithInventory(InInventory); }
 
-	// ----- External API -----
+	// External API
 	UFUNCTION(BlueprintCallable, Category="1_Inventory-UI|Setup")
 	void InitializeWithInventory(UInventoryComponent* InInventory);
 
-	/** If you don't want to name the container "SlotContainer", set it explicitly. */
 	UFUNCTION(BlueprintCallable, Category="1_Inventory-UI|Setup")
 	void SetSlotContainer(class UPanelWidget* InContainer) { SlotContainer = InContainer; }
 
@@ -57,7 +56,6 @@ public:
 	UFUNCTION(BlueprintCallable, Category="1_Inventory-UI|Refresh")
 	void RefreshSlot(int32 SlotIndex);
 
-	/** BP hook before/after rebuild to adjust layout, headers, etc. */
 	UFUNCTION(BlueprintImplementableEvent, Category="1_Inventory-UI|Events")
 	void OnAboutToRebuild();
 
@@ -67,6 +65,7 @@ public:
 protected:
 	virtual void NativeConstruct() override;
 	virtual void NativeDestruct() override;
+	virtual bool NativeOnDrop(const FGeometry& InGeo, const FDragDropEvent& InEvent, UDragDropOperation* InOp) override;
 
 	// Inventory events
 	UFUNCTION() void HandleSlotUpdated(int32 SlotIndex);
@@ -77,10 +76,7 @@ protected:
 private:
 	void BindInventory(UInventoryComponent* InInventory);
 	void UnbindInventory();
-
-	/** Ensures SlotContainer has exactly N children; spawns & binds each BEFORE Construct. */
 	void EnsureSlotWidgets(int32 DesiredCount);
-
-	/** Returns (ItemData, Qty) for a slot; null if empty. */
 	void QuerySlotData(int32 SlotIndex, UItemDataAsset*& OutData, int32& OutQty) const;
+	bool TryAutoPlaceDrag(class UInventoryComponent* TargetInv, class UDragDropOperation* Op);
 };

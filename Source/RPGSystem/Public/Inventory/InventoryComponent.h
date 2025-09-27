@@ -143,6 +143,10 @@ public:
 	UPROPERTY(BlueprintAssignable, Category="1_Inventory|Events") FOnItemRemoved OnItemRemoved;
 	UPROPERTY(BlueprintAssignable, Category="1_Inventory|Events") FOnItemTransferSuccess OnItemTransferSuccess;
 
+	UPROPERTY(Transient)
+	TArray<FInventoryItem> ClientPrevItems;	
+	static bool ItemsEqual_Client(const FInventoryItem& A, const FInventoryItem& B);
+
 	// Replication
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 

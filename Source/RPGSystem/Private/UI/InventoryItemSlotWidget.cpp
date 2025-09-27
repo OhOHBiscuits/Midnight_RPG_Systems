@@ -3,21 +3,23 @@
 #include "UI/InventoryDragDropOp.h"
 
 #include "Inventory/InventoryComponent.h"
-#include "Inventory/InventoryHelpers.h"
+#include "Inventory/InventoryItem.h"
 #include "Inventory/ItemDataAsset.h"
 
 #include "Blueprint/WidgetBlueprintLibrary.h"
+#include "InputCoreTypes.h"
+
+UInventoryItemSlotWidget::UInventoryItemSlotWidget(const FObjectInitializer& Obj)
+	: Super(Obj)
+{
+	DragMouseButton = EKeys::LeftMouseButton;
+	DragOpClass     = UInventoryDragDropOp::StaticClass();
+}
 
 void UInventoryItemSlotWidget::NativeOnInitialized()
 {
 	Super::NativeOnInitialized();
-
-	// If the slot was created from BP and ExposeOnSpawn set these,
-	// bind now so Construct() already sees a valid InventoryRef.
-	if (InventoryRef && SlotIndex >= 0)
-	{
-		BindToInventory(InventoryRef, SlotIndex);
-	}
+	if (InventoryRef && SlotIndex >= 0) { BindToInventory(InventoryRef, SlotIndex); }
 }
 
 void UInventoryItemSlotWidget::BindToInventory(UInventoryComponent* InInv, int32 InIndex)
@@ -25,15 +27,10 @@ void UInventoryItemSlotWidget::BindToInventory(UInventoryComponent* InInv, int32
 	if (InventoryRef == InInv && SlotIndex == InIndex) return;
 
 	UnbindFromInventory();
-
 	InventoryRef = InInv;
-	SlotIndex = InIndex;
+	SlotIndex    = InIndex;
 
-	// Cache parent panel for quick refresh after same-inventory moves
-	if (!CachedPanel.IsValid())
-	{
-		CachedPanel = GetTypedOuter<UInventoryPanelWidget>();
-	}
+	if (!CachedPanel.IsValid()) { CachedPanel = GetTypedOuter<UInventoryPanelWidget>(); }
 
 	if (InventoryRef)
 	{
@@ -52,7 +49,7 @@ void UInventoryItemSlotWidget::UnbindFromInventory()
 		InventoryRef->OnInventoryChanged.RemoveAll(this);
 	}
 	InventoryRef = nullptr;
-	SlotIndex = INDEX_NONE;
+	SlotIndex    = INDEX_NONE;
 }
 
 void UInventoryItemSlotWidget::NativeDestruct()
@@ -68,15 +65,11 @@ void UInventoryItemSlotWidget::UpdateSlotFromInventory()
 
 void UInventoryItemSlotWidget::HandleInvSlotUpdated(int32 UpdatedIndex)
 {
-	if (UpdatedIndex == SlotIndex)
-	{
-		UpdateFromInventory();
-	}
+	if (UpdatedIndex == SlotIndex) { UpdateFromInventory(); }
 }
 
 void UInventoryItemSlotWidget::HandleInvChanged()
 {
-	// Inventory size or ordering might have changed; refresh if our index is still valid.
 	UpdateFromInventory();
 }
 
@@ -87,12 +80,9 @@ UItemDataAsset* UInventoryItemSlotWidget::ResolveItemData() const
 	const FInventoryItem Item = InventoryRef->GetItem(SlotIndex);
 	if (Item.ItemData.IsNull()) return nullptr;
 
-	if (UItemDataAsset* Already = Item.ItemData.Get())
-	{
-		return Already;
-	}
-	TSoftObjectPtr<UItemDataAsset> Soft = Item.ItemData;
-	return Soft.LoadSynchronous(); // safe for occasional UI use
+	if (UItemDataAsset* Already = Item.ItemData.Get()) return Already;
+
+	return TSoftObjectPtr<UItemDataAsset>(Item.ItemData).LoadSynchronous();
 }
 
 void UInventoryItemSlotWidget::UpdateFromInventory()
@@ -102,15 +92,66 @@ void UInventoryItemSlotWidget::UpdateFromInventory()
 		SetSlotData(nullptr, INDEX_NONE, nullptr, 0);
 		return;
 	}
-
 	const FInventoryItem Item = InventoryRef->GetItem(SlotIndex);
-	UItemDataAsset* Data = ResolveItemData();
-	const int32 Qty = Item.Quantity;
-
-	SetSlotData(InventoryRef, SlotIndex, Data, Qty);
+	SetSlotData(InventoryRef, SlotIndex, ResolveItemData(), Item.Quantity);
 }
 
-bool UInventoryItemSlotWidget::NativeOnDrop(const FGeometry& Geom, const FDragDropEvent& Ev, UDragDropOperation* Op)
+/* ---------- Input & Drag ---------- */
+
+FReply UInventoryItemSlotWidget::NativeOnMouseButtonDown(const FGeometry& Geo, const FPointerEvent& MouseEvent)
+{
+	// Right click → BP hook, no drag
+	if (MouseEvent.GetEffectingButton() == EKeys::RightMouseButton)
+	{
+		OnSlotRightClick(Geo, MouseEvent);
+		return bConsumeRightClick ? FReply::Handled() : FReply::Unhandled();
+	}
+
+	FReply Reply = Super::NativeOnMouseButtonDown(Geo, MouseEvent);
+
+	const bool bHasItem =
+		(InventoryRef && SlotIndex != INDEX_NONE && InventoryRef->GetItem(SlotIndex).Quantity > 0);
+
+	if ((bHasItem || bAllowDragWhenEmpty) && MouseEvent.GetEffectingButton() == DragMouseButton)
+	{
+		FEventReply ER = UWidgetBlueprintLibrary::DetectDragIfPressed(MouseEvent, this, DragMouseButton);
+		if (ER.NativeReply.IsEventHandled()) { return ER.NativeReply; }
+	}
+	return Reply;
+}
+
+void UInventoryItemSlotWidget::NativeOnDragDetected(
+	const FGeometry& Geo, const FPointerEvent& MouseEvent, UDragDropOperation*& OutOp)
+{
+	if (!InventoryRef || SlotIndex == INDEX_NONE) return;
+
+	// BP can fully craft the operation
+	UInventoryDragDropOp* BpOp = nullptr;
+	if (BuildDragOperation(BpOp))
+	{
+		OutOp = BpOp;
+		return;
+	}
+
+	// Native op
+	UClass* OpCls = DragOpClass ? DragOpClass.Get() : UInventoryDragDropOp::StaticClass();
+	UInventoryDragDropOp* Drag = NewObject<UInventoryDragDropOp>(this, OpCls);
+	Drag->SourceInventory = InventoryRef;
+	Drag->FromIndex       = SlotIndex;
+	Drag->Pivot           = EDragPivot::MouseDown;
+	Drag->SourcePanel     = CachedPanel; // for cross-panel refresh
+
+	if (UUserWidget* Visual = CreateDragVisual())
+	{
+		Drag->DefaultDragVisual = Visual;
+	}
+
+	OutOp = Drag;
+	UWidgetBlueprintLibrary::SetFocusToGameViewport();
+}
+
+bool UInventoryItemSlotWidget::NativeOnDrop(
+	const FGeometry& Geo, const FDragDropEvent& Ev, UDragDropOperation* Op)
 {
 	if (!InventoryRef) return false;
 
@@ -118,49 +159,42 @@ bool UInventoryItemSlotWidget::NativeOnDrop(const FGeometry& Geom, const FDragDr
 	{
 		if (!CanAcceptDrop(Drag)) return false;
 
-		bool bSuccess = false;
+		const bool bSameInventory = (Drag->SourceInventory == InventoryRef);
 
-		if (Drag->SourceInventory == InventoryRef)
+		// Fire-and-forget RPC; UI refreshes optimistically
+		if (bSameInventory)
 		{
-			bSuccess = InventoryRef->TryMoveItem(Drag->FromIndex, SlotIndex);
+			InventoryRef->TryMoveItem(Drag->FromIndex, SlotIndex);
 
-			// Fast local refresh of both slots (inventory events will also fire)
-			if (bSuccess && CachedPanel.IsValid())
+			if (CachedPanel.IsValid())
 			{
-				CachedPanel->RefreshSlot(SlotIndex);
-				CachedPanel->RefreshSlot(Drag->FromIndex);
+				if (bFullRefreshAfterDropSameInventory)  CachedPanel->RefreshAll();
+				else                                     { CachedPanel->RefreshSlot(SlotIndex); CachedPanel->RefreshSlot(Drag->FromIndex); }
 			}
 		}
 		else
 		{
-			// Use component API (handles server routing)
-			bSuccess = InventoryRef->RequestTransferItem(Drag->SourceInventory, Drag->FromIndex, InventoryRef, SlotIndex);
+			InventoryRef->RequestTransferItem(Drag->SourceInventory, Drag->FromIndex, InventoryRef, SlotIndex);
 
-			// Fast local refresh of the target slot; source panel refreshes via its own delegate
-			if (bSuccess)
-			{
-				UpdateFromInventory();
-				if (CachedPanel.IsValid())
-				{
-					CachedPanel->RefreshSlot(SlotIndex);
-				}
-			}
+			if (CachedPanel.IsValid())       { CachedPanel->RefreshAll(); }
+			if (Drag->SourcePanel.IsValid()) { Drag->SourcePanel->RefreshAll(); }
 		}
 
-		return bSuccess;
+		return true; // handled
 	}
 	return false;
 }
 
-void UInventoryItemSlotWidget::NativeOnDragDetected(const FGeometry& Geom, const FPointerEvent& Mouse, UDragDropOperation*& OutOperation)
+
+
+
+bool UInventoryItemSlotWidget::BuildDragOperation_Implementation(UInventoryDragDropOp*& OutOperation)
 {
-	if (!InventoryRef || SlotIndex == INDEX_NONE) return;
+	OutOperation = nullptr;
+	return false; 
+}
 
-	UInventoryDragDropOp* Drag = NewObject<UInventoryDragDropOp>(this);
-	Drag->SourceInventory = InventoryRef;
-	Drag->FromIndex = SlotIndex;
-	Drag->Pivot = EDragPivot::MouseDown;
-	OutOperation = Drag;
-
-	UWidgetBlueprintLibrary::SetFocusToGameViewport();
+UUserWidget* UInventoryItemSlotWidget::CreateDragVisual_Implementation()
+{
+	return DragVisualClass ? CreateWidget<UUserWidget>(GetOwningPlayer(), DragVisualClass) : nullptr;
 }

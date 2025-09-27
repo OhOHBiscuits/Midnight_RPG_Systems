@@ -29,9 +29,31 @@ void UInventoryComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& 
 }
 void UInventoryComponent::OnRep_InventoryItems()
 {
-	OnInventoryChanged.Broadcast();
-	RecalculateWeightAndVolume();
-	NotifyInventoryChanged();
+	const int32 OldNum = ClientPrevItems.Num();
+	const int32 NewNum = Items.Num();
+
+	
+	const int32 Overlap = FMath::Min(OldNum, NewNum);
+	for (int32 i = 0; i < Overlap; ++i)
+	{
+		if (!ItemsEqual_Client(ClientPrevItems[i], Items[i]))
+		{
+			OnInventoryUpdated.Broadcast(i);
+		}
+	}
+
+	
+	if (OldNum != NewNum)
+	{
+		OnInventoryChanged.Broadcast();
+	}
+	else
+	{
+		
+		OnInventoryChanged.Broadcast();
+	}
+
+	ClientPrevItems = Items; 
 }
 void UInventoryComponent::OnRep_AccessTag(){}
 void UInventoryComponent::SetInventoryAccess(const FGameplayTag& NewAccessTag)
@@ -504,3 +526,9 @@ void UInventoryComponent::RecalculateWeightAndVolume()
 	if(FMath::Abs(NewVolume-CurrentVolume)>Eps){ CurrentVolume=NewVolume; OnVolumeChanged.Broadcast(CurrentVolume); }
 }
 
+bool UInventoryComponent::ItemsEqual_Client(const FInventoryItem& A, const FInventoryItem& B)
+{
+	const FSoftObjectPath PA = A.ItemData.ToSoftObjectPath();
+	const FSoftObjectPath PB = B.ItemData.ToSoftObjectPath();
+	return A.Quantity == B.Quantity && PA == PB;
+}

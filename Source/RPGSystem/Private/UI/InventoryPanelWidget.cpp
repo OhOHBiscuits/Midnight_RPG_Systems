@@ -1,16 +1,18 @@
 #include "UI/InventoryPanelWidget.h"
 #include "UI/InventoryItemSlotWidget.h"
+#include "UI/InventoryDragDropOp.h"
+
 #include "Components/PanelWidget.h"
 #include "Blueprint/WidgetTree.h"
 
 #include "Inventory/InventoryComponent.h"
+#include "Inventory/InventoryItem.h"
 #include "Inventory/ItemDataAsset.h"
 
 void UInventoryPanelWidget::NativeConstruct()
 {
 	Super::NativeConstruct();
 
-	// Fallback: auto-find by name "SlotContainer" if not set explicitly
 	if (!SlotContainer && WidgetTree)
 	{
 		if (UWidget* Found = WidgetTree->FindWidget(FName("SlotContainer")))
@@ -75,21 +77,20 @@ void UInventoryPanelWidget::EnsureSlotWidgets(int32 DesiredCount)
 		SlotContainer->RemoveChildAt(i);
 	}
 
-	// Add missing and bind BEFORE adding to container so InventoryRef is valid in Construct()
+	// Add missing and bind BEFORE adding so Construct sees valid refs
 	for (int32 i = Current; i < DesiredCount; ++i)
 	{
 		UInventoryItemSlotWidget* SlotW = CreateWidget<UInventoryItemSlotWidget>(this, SlotWidgetClass);
 
 		if (InventoryRef)
 		{
-			// Bind now: Construct on add will see InventoryRef/SlotIndex already set
 			SlotW->BindToInventory(InventoryRef, i);
 		}
 
 		SlotContainer->AddChild(SlotW);
 	}
 
-	// Re-bind any existing children to ensure they’re connected after size changes
+	// Re-bind existing
 	for (int32 i = 0; i < SlotContainer->GetChildrenCount(); ++i)
 	{
 		if (UInventoryItemSlotWidget* SlotW = Cast<UInventoryItemSlotWidget>(SlotContainer->GetChildAt(i)))
@@ -152,7 +153,6 @@ void UInventoryPanelWidget::RefreshSlot(int32 SlotIndex)
 
 	if (UInventoryItemSlotWidget* SlotW = Cast<UInventoryItemSlotWidget>(SlotContainer->GetChildAt(SlotIndex)))
 	{
-		// Ensure bound (safe to repeat)
 		SlotW->BindToInventory(InventoryRef, SlotIndex);
 
 		UItemDataAsset* Data = nullptr; 
@@ -164,5 +164,75 @@ void UInventoryPanelWidget::RefreshSlot(int32 SlotIndex)
 
 void UInventoryPanelWidget::HandleSlotUpdated(int32 SlotIndex)   { RefreshSlot(SlotIndex); }
 void UInventoryPanelWidget::HandleInventoryChanged()              { if (!bDeferFullRebuild) RefreshAll(); }
-void UInventoryPanelWidget::HandleWeightChanged(float)            { /* optional BP label update */ }
-void UInventoryPanelWidget::HandleVolumeChanged(float)            { /* optional BP label update */ }
+void UInventoryPanelWidget::HandleWeightChanged(float)            { }
+void UInventoryPanelWidget::HandleVolumeChanged(float)            { }
+
+/* ---------- Panel background drop (auto-place) ---------- */
+
+bool UInventoryPanelWidget::NativeOnDrop(const FGeometry& Geo, const FDragDropEvent& Ev, UDragDropOperation* Op)
+{
+	if (!bAcceptDropsOnPanel || !InventoryRef) return Super::NativeOnDrop(Geo, Ev, Op);
+
+	if (TryAutoPlaceDrag(InventoryRef, Op))
+	{
+		RefreshAll();
+		return true;
+	}
+
+	return Super::NativeOnDrop(Geo, Ev, Op);
+}
+
+bool UInventoryPanelWidget::TryAutoPlaceDrag(UInventoryComponent* TargetInv, UDragDropOperation* Op)
+{
+	const UInventoryDragDropOp* Drag = Cast<UInventoryDragDropOp>(Op);
+	if (!Drag || !TargetInv || !Drag->SourceInventory) return false;
+
+	const bool bSameInventory = (Drag->SourceInventory == TargetInv);
+	const int32 Num = TargetInv->GetNumUISlots();
+
+	const FInventoryItem SourceItem = Drag->SourceInventory->GetItem(Drag->FromIndex);
+	if (SourceItem.Quantity <= 0) return false;
+
+	auto Attempt = [&](int32 SlotIdx)
+	{
+		if (bSameInventory) TargetInv->TryMoveItem(Drag->FromIndex, SlotIdx);
+		else                TargetInv->RequestTransferItem(Drag->SourceInventory, Drag->FromIndex, TargetInv, SlotIdx);
+	};
+
+	// 1) Prefer stacking
+	int32 ChosenIndex = INDEX_NONE;
+	if (!SourceItem.ItemData.IsNull())
+	{
+		const FSoftObjectPath SrcPath = SourceItem.ItemData.ToSoftObjectPath();
+		for (int32 i = 0; i < Num; ++i)
+		{
+			const FInventoryItem Tgt = TargetInv->GetItem(i);
+			if (Tgt.Quantity > 0 && !Tgt.ItemData.IsNull() && Tgt.ItemData.ToSoftObjectPath() == SrcPath)
+			{
+				ChosenIndex = i; break;
+			}
+		}
+	}
+
+	// 2) First empty if no stack
+	if (ChosenIndex == INDEX_NONE)
+	{
+		for (int32 i = 0; i < Num; ++i)
+		{
+			if (TargetInv->GetItem(i).Quantity <= 0) { ChosenIndex = i; break; }
+		}
+	}
+
+	if (ChosenIndex == INDEX_NONE) return false; // nowhere to place
+
+	// Fire-and-forget the request, then optimistic refresh both views
+	Attempt(ChosenIndex);
+
+	RefreshAll();
+	if (UInventoryPanelWidget* SrcPanel = Drag->SourcePanel.Get())
+	{
+		if (SrcPanel != this) { SrcPanel->RefreshAll(); }
+	}
+
+	return true;
+}
