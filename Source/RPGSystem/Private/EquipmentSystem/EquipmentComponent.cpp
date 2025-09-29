@@ -4,6 +4,8 @@
 #include "Inventory/InventoryComponent.h"
 #include "Inventory/InventoryAssetManager.h"
 #include "Inventory/ItemDataAsset.h"
+#include "Inventory/InventoryHelpers.h"
+#include "GameFramework/Controller.h"
 #include "GameFramework/Actor.h"
 #include "Net/UnrealNetwork.h"
 
@@ -218,3 +220,45 @@ void UEquipmentComponent::ServerUnequipSlot_Implementation(FGameplayTag SlotTag)
 }
 
 void UEquipmentComponent::ApplyItemModifiers_Implementation(UItemDataAsset* /*ItemData*/, bool /*bApply*/) {}
+
+bool UEquipmentComponent::TryUnequipSlotToInventory(FGameplayTag SlotTag, UInventoryComponent* DestInv)
+{
+	// If there's no inventory to catch it, just clear the slot. Nothing fancy.
+	if (!DestInv)
+	{
+		return TryUnequipSlot(SlotTag);
+	}
+
+	AActor* OwnerActor = GetOwner();
+	AController* Ctrl = OwnerActor ? OwnerActor->GetInstigatorController() : nullptr;
+
+	// Clients ask the server to do the real work.
+	if (!OwnerActor || !OwnerActor->HasAuthority())
+	{
+		Server_UnequipSlotToInventory(SlotTag, DestInv, Ctrl);
+		return true; // UI can optimistically refresh; replication will reconcile
+	}
+
+	// Authority path:
+	UItemDataAsset* Data = GetEquippedItemData(SlotTag);
+	if (!Data)
+	{
+		return false; // nothing to unequip
+	}
+
+	// Politely put the item back into the target inventory. We add by ItemIDTag (stack-first).
+	int32 AddedIndex = INDEX_NONE;
+	const bool bAdded = UInventoryHelpers::TryAddByItemIDTag(DestInv, Data->ItemIDTag, /*Qty*/1, AddedIndex);
+	if (!bAdded)
+	{
+		return false; // nowhere to put it
+	}
+
+	// Now that it safely lives in an inventory, clear the equipment slot.
+	return TryUnequipSlot(SlotTag);
+}
+
+void UEquipmentComponent::Server_UnequipSlotToInventory_Implementation(FGameplayTag SlotTag, UInventoryComponent* DestInventory, AController* Requestor)
+{
+	TryUnequipSlotToInventory(SlotTag, DestInventory);
+}

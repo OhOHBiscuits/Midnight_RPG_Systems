@@ -55,6 +55,9 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category="1_Inventory|Helpers")
 	static bool ClientRequestTransfer(AActor* Requestor, UInventoryComponent* SourceInventory, int32 SourceIndex, UInventoryComponent* TargetInventory, int32 TargetIndex = -1);
+
+	UFUNCTION(BlueprintCallable, Category="1_Inventory-Actions")
+	static bool TryAddByItemIDTag(UInventoryComponent* Inventory, FGameplayTag ItemIDTag, int32 Quantity, int32& OutAddedIndex);
 	
 	
 	

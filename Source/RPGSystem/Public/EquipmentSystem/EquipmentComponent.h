@@ -99,6 +99,13 @@ public:
 	void ApplyItemModifiers(UItemDataAsset* ItemData, bool bApply);
 	virtual void ApplyItemModifiers_Implementation(UItemDataAsset* ItemData, bool bApply);
 
+	UFUNCTION(BlueprintCallable, Category="1_Equipment-Actions")
+	bool TryUnequipSlotToInventory(FGameplayTag SlotTag, class UInventoryComponent* DestInventory);
+
+	// +++ Add server stub if you keep RPCs explicit +++
+	UFUNCTION(Server, Reliable)
+	void Server_UnequipSlotToInventory(FGameplayTag SlotTag, class UInventoryComponent* DestInventory, class AController* Requestor);
+
 protected:
 	virtual void BeginPlay() override;
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;

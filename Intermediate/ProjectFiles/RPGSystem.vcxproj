@@ -1338,6 +1338,10 @@
       <AdditionalIncludeDirectories>$(ClCompile_AdditionalIncludeDirectories_4)</AdditionalIncludeDirectories>
       <ForcedIncludeFiles>$(ClCompile_ForcedIncludeFiles_4)</ForcedIncludeFiles>
     </ClCompile>
+    <ClCompile Include="..\..\Source\RPGSystem\Private\UI\EquipmentSlotWidget.cpp">
+      <AdditionalIncludeDirectories>$(ClCompile_AdditionalIncludeDirectories_4)</AdditionalIncludeDirectories>
+      <ForcedIncludeFiles>$(ClCompile_ForcedIncludeFiles_4)</ForcedIncludeFiles>
+    </ClCompile>
     <ClCompile Include="..\..\Source\RPGSystem\Private\UI\InventoryDragDropOp.cpp">
       <AdditionalIncludeDirectories>$(ClCompile_AdditionalIncludeDirectories_4)</AdditionalIncludeDirectories>
       <ForcedIncludeFiles>$(ClCompile_ForcedIncludeFiles_4)</ForcedIncludeFiles>
@@ -1432,6 +1436,7 @@
     <ClInclude Include="..\..\Source\RPGSystem\Public\Stats\StatBlueprintLibrary.h"/>
     <ClInclude Include="..\..\Source\RPGSystem\Public\Stats\StatProviderInterface.h"/>
     <ClInclude Include="..\..\Source\RPGSystem\Public\Stats\StatSetDataAsset.h"/>
+    <ClInclude Include="..\..\Source\RPGSystem\Public\UI\EquipmentSlotWidget.h"/>
     <ClInclude Include="..\..\Source\RPGSystem\Public\UI\InventoryDragDropOp.h"/>
     <ClInclude Include="..\..\Source\RPGSystem\Public\UI\InventoryItemSlotWidget.h"/>
     <ClInclude Include="..\..\Source\RPGSystem\Public\UI\InventoryPanelWidget.h"/>

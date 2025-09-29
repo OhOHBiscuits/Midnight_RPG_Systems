@@ -198,6 +198,9 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Tags")
 	TArray<FGameplayTag> AdditionalTags;
 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Equipment")
+	TArray<FGameplayTag> PreferredEquipSlots;
+
 	/** Legacy, kept for compatibility */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Tags")
 	TArray<FGameplayTag> AllowedActions;

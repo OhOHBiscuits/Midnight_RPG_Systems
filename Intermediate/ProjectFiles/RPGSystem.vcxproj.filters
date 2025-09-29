@@ -977,6 +977,9 @@
     <Filter Include="Source\RPGSystem\Private\UI">
       <UniqueIdentifier>{BD8A85D2-1FCF-3DAE-90B4-D1ABAD310B40}</UniqueIdentifier>
     </Filter>
+    <ClCompile Include="..\..\Source\RPGSystem\Private\UI\EquipmentSlotWidget.cpp">
+      <Filter>Source\RPGSystem\Private\UI</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Source\RPGSystem\Private\UI\InventoryDragDropOp.cpp">
       <Filter>Source\RPGSystem\Private\UI</Filter>
     </ClCompile>
@@ -1229,6 +1232,9 @@
     <Filter Include="Source\RPGSystem\Public\UI">
       <UniqueIdentifier>{A5D3789A-FDCE-3A9A-A3A0-1834986E66F3}</UniqueIdentifier>
     </Filter>
+    <ClInclude Include="..\..\Source\RPGSystem\Public\UI\EquipmentSlotWidget.h">
+      <Filter>Source\RPGSystem\Public\UI</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Source\RPGSystem\Public\UI\InventoryDragDropOp.h">
       <Filter>Source\RPGSystem\Public\UI</Filter>
     </ClInclude>

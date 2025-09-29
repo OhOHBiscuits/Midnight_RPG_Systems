@@ -326,3 +326,44 @@ bool UInventoryHelpers::ClientRequestTransfer(AActor* Requestor, UInventoryCompo
 	// If no owned inventory was found, we can’t safely RPC from client → server
 	return false;
 }
+
+bool UInventoryHelpers::TryAddByItemIDTag(UInventoryComponent* Inventory, FGameplayTag ItemIDTag, int32 Quantity, int32& OutAddedIndex)
+{
+	OutAddedIndex = INDEX_NONE;
+
+	// Sanity checks — we're not adding negative bananas to no inventory.
+	if (!Inventory || !ItemIDTag.IsValid() || Quantity <= 0)
+	{
+		return false;
+	}
+
+	// Translate "ItemID tag" -> the actual item data (safe for Standalone/cooked builds).
+	UItemDataAsset* Data = UInventoryAssetManager::Get().LoadItemDataByTag(ItemIDTag, /*bSyncLoad*/ true);
+	if (!Data)
+	{
+		return false; // Unknown item id
+	}
+
+	// IMPORTANT: Your inventory API wants (UItemDataAsset*, Quantity), not FInventoryItem.
+	const bool bAdded = Inventory->TryAddItem(Data, Quantity);
+
+	// Friendly extra: try to tell callers where it landed (best effort).
+	if (bAdded)
+	{
+		const int32 Num = Inventory->GetNumUISlots();
+		for (int32 i = 0; i < Num; ++i)
+		{
+			const FInventoryItem Slot = Inventory->GetItem(i);
+			if (Slot.Quantity > 0 && !Slot.ItemData.IsNull())
+			{
+				if (Slot.ItemData.Get() == Data) // pointer compare is cheap & good enough
+				{
+					OutAddedIndex = i;
+					break;
+				}
+			}
+		}
+	}
+
+	return bAdded;
+}

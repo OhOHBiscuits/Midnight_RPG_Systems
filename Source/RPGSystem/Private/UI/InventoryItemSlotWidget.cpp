@@ -5,9 +5,31 @@
 #include "Inventory/InventoryComponent.h"
 #include "Inventory/InventoryItem.h"
 #include "Inventory/ItemDataAsset.h"
+#include "GameFramework/PlayerController.h"
+#include "GameFramework/PlayerState.h"
+#include "GameFramework/Pawn.h"
 
 #include "Blueprint/WidgetBlueprintLibrary.h"
 #include "InputCoreTypes.h"
+
+static UInventoryComponent* FindOwnedInventoryForWidget(const UUserWidget* W, APlayerController*& OutPC)
+{
+	OutPC = W ? W->GetOwningPlayer() : nullptr;
+	if (!OutPC) return nullptr;
+
+	// Preferred: PlayerState inventory (your project keeps it there)
+	if (APlayerState* PS = OutPC->PlayerState)
+	{
+		if (UInventoryComponent* Inv = PS->FindComponentByClass<UInventoryComponent>())
+			return Inv;
+	}
+	// Fallbacks (harmless if not used)
+	if (UInventoryComponent* Inv = OutPC->FindComponentByClass<UInventoryComponent>()) return Inv;
+	if (APawn* Pawn = OutPC->GetPawn())
+		if (UInventoryComponent* Inv = Pawn->FindComponentByClass<UInventoryComponent>()) return Inv;
+
+	return nullptr;
+}
 
 UInventoryItemSlotWidget::UInventoryItemSlotWidget(const FObjectInitializer& Obj)
 	: Super(Obj)
@@ -159,28 +181,40 @@ bool UInventoryItemSlotWidget::NativeOnDrop(
 	{
 		if (!CanAcceptDrop(Drag)) return false;
 
-		const bool bSameInventory = (Drag->SourceInventory == InventoryRef);
-
-		// Fire-and-forget RPC; UI refreshes optimistically
-		if (bSameInventory)
+		// Always call the Server RPC on a client-owned InventoryComponent
+		APlayerController* PC = nullptr;
+		if (UInventoryComponent* OwnedInv = FindOwnedInventoryForWidget(this, PC))
 		{
-			InventoryRef->TryMoveItem(Drag->FromIndex, SlotIndex);
+			// One RPC handles all cases: same-inventory reorder OR cross-inventory transfer
+			OwnedInv->Server_TransferItem(
+				Drag->SourceInventory,      // may be same as target for reorders
+				Drag->FromIndex,
+				InventoryRef,               // target is this slot’s inventory
+				SlotIndex,
+				PC                          // requestor for permissions/logging
+			);
+		}
+		else
+		{
+			// Host/server fallback (authority has no ownership restriction)
+			InventoryRef->RequestTransferItem(Drag->SourceInventory, Drag->FromIndex, InventoryRef, SlotIndex);
+		}
 
+		// Optimistic refresh so UI reacts immediately
+		if (Drag->SourceInventory == InventoryRef)
+		{
 			if (CachedPanel.IsValid())
 			{
-				if (bFullRefreshAfterDropSameInventory)  CachedPanel->RefreshAll();
-				else                                     { CachedPanel->RefreshSlot(SlotIndex); CachedPanel->RefreshSlot(Drag->FromIndex); }
+				if (bFullRefreshAfterDropSameInventory) CachedPanel->RefreshAll();
+				else { CachedPanel->RefreshSlot(SlotIndex); CachedPanel->RefreshSlot(Drag->FromIndex); }
 			}
 		}
 		else
 		{
-			InventoryRef->RequestTransferItem(Drag->SourceInventory, Drag->FromIndex, InventoryRef, SlotIndex);
-
-			if (CachedPanel.IsValid())       { CachedPanel->RefreshAll(); }
-			if (Drag->SourcePanel.IsValid()) { Drag->SourcePanel->RefreshAll(); }
+			if (CachedPanel.IsValid())       CachedPanel->RefreshAll();
+			if (Drag->SourcePanel.IsValid()) Drag->SourcePanel->RefreshAll();
 		}
-
-		return true; // handled
+		return true;
 	}
 	return false;
 }

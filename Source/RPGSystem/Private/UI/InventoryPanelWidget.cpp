@@ -9,6 +9,10 @@
 #include "Inventory/InventoryItem.h"
 #include "Inventory/ItemDataAsset.h"
 
+#include "GameFramework/PlayerController.h"
+#include "GameFramework/PlayerState.h"
+#include "GameFramework/Pawn.h"
+
 void UInventoryPanelWidget::NativeConstruct()
 {
 	Super::NativeConstruct();
@@ -36,7 +40,21 @@ void UInventoryPanelWidget::NativeDestruct()
 	UnbindInventory();
 	Super::NativeDestruct();
 }
+static UInventoryComponent* FindOwnedInventoryForPanel(const UUserWidget* W, APlayerController*& OutPC)
+{
+	OutPC = W ? W->GetOwningPlayer() : nullptr;
+	if (!OutPC) return nullptr;
 
+	if (APlayerState* PS = OutPC->PlayerState)
+		if (UInventoryComponent* Inv = PS->FindComponentByClass<UInventoryComponent>())
+			return Inv;
+
+	if (UInventoryComponent* Inv = OutPC->FindComponentByClass<UInventoryComponent>()) return Inv;
+	if (APawn* Pawn = OutPC->GetPawn())
+		if (UInventoryComponent* Inv = Pawn->FindComponentByClass<UInventoryComponent>()) return Inv;
+
+	return nullptr;
+}
 void UInventoryPanelWidget::InitializeWithInventory(UInventoryComponent* InInventory)
 {
 	if (InInventory == InventoryRef) return;
@@ -187,20 +205,13 @@ bool UInventoryPanelWidget::TryAutoPlaceDrag(UInventoryComponent* TargetInv, UDr
 	const UInventoryDragDropOp* Drag = Cast<UInventoryDragDropOp>(Op);
 	if (!Drag || !TargetInv || !Drag->SourceInventory) return false;
 
-	const bool bSameInventory = (Drag->SourceInventory == TargetInv);
 	const int32 Num = TargetInv->GetNumUISlots();
-
 	const FInventoryItem SourceItem = Drag->SourceInventory->GetItem(Drag->FromIndex);
 	if (SourceItem.Quantity <= 0) return false;
 
-	auto Attempt = [&](int32 SlotIdx)
-	{
-		if (bSameInventory) TargetInv->TryMoveItem(Drag->FromIndex, SlotIdx);
-		else                TargetInv->RequestTransferItem(Drag->SourceInventory, Drag->FromIndex, TargetInv, SlotIdx);
-	};
+	// Choose a slot once (stack first, then first empty)
+	int32 Chosen = INDEX_NONE;
 
-	// 1) Prefer stacking
-	int32 ChosenIndex = INDEX_NONE;
 	if (!SourceItem.ItemData.IsNull())
 	{
 		const FSoftObjectPath SrcPath = SourceItem.ItemData.ToSoftObjectPath();
@@ -209,29 +220,34 @@ bool UInventoryPanelWidget::TryAutoPlaceDrag(UInventoryComponent* TargetInv, UDr
 			const FInventoryItem Tgt = TargetInv->GetItem(i);
 			if (Tgt.Quantity > 0 && !Tgt.ItemData.IsNull() && Tgt.ItemData.ToSoftObjectPath() == SrcPath)
 			{
-				ChosenIndex = i; break;
+				Chosen = i; break;
 			}
 		}
 	}
-
-	// 2) First empty if no stack
-	if (ChosenIndex == INDEX_NONE)
+	if (Chosen == INDEX_NONE)
 	{
 		for (int32 i = 0; i < Num; ++i)
-		{
-			if (TargetInv->GetItem(i).Quantity <= 0) { ChosenIndex = i; break; }
-		}
+			if (TargetInv->GetItem(i).Quantity <= 0) { Chosen = i; break; }
+	}
+	if (Chosen == INDEX_NONE) return false;
+
+	// Route the RPC through the client-owned inventory
+	APlayerController* PC = nullptr;
+	if (UInventoryComponent* OwnedInv = FindOwnedInventoryForPanel(this, PC))
+	{
+		OwnedInv->Server_TransferItem(Drag->SourceInventory, Drag->FromIndex, TargetInv, Chosen, PC);
+	}
+	else
+	{
+		// Host/server fallback
+		TargetInv->RequestTransferItem(Drag->SourceInventory, Drag->FromIndex, TargetInv, Chosen);
 	}
 
-	if (ChosenIndex == INDEX_NONE) return false; // nowhere to place
-
-	// Fire-and-forget the request, then optimistic refresh both views
-	Attempt(ChosenIndex);
-
+	// Optimistic refresh both views
 	RefreshAll();
 	if (UInventoryPanelWidget* SrcPanel = Drag->SourcePanel.Get())
 	{
-		if (SrcPanel != this) { SrcPanel->RefreshAll(); }
+		if (SrcPanel != this) SrcPanel->RefreshAll();
 	}
 
 	return true;
