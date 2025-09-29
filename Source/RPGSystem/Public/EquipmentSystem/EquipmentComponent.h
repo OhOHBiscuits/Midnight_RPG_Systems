@@ -106,6 +106,7 @@ public:
 	UFUNCTION(Server, Reliable)
 	void Server_UnequipSlotToInventory(FGameplayTag SlotTag, class UInventoryComponent* DestInventory, class AController* Requestor);
 
+	
 protected:
 	virtual void BeginPlay() override;
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;

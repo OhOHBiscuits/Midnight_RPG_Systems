@@ -108,6 +108,14 @@ protected:
 	UFUNCTION(BlueprintNativeEvent, Category="1_Inventory-UI|Drag")
 	UUserWidget* CreateDragVisual();
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="1_Inventory-UI|Input")
+	bool bDoubleClickEquips = true;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="1_Inventory-UI|Input")
+	bool bDoubleClickAlsoWields = true;
+
+	virtual FReply NativeOnMouseButtonDoubleClick(const FGeometry& InGeo, const FPointerEvent& InMouseEvent) override;
+
 private:
 	UFUNCTION() void HandleInvSlotUpdated(int32 UpdatedIndex);
 	UFUNCTION() void HandleInvChanged();

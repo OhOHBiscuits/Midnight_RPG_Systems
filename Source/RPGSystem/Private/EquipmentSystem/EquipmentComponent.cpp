@@ -3,10 +3,14 @@
 #include "EquipmentSystem/EquipmentComponent.h"
 #include "Inventory/InventoryComponent.h"
 #include "Inventory/InventoryAssetManager.h"
+#include "EquipmentSystem/EquipmentHelperLibrary.h"
+#include "Engine/StreamableManager.h"
+#include "Engine/AssetManager.h"
 #include "Inventory/ItemDataAsset.h"
 #include "Inventory/InventoryHelpers.h"
 #include "GameFramework/Controller.h"
 #include "GameFramework/Actor.h"
+#include "UI/EquipmentSlotWidget.h"
 #include "Net/UnrealNetwork.h"
 
 UEquipmentComponent::UEquipmentComponent()
@@ -262,3 +266,4 @@ void UEquipmentComponent::Server_UnequipSlotToInventory_Implementation(FGameplay
 {
 	TryUnequipSlotToInventory(SlotTag, DestInventory);
 }
+

@@ -8,6 +8,7 @@
 #include "GameFramework/PlayerController.h"
 #include "GameFramework/PlayerState.h"
 #include "GameFramework/Pawn.h"
+#include "EquipmentSystem/EquipmentHelperLibrary.h"
 
 #include "Blueprint/WidgetBlueprintLibrary.h"
 #include "InputCoreTypes.h"
@@ -222,6 +223,8 @@ bool UInventoryItemSlotWidget::NativeOnDrop(
 
 
 
+
+
 bool UInventoryItemSlotWidget::BuildDragOperation_Implementation(UInventoryDragDropOp*& OutOperation)
 {
 	OutOperation = nullptr;
@@ -231,4 +234,18 @@ bool UInventoryItemSlotWidget::BuildDragOperation_Implementation(UInventoryDragD
 UUserWidget* UInventoryItemSlotWidget::CreateDragVisual_Implementation()
 {
 	return DragVisualClass ? CreateWidget<UUserWidget>(GetOwningPlayer(), DragVisualClass) : nullptr;
+}
+
+FReply UInventoryItemSlotWidget::NativeOnMouseButtonDoubleClick(const FGeometry& Geo, const FPointerEvent& Ev)
+{
+	if (!bDoubleClickEquips || !InventoryRef || SlotIndex < 0)
+	{
+		return FReply::Unhandled();
+	}
+
+	// One-liner: let the helper pick Primary/Secondary or swap back into this inventory if needed.
+	const bool bOK = UEquipmentHelperLibrary::EquipBestFromInventoryIndex(
+		GetOwningPlayerPawn(), InventoryRef, SlotIndex, bDoubleClickAlsoWields);
+
+	return bOK ? FReply::Handled() : FReply::Unhandled();
 }
