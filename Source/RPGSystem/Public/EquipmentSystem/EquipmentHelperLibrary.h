@@ -6,6 +6,7 @@
 #include "Abilities/GameplayAbilityTypes.h"
 #include "EquipmentHelperLibrary.generated.h"
 
+
 class UInventoryComponent;
 class UEquipmentComponent;
 class UDynamicToolbarComponent;
@@ -123,4 +124,19 @@ public:
 	UFUNCTION(BlueprintCallable, Category="1_Equipment-Actions")
 	static bool EquipBestFromInventoryIndex(AActor* ContextActor, class UInventoryComponent* SourceInventory, int32 SourceIndex, bool bAlsoWield = false);
 
+	/** Filter an item’s PreferredEquipSlots by a root (e.g., Slots.Weapon). */
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category="1_Equipment-Queries")
+	static void FilterPreferredSlotsByRoot(class UItemDataAsset* ItemData, FGameplayTag RootTag, TArray<FGameplayTag>& OutSlots);
+
+	/** Equip best slot *within a family/root* (e.g., Weapons vs Armor) from an inventory index.
+	 *  Empty → equip; both full → swap back into SourceInventory, then equip.
+	 */
+	UFUNCTION(BlueprintCallable, Category="1_Equipment-Actions")
+	static bool EquipBestFromInventoryIndexUnder(AActor* ContextActor, class UInventoryComponent* SourceInventory, int32 SourceIndex, FGameplayTag RootTag, bool bAlsoWield = false);
+
+	// Pass PS, PC, Pawn, or any Actor you have; we resolve to the owning PS.
+	UFUNCTION(BlueprintPure, Category="1_Equipment|Resolve")
+	static class APlayerState* ResolvePlayerState(AActor* ContextActor);
+
+	
 };
