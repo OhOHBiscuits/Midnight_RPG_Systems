@@ -2,6 +2,7 @@
 
 #include "EquipmentSystem/WieldComponent.h"
 #include "EquipmentSystem/EquipmentComponent.h"
+#include "EquipmentSystem/EquipmentHelperLibrary.h"
 #include "EquipmentSystem/DynamicToolbarComponent.h"
 #include "Inventory/InventoryAssetManager.h"
 #include "Inventory/ItemDataAsset.h"
@@ -257,7 +258,7 @@ void UWieldComponent::ComputeAndBroadcastCandidate()
 		for (const FGameplayTag& SlotTag : Order)
 		{
 			if (!SlotTag.IsValid()) continue;
-			if (UItemDataAsset* Data = Equip->GetEquippedItemData(SlotTag))
+			if (UItemDataAsset* Data = UEquipmentHelperLibrary::GetEquippedItemData(GetOwner(), SlotTag))
 			{
 				WieldSourceSlotTag = SlotTag;
 				OnWieldCandidateChanged.Broadcast(SlotTag, Data);
@@ -336,7 +337,10 @@ void UWieldComponent::SetCombat_Server(bool bNewInCombat)
 void UWieldComponent::WieldEquippedInSlot_Server(FGameplayTag SlotTag)
 {
 	UItemDataAsset* Data = nullptr;
-	if (UEquipmentComponent* Equip = ResolveEquipment()) { Data = Equip->GetEquippedItemData(SlotTag); }
+	if (UEquipmentComponent* Equip = ResolveEquipment())
+	{
+		Data = UEquipmentHelperLibrary::GetEquippedItemData(GetOwner(), SlotTag);		
+	}
 	if (!Data) return;
 
 	WieldSourceSlotTag = SlotTag;

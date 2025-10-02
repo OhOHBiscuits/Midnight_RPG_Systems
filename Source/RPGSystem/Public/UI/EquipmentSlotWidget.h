@@ -1,83 +1,64 @@
-// Source/RPGSystem/Public/UI/EquipmentSlotWidget.h
 #pragma once
 
-#include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
 #include "GameplayTagContainer.h"
 #include "EquipmentSlotWidget.generated.h"
 
-class UInventoryDragDropOp;
-class UInventoryComponent;
-class UEquipmentComponent;
 class UImage;
+class UEquipmentComponent;
 class UItemDataAsset;
+class UInventoryDragDropOp;
 
-/** One equipment slot (Primary/Secondary/Helmet/etc.). */
-UCLASS(Blueprintable)
+UCLASS()
 class RPGSYSTEM_API UEquipmentSlotWidget : public UUserWidget
 {
 	GENERATED_BODY()
 
 public:
-	// Which slot is this card representing? e.g. Slots.Weapon.Primary
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="1_Equipment-UI|Setup", meta=(ExposeOnSpawn="true"))
+	/** Which slot does this widget represent */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="1_Equipment|UI")
 	FGameplayTag SlotTag;
 
-	// Optional root to filter drags (e.g., Slots.Weapon vs Slots.Armor)
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="1_Equipment-UI|Setup", meta=(ExposeOnSpawn="true"))
-	FGameplayTag AcceptRootTag;
+	/** Optional: auto-bind to local player’s PS equipment at construct */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="1_Equipment|UI")
+	bool bAutoBindEquipment = true;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="1_Equipment-UI|Setup")
-	bool bPreferThisSlotOnDrop = true;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="1_Equipment-UI|Setup")
-	bool bWieldAfterEquip = true;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="1_Equipment-UI|Setup")
-	bool bAllowSwapWhenFull = true;
-
-	// Optional icon image to fill automatically; leave null to drive visuals fully in BP.
-	UPROPERTY(meta=(BindWidgetOptional))
+	/** Optional icon brush receiver (hook this in UMG) */
+	UPROPERTY(meta=(BindWidgetOptional), BlueprintReadOnly)
 	UImage* IconImage = nullptr;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="1_Equipment")
-	bool bLoadAssetsIfNeeded = true;
+	/** Manual binding API if you don’t use auto-bind */
+	UFUNCTION(BlueprintCallable, Category="1_Equipment|UI")
+	void BindToEquipment(UEquipmentComponent* Equip);
 
-	// Repaint from current equipped state
-	UFUNCTION(BlueprintCallable, Category="1_Equipment-UI")
+	UFUNCTION(BlueprintCallable, Category="1_Equipment|UI")
 	void RefreshVisuals();
 
-	// BP hooks so you can style and veto in blueprints
-	UFUNCTION(BlueprintImplementableEvent, Category="1_Equipment-UI|Hooks")
-	void OnRefreshVisualsBP(UItemDataAsset* ItemData);
-
-	UFUNCTION(BlueprintImplementableEvent, Category="1_Equipment-UI|Hooks")
-	void OnDragHoverChanged(bool bHovering);
-
-	UFUNCTION(BlueprintNativeEvent, Category="1_Equipment-UI|Hooks")
-	bool CanAcceptDrag_BP(UInventoryComponent* SourceInventory, int32 SourceIndex);
-	virtual bool CanAcceptDrag_BP_Implementation(UInventoryComponent* SourceInventory, int32 SourceIndex) { return true; }
-
-	UFUNCTION(BlueprintImplementableEvent, Category="1_Equipment-UI|Hooks")
-	void OnDropOutcome(bool bSuccess, FGameplayTag UsedSlot);
-
 protected:
-	virtual void NativeOnInitialized() override;
+	UPROPERTY()
+	TWeakObjectPtr<UEquipmentComponent> BoundEquip;
+
+	// Events from component
+	UFUNCTION()
+	void HandleEquipChanged(FGameplayTag InSlot, UItemDataAsset* InData);
+
+	UFUNCTION()
+	void HandleSlotCleared(FGameplayTag InSlot);
+
+	// UUserWidget
 	virtual void NativeConstruct() override;
 	virtual void NativeDestruct() override;
 
-	virtual bool NativeOnDrop(const FGeometry& InGeo, const FDragDropEvent& InEvent, UDragDropOperation* InOp) override;
-	virtual void NativeOnDragEnter(const FGeometry& InGeo, const FDragDropEvent& InEvent, UDragDropOperation* InOp) override;
-	virtual void NativeOnDragLeave(const FDragDropEvent& InEvent, UDragDropOperation* InOp) override;
+	// Drag & Drop
+	virtual FReply NativeOnMouseButtonDown(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent) override;
+	virtual void NativeOnDragDetected(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent, UDragDropOperation*& OutOperation) override;
+	virtual bool NativeOnDrop(const FGeometry& InGeometry, const FDragDropEvent& InDragDropEvent, UDragDropOperation* InOperation) override;
 
-	// Bound to component signals
-	UFUNCTION() void HandleEquipChanged(FGameplayTag InSlot, UItemDataAsset* Item);
-	UFUNCTION() void HandleSlotCleared(FGameplayTag InSlot);
+	// For building drag payloads in Blueprints if desired
+	UFUNCTION(BlueprintNativeEvent, Category="1_Equipment|UI")
+	bool BuildDragOperation(UInventoryDragDropOp*& OutOperation);
+	virtual bool BuildDragOperation_Implementation(UInventoryDragDropOp*& OutOperation) { OutOperation = nullptr; return false; }
 
 private:
-	// Cache the PS-owned EquipmentComponent we’re listening to
-	TWeakObjectPtr<UEquipmentComponent> BoundEquip;
-
-	// Hook up delegates
-	void BindToEquipment();
+	void ApplyIcon(UItemDataAsset* Data);
 };

@@ -245,7 +245,10 @@ FReply UInventoryItemSlotWidget::NativeOnMouseButtonDoubleClick(const FGeometry&
 
 	// One-liner: let the helper pick Primary/Secondary or swap back into this inventory if needed.
 	const bool bOK = UEquipmentHelperLibrary::EquipBestFromInventoryIndex(
-		GetOwningPlayerPawn(), InventoryRef, SlotIndex, bDoubleClickAlsoWields);
+	GetOwningPlayerPawn(), InventoryRef, SlotIndex,
+	/*PreferredSlot*/ FGameplayTag(),       // none → let it auto pick
+	/*bAlsoWield*/ bDoubleClickAlsoWields);
+
 
 	return bOK ? FReply::Handled() : FReply::Unhandled();
 }

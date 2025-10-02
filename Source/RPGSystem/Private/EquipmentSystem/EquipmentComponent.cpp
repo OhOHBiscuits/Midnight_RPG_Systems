@@ -1,126 +1,23 @@
-// Source/RPGSystem/Private/EquipmentSystem/EquipmentComponent.cpp
-
+// Copyright ...
 #include "EquipmentSystem/EquipmentComponent.h"
 
 #include "Net/UnrealNetwork.h"
-#include "Engine/World.h"
-#include "GameFramework/Actor.h"
+#include "GameplayTagAssetInterface.h"
+#include "GameFramework/PlayerState.h"
+#include "Net/UnrealNetwork.h"
+#include "GameplayTagAssetInterface.h"
 #include "GameFramework/PlayerState.h"
 
 #include "Inventory/InventoryComponent.h"
-#include "Inventory/InventoryItem.h"
-#include "Inventory/ItemDataAsset.h"
-#include "Inventory/InventoryAssetManager.h"
+#include "Inventory/InventoryHelpers.h"
 
-// -------- local helpers (file scope) ----------
-static FText PrettyFromTag(const FGameplayTag& Tag)
-{
-	return FText::FromName(Tag.IsValid() ? Tag.GetTagName() : NAME_None);
-}
-
-static void BuildItemTagContainer(const UItemDataAsset* Data, FGameplayTagContainer& OutTags)
-{
-	OutTags.Reset();
-	if (!Data) return;
-
-	// These names match your data assets. If you’ve renamed them, add/adjust here:
-	// (Failsafe: if a field is missing in this build, it simply won't be added.)
-	auto TryAdd = [&OutTags](const FGameplayTag& T)
-	{
-		if (T.IsValid()) { OutTags.AddTag(T); }
-	};
-
-	// Common ID/type/category fields
-	// UItemDataAsset::ItemIDTag
-	// UItemDataAsset::ItemTypeTag
-	// UItemDataAsset::ItemCategoryTag
-	// UItemDataAsset::ItemSubCategoryTag
-	// Some weapon assets also carry preferred slot tags arrays; those are not required for AllowedItemQuery.
-
-	// We can't include headers showing these properties explicitly (they were truncated in the provided file),
-	// so we use a soft approach: check for UPROPERTYs via accessors if you expose them; otherwise, keep core fields.
-
-	// Core expected fields:
-	// clang-format off
-	// If you expose accessors later, prefer those. For now we assume public fields:
-	// NOTE: Remove comments and switch to your actual getters if needed.
-	TryAdd(Data->ItemIDTag);
-	TryAdd(Data->ItemTypeTag);
-	TryAdd(Data->ItemCategoryTag);
-	TryAdd(Data->ItemSubCategoryTag);
-	// clang-format on
-}
-
-// --------------- UEquipmentComponent ----------------
+#include "EquipmentSystem/WieldComponent.h"
+#include "EquipmentSystem/EquipmentHelperLibrary.h"
 
 UEquipmentComponent::UEquipmentComponent()
 {
 	PrimaryComponentTick.bCanEverTick = false;
 	SetIsReplicatedByDefault(true);
-
-	// Sensible defaults in case designer forgets to add slots
-	if (WeaponSlots.Num() == 0)
-	{
-		FEquipmentSlotDef S;
-		S.SlotName = TEXT("Primary");
-		S.SlotTag = FGameplayTag::RequestGameplayTag(FName("Slots.Weapon.Primary"), false);
-		S.bOptional = true;
-		WeaponSlots.Add(S);
-
-		S.SlotName = TEXT("Secondary");
-		S.SlotTag = FGameplayTag::RequestGameplayTag(FName("Slots.Weapon.Secondary"), false);
-		WeaponSlots.Add(S);
-
-		S.SlotName = TEXT("SideArm");
-		S.SlotTag = FGameplayTag::RequestGameplayTag(FName("Slots.Weapon.SideArm"), false);
-		WeaponSlots.Add(S);
-
-		S.SlotName = TEXT("Melee");
-		S.SlotTag = FGameplayTag::RequestGameplayTag(FName("Slots.Weapon.Melee"), false);
-		WeaponSlots.Add(S);
-	}
-
-	if (ArmorSlots.Num() == 0)
-	{
-		FEquipmentSlotDef S;
-		S.SlotName = TEXT("Helmet");
-		S.SlotTag = FGameplayTag::RequestGameplayTag(FName("Slots.Armor.Helmet"), false);
-		ArmorSlots.Add(S);
-
-		S.SlotName = TEXT("Chest");
-		S.SlotTag = FGameplayTag::RequestGameplayTag(FName("Slots.Armor.Chest"), false);
-		ArmorSlots.Add(S);
-
-		S.SlotName = TEXT("Hands");
-		S.SlotTag = FGameplayTag::RequestGameplayTag(FName("Slots.Armor.Hands"), false);
-		ArmorSlots.Add(S);
-	}
-}
-
-void UEquipmentComponent::BeginPlay()
-{
-	Super::BeginPlay();
-
-	// Ensure Equipped array has an entry for every configured slot.
-	auto EnsureEntryFor = [this](const TArray<FEquipmentSlotDef>& Defs)
-	{
-		for (const FEquipmentSlotDef& D : Defs)
-		{
-			if (!D.SlotTag.IsValid()) continue;
-			if (FindEquippedIndex(D.SlotTag) == INDEX_NONE)
-			{
-				FEquippedEntry E;
-				E.SlotTag = D.SlotTag;
-				Equipped.Add(E);
-			}
-		}
-	};
-
-	EnsureEntryFor(WeaponSlots);
-	EnsureEntryFor(ArmorSlots);
-
-	// Cache initial copy for client diffing
-	LocalLastEquippedCache = Equipped;
 }
 
 void UEquipmentComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -131,310 +28,280 @@ void UEquipmentComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& 
 
 void UEquipmentComponent::OnRep_Equipped()
 {
-	// Diff vs last local cache to broadcast only the changed slots
-	TMap<FGameplayTag, FGameplayTag> PrevBySlot;
-	for (const FEquippedEntry& E : LocalLastEquippedCache)
+	// Notify UI for all slots (cheap; you can granularize later if desired)
+	for (const FEquippedEntry& E : Equipped)
 	{
-		PrevBySlot.Add(E.SlotTag, E.ItemIDTag);
-	}
-
-	for (const FEquippedEntry& Now : Equipped)
-	{
-		const FGameplayTag* PrevItem = PrevBySlot.Find(Now.SlotTag);
-		const bool bWasEmpty = (!PrevItem || !PrevItem->IsValid());
-		const bool bIsEmpty  = (!Now.ItemIDTag.IsValid());
-
-		if (bIsEmpty && !bWasEmpty)
+		UItemDataAsset* Data = LoadItemDataByID(E.ItemIDTag);
+		OnEquipmentChanged.Broadcast(E.SlotTag, Data);
+		OnEquippedItemChanged.Broadcast(E.SlotTag, Data);
+		if (!E.ItemIDTag.IsValid())
 		{
-			OnEquipmentSlotCleared.Broadcast(Now.SlotTag);
-		}
-		else if (!bIsEmpty && (bWasEmpty || *PrevItem != Now.ItemIDTag))
-		{
-			UItemDataAsset* Data = UInventoryAssetManager::Get().LoadItemDataByTag(Now.ItemIDTag, /*Sync*/true);
-			OnEquipmentChanged.Broadcast(Now.SlotTag, Data);
+			OnEquipmentSlotCleared.Broadcast(E.SlotTag);
+			OnEquippedSlotCleared.Broadcast(E.SlotTag);
 		}
 	}
-
-	LocalLastEquippedCache = Equipped;
 }
 
-// ---------------- Queries ----------------
-
-const FEquipmentSlotDef* UEquipmentComponent::FindSlotDef(FGameplayTag SlotTag) const
+int32 UEquipmentComponent::FindEquippedIndex(const FGameplayTag& Slot) const
 {
-	if (!SlotTag.IsValid()) return nullptr;
-
-	for (const FEquipmentSlotDef& D : WeaponSlots)
+	for (int32 i=0;i<Equipped.Num();++i)
 	{
-		if (D.SlotTag == SlotTag) return &D;
-	}
-	for (const FEquipmentSlotDef& D : ArmorSlots)
-	{
-		if (D.SlotTag == SlotTag) return &D;
-	}
-	return nullptr;
-}
-
-int32 UEquipmentComponent::FindEquippedIndex(FGameplayTag SlotTag) const
-{
-	for (int32 i = 0; i < Equipped.Num(); ++i)
-	{
-		if (Equipped[i].SlotTag == SlotTag) return i;
+		if (Equipped[i].SlotTag == Slot) return i;
 	}
 	return INDEX_NONE;
 }
 
-bool UEquipmentComponent::IsItemAllowedInSlot(const FEquipmentSlotDef& SlotDef, const UItemDataAsset* ItemData) const
+bool UEquipmentComponent::IsItemAllowedInSlot(const UItemDataAsset* ItemData, const FGameplayTag& SlotTag) const
 {
 	if (!ItemData) return false;
-	if (!SlotDef.AllowedItemQuery.IsEmpty()) // if you set a query, enforce it
+
+	auto Matches = [&](const TArray<FEquipmentSlotDef>& Defs)->bool
 	{
-		FGameplayTagContainer ItemTags;
-		BuildItemTagContainer(ItemData, ItemTags);
-		return SlotDef.AllowedItemQuery.Matches(ItemTags);
-	}
-	return true;
+		for (const FEquipmentSlotDef& Def : Defs)
+		{
+			if (Def.SlotTag == SlotTag)
+			{
+				FGameplayTagContainer ItemTags;
+
+				// If the DataAsset exposes tags via the interface, pull them
+				if (const IGameplayTagAssetInterface* TagSrc = Cast<IGameplayTagAssetInterface>(ItemData))
+				{
+					TagSrc->GetOwnedGameplayTags(ItemTags);
+				}
+
+				// Always include the ItemIDTag so queries can at least match that
+				ItemTags.AddTag(ItemData->ItemIDTag);
+
+				// Empty query = everything allowed
+				return Def.AllowedItemQuery.IsEmpty() || Def.AllowedItemQuery.Matches(ItemTags);
+			}
+		}
+		return false;
+	};
+
+	return Matches(WeaponSlots) || Matches(ArmorSlots);
 }
 
-UItemDataAsset* UEquipmentComponent::GetEquippedItemData(FGameplayTag SlotTag) const
-{
-	const int32 Idx = FindEquippedIndex(SlotTag);
-	if (Idx == INDEX_NONE) return nullptr;
 
-	const FGameplayTag ItemID = Equipped[Idx].ItemIDTag;
+UItemDataAsset* UEquipmentComponent::LoadItemDataByID(const FGameplayTag& ItemID) const
+{
 	if (!ItemID.IsValid()) return nullptr;
-
-	return UInventoryAssetManager::Get().LoadItemDataByTag(ItemID, /*Sync*/true);
+	return UInventoryHelpers::FindItemDataByTag(GetWorld(), ItemID);
 }
 
-bool UEquipmentComponent::IsEquipped(FGameplayTag SlotTag) const
+FText UEquipmentComponent::GetSlotDisplayName(const FGameplayTag& Slot) const
 {
-	const int32 Idx = FindEquippedIndex(SlotTag);
-	return (Idx != INDEX_NONE && Equipped[Idx].ItemIDTag.IsValid());
-}
-
-void UEquipmentComponent::GetAllSlotTags(TArray<FGameplayTag>& OutSlots) const
-{
-	OutSlots.Reset();
-	OutSlots.Reserve(WeaponSlots.Num() + ArmorSlots.Num());
-	for (const FEquipmentSlotDef& D : WeaponSlots) if (D.SlotTag.IsValid()) OutSlots.Add(D.SlotTag);
-	for (const FEquipmentSlotDef& D : ArmorSlots) if (D.SlotTag.IsValid()) OutSlots.Add(D.SlotTag);
-}
-
-FText UEquipmentComponent::GetSlotDisplayName(FGameplayTag Slot) const
-{
-	if (const FEquipmentSlotDef* Def = FindSlotDef(Slot))
+	auto PrettyFromTag = [](const FGameplayTag& T)->FText
 	{
-		return Def->SlotName.IsNone() ? PrettyFromTag(Slot) : FText::FromName(Def->SlotName);
+		const FString S = T.ToString().Replace(TEXT("."), TEXT(" / "));
+		return FText::FromString(S);
+	};
+
+	for (const FEquipmentSlotDef& D : WeaponSlots)
+	{
+		if (D.SlotTag == Slot)
+			return D.SlotName.IsNone() ? PrettyFromTag(Slot) : FText::FromName(D.SlotName);
+	}
+	for (const FEquipmentSlotDef& D : ArmorSlots)
+	{
+		if (D.SlotTag == Slot)
+			return D.SlotName.IsNone() ? PrettyFromTag(Slot) : FText::FromName(D.SlotName);
 	}
 	return PrettyFromTag(Slot);
 }
 
-void UEquipmentComponent::GetWeaponSlotsWithNames(TArray<FGameplayTag>& OutTags, TArray<FText>& OutNames) const
+void UEquipmentComponent::GetAllSlotTags(TArray<FGameplayTag>& Out) const
 {
-	OutTags.Reset(); OutNames.Reset();
-	for (const FEquipmentSlotDef& D : WeaponSlots)
-	{
-		if (!D.SlotTag.IsValid()) continue;
-		OutTags.Add(D.SlotTag);
-		OutNames.Add(D.SlotName.IsNone() ? PrettyFromTag(D.SlotTag) : FText::FromName(D.SlotName));
-	}
+	Out.Reset();
+	for (const FEquipmentSlotDef& D : WeaponSlots) Out.Add(D.SlotTag);
+	for (const FEquipmentSlotDef& D : ArmorSlots)  Out.Add(D.SlotTag);
+	Out.Sort([](const FGameplayTag& A, const FGameplayTag& B){ return A.ToString() < B.ToString(); });
+	Out.SetNum(Out.Num(), EAllowShrinking::No);
 }
 
-void UEquipmentComponent::GetArmorSlotsWithNames(TArray<FGameplayTag>& OutTags, TArray<FText>& OutNames) const
+bool UEquipmentComponent::IsSlotOccupied(const FGameplayTag& Slot) const
 {
-	OutTags.Reset(); OutNames.Reset();
-	for (const FEquipmentSlotDef& D : ArmorSlots)
-	{
-		if (!D.SlotTag.IsValid()) continue;
-		OutTags.Add(D.SlotTag);
-		OutNames.Add(D.SlotName.IsNone() ? PrettyFromTag(D.SlotTag) : FText::FromName(D.SlotName));
-	}
+	const int32 Idx = FindEquippedIndex(Slot);
+	return (Idx != INDEX_NONE) && Equipped[Idx].ItemIDTag.IsValid();
 }
 
-// ---------------- Actions ---------------
-
-bool UEquipmentComponent::EquipByInventoryIndex(FGameplayTag SlotTag, UInventoryComponent* FromInventory, int32 FromIndex, bool bAutoApplyModifiers, bool bAlsoWield)
+UItemDataAsset* UEquipmentComponent::GetEquippedItemDataForSlot(const FGameplayTag& Slot) const
 {
-	if (!GetOwner() || !FromInventory) return false;
-
-	if (!GetOwner()->HasAuthority())
-	{
-		ServerEquipByInventoryIndex(SlotTag, FromInventory, FromIndex, bAutoApplyModifiers, bAlsoWield);
-		return true; // let server decide; UI will tick after replication
-	}
-
-	// Validate item from the inventory
-	if (!FromInventory->Items.IsValidIndex(FromIndex)) return false;
-
-	const FInventoryItem& ItemRef = FromInventory->Items[FromIndex];
-	UItemDataAsset* Data = ItemRef.ItemData.Get(); // Data assets are soft in your Items array
-	if (!Data) return false;
-
-	const FEquipmentSlotDef* Def = FindSlotDef(SlotTag);
-	if (!Def || !IsItemAllowedInSlot(*Def, Data)) return false;
-
-	// Set slot to item
-	const FGameplayTag ItemID = Data->ItemIDTag;
-	if (!EquipLocal(SlotTag, ItemID, bAutoApplyModifiers, bAlsoWield)) return false;
-
-	// Consume 1 from that stack on the authoritative inventory
-	FromInventory->TryRemoveItem(FromIndex, /*Quantity*/1);
-
-	return true;
+	const int32 Idx = FindEquippedIndex(Slot);
+	return (Idx != INDEX_NONE) ? LoadItemDataByID(Equipped[Idx].ItemIDTag) : nullptr;
 }
 
-bool UEquipmentComponent::EquipByItemIDTag(FGameplayTag SlotTag, FGameplayTag ItemIDTag, bool bAutoApplyModifiers, bool bAlsoWield)
+void UEquipmentComponent::SetSlot_Internal(const FGameplayTag& Slot, const FGameplayTag& ItemID)
 {
-	if (!GetOwner()) return false;
-
-	if (!GetOwner()->HasAuthority())
-	{
-		ServerEquipByItemIDTag(SlotTag, ItemIDTag, bAutoApplyModifiers, bAlsoWield);
-		return true;
-	}
-
-	// Load the data to validate against AllowedItemQuery
-	UItemDataAsset* Data = UInventoryAssetManager::Get().LoadItemDataByTag(ItemIDTag, /*Sync*/true);
-	if (!Data) return false;
-
-	const FEquipmentSlotDef* Def = FindSlotDef(SlotTag);
-	if (!Def || !IsItemAllowedInSlot(*Def, Data)) return false;
-
-	return EquipLocal(SlotTag, ItemIDTag, bAutoApplyModifiers, bAlsoWield);
-}
-
-bool UEquipmentComponent::UnequipSlot(FGameplayTag SlotTag)
-{
-	if (!GetOwner()) return false;
-
-	if (!GetOwner()->HasAuthority())
-	{
-		ServerUnequipSlot(SlotTag);
-		return true;
-	}
-
-	return UnequipLocal(SlotTag);
-}
-
-bool UEquipmentComponent::UnequipSlotToInventory(FGameplayTag SlotTag, UInventoryComponent* DestInventory)
-{
-	if (!GetOwner()) return false;
-
-	if (!GetOwner()->HasAuthority())
-	{
-		ServerUnequipSlotToInventory(SlotTag, DestInventory);
-		return true;
-	}
-
-	const int32 Idx = FindEquippedIndex(SlotTag);
-	if (Idx == INDEX_NONE) return false;
-
-	const FGameplayTag ItemID = Equipped[Idx].ItemIDTag;
-	if (!ItemID.IsValid()) return false;
-
-	UItemDataAsset* Data = UInventoryAssetManager::Get().LoadItemDataByTag(ItemID, /*Sync*/true);
-	if (!Data) return false;
-
-	// Try add back to inventory first
-	bool bAdded = false;
-	if (DestInventory)
-	{
-		bAdded = DestInventory->TryAddItem(Data, /*Quantity*/1);
-	}
-
-	// Even if add fails, we still clear the slot (design choice; change if you want strict behavior)
-	UnequipLocal(SlotTag);
-	return bAdded;
-}
-
-// ---------------- Local mutators (authority only) ----------------
-
-bool UEquipmentComponent::EquipLocal(FGameplayTag SlotTag, FGameplayTag ItemIDTag, bool /*bAutoApplyModifiers*/, bool /*bAlsoWield*/)
-{
-	int32 Idx = FindEquippedIndex(SlotTag);
+	const int32 Idx = FindEquippedIndex(Slot);
 	if (Idx == INDEX_NONE)
 	{
-		FEquippedEntry E; E.SlotTag = SlotTag; E.ItemIDTag = ItemIDTag;
-		Idx = Equipped.Add(E);
+		Equipped.Add(FEquippedEntry(Slot, ItemID));
 	}
 	else
 	{
-		Equipped[Idx].ItemIDTag = ItemIDTag;
+		Equipped[Idx].ItemIDTag = ItemID;
 	}
 
-	// Immediate feedback on the server (listen server host sees UI instantly)
-	NotifySlotSetLocal(SlotTag, ItemIDTag);
+	UItemDataAsset* Data = LoadItemDataByID(ItemID);
+	OnEquipmentChanged.Broadcast(Slot, Data);
+	OnEquippedItemChanged.Broadcast(Slot, Data);
+}
+
+void UEquipmentComponent::ClearSlot_Internal(const FGameplayTag& Slot)
+{
+	const int32 Idx = FindEquippedIndex(Slot);
+	if (Idx != INDEX_NONE)
+	{
+		Equipped[Idx].ItemIDTag = FGameplayTag();
+		OnEquipmentChanged.Broadcast(Slot, nullptr);
+		OnEquipmentSlotCleared.Broadcast(Slot);
+		OnEquippedItemChanged.Broadcast(Slot, nullptr);
+		OnEquippedSlotCleared.Broadcast(Slot);
+	}
+}
+
+UInventoryComponent* UEquipmentComponent::FindPlayerStateInventory() const
+{
+	const AActor* OwnerActor = GetOwner();
+	if (!OwnerActor) return nullptr;
+
+	const APawn* Pawn = Cast<APawn>(OwnerActor);
+	const APlayerState* PS = Pawn ? Pawn->GetPlayerState() : Cast<APlayerState>(OwnerActor);
+	if (!PS) return nullptr;
+
+	return PS->FindComponentByClass<UInventoryComponent>();
+}
+
+// ---------- Public Actions (with client->server forwarding) ----------
+bool UEquipmentComponent::TryEquipByInventoryIndex(const FGameplayTag& SlotTag, UInventoryComponent* SourceInventory, int32 SourceIndex, bool bAlsoWield)
+{
+	if (!SourceInventory) return false;
+
+	// Pull item by value
+	FInventoryItem Item = SourceInventory->GetItem(SourceIndex);
+	UItemDataAsset* SourceData = Item.ItemData.LoadSynchronous(); // OK to use .Get() if you don't async-load
+	if (!SourceData) return false;
+
+	// Check slot acceptance
+	if (!IsItemAllowedInSlot(SourceData, SlotTag)) return false;
+
+	// Consume 1 from that inventory slot (your API removes by index)
+	if (!SourceInventory->TryRemoveItem(SourceIndex, /*Quantity*/1))
+	{
+		return false;
+	}
+
+	// Record the equipped state
+	SetSlot_Internal(SlotTag, SourceData->ItemIDTag);
+
+	// Optional: auto-wield the freshly equipped item
+	if (bAlsoWield || bAutoWieldAfterEquip)
+	{
+		if (UWieldComponent* W = UEquipmentHelperLibrary::GetWieldPS(GetOwner()))
+		{
+			W->TryWieldEquippedInSlot(SlotTag);
+		}
+	}
 	return true;
 }
 
-bool UEquipmentComponent::UnequipLocal(FGameplayTag SlotTag)
+bool UEquipmentComponent::TryEquipByItemIDTag(const FGameplayTag& SlotTag, const FGameplayTag& ItemIDTag, bool bAlsoWield)
 {
-	const int32 Idx = FindEquippedIndex(SlotTag);
-	if (Idx == INDEX_NONE) return false;
+	if (!GetOwner()) return false;
 
-	if (!Equipped[Idx].ItemIDTag.IsValid())
+	if (!GetOwner()->HasAuthority())
 	{
-		// Already empty
+		Server_TryEquipByItemIDTag(SlotTag, ItemIDTag, bAlsoWield);
 		return true;
 	}
 
-	Equipped[Idx].ItemIDTag = FGameplayTag(); // clear
-	NotifySlotClearedLocal(SlotTag);
+	UItemDataAsset* Data = LoadItemDataByID(ItemIDTag);
+	if (!Data) return false;
+	if (!IsItemAllowedInSlot(Data, SlotTag)) return false;
+
+	SetSlot_Internal(SlotTag, ItemIDTag);
+
+	if (bAlsoWield || bAutoWieldAfterEquip)
+	{
+		if (UWieldComponent* W = UEquipmentHelperLibrary::GetWieldPS(GetOwner()))
+		{
+			W->TryWieldEquippedInSlot(SlotTag);
+		}
+	}
+
 	return true;
 }
 
-void UEquipmentComponent::NotifySlotSetLocal(FGameplayTag SlotTag, FGameplayTag ItemIDTag)
+bool UEquipmentComponent::TryUnequipSlotToInventory(const FGameplayTag& SlotTag, UInventoryComponent* DestInventory)
 {
-	UItemDataAsset* Data = UInventoryAssetManager::Get().LoadItemDataByTag(ItemIDTag, /*Sync*/true);
-	OnEquipmentChanged.Broadcast(SlotTag, Data);
+	if (!GetOwner()) return false;
 
-	// Update local cache so subsequent OnRep diff is correct on server too
-	bool bFound = false;
-	for (FEquippedEntry& E : LocalLastEquippedCache)
+	if (!GetOwner()->HasAuthority())
 	{
-		if (E.SlotTag == SlotTag) { E.ItemIDTag = ItemIDTag; bFound = true; break; }
+		Server_TryUnequipSlotToInventory(SlotTag, DestInventory);
+		return true;
 	}
-	if (!bFound)
+
+	const int32 Idx = FindEquippedIndex(SlotTag);
+	if (Idx == INDEX_NONE || !Equipped[Idx].ItemIDTag.IsValid()) return false;
+
+	if (!DestInventory)
 	{
-		FEquippedEntry NewE; NewE.SlotTag = SlotTag; NewE.ItemIDTag = ItemIDTag;
-		LocalLastEquippedCache.Add(NewE);
+		DestInventory = FindPlayerStateInventory();
+		if (!DestInventory) return false;
 	}
-}
 
-void UEquipmentComponent::NotifySlotClearedLocal(FGameplayTag SlotTag)
-{
-	OnEquipmentSlotCleared.Broadcast(SlotTag);
+	UItemDataAsset* Data = LoadItemDataByID(Equipped[Idx].ItemIDTag);
+	if (!Data) return false;
 
-	// Update cache
-	for (FEquippedEntry& E : LocalLastEquippedCache)
+	// Add back one to the destination inventory
+	if (!DestInventory->TryAddItem(Data, /*Quantity*/1))
 	{
-		if (E.SlotTag == SlotTag) { E.ItemIDTag = FGameplayTag(); break; }
+		return false;
 	}
+
+	// Clear slot
+	ClearSlot_Internal(SlotTag);
+	return true;
 }
 
-// ---------------- RPC impls ----------------
-
-bool UEquipmentComponent::ServerEquipByInventoryIndex_Validate(FGameplayTag, UInventoryComponent*, int32, bool, bool) { return true; }
-void UEquipmentComponent::ServerEquipByInventoryIndex_Implementation(FGameplayTag SlotTag, UInventoryComponent* FromInventory, int32 FromIndex, bool bAutoApplyModifiers, bool bAlsoWield)
+bool UEquipmentComponent::TryUnequipSlot(const FGameplayTag& SlotTag)
 {
-	EquipByInventoryIndex(SlotTag, FromInventory, FromIndex, bAutoApplyModifiers, bAlsoWield);
+	if (!GetOwner()) return false;
+
+	if (!GetOwner()->HasAuthority())
+	{
+		Server_TryUnequipSlot(SlotTag);
+		return true;
+	}
+
+	ClearSlot_Internal(SlotTag);
+	return true;
 }
 
-bool UEquipmentComponent::ServerEquipByItemIDTag_Validate(FGameplayTag, FGameplayTag, bool, bool) { return true; }
-void UEquipmentComponent::ServerEquipByItemIDTag_Implementation(FGameplayTag SlotTag, FGameplayTag ItemIDTag, bool bAutoApplyModifiers, bool bAlsoWield)
+// ---------- Server RPCs ----------
+void UEquipmentComponent::Server_TryEquipByInventoryIndex_Implementation(const FGameplayTag& SlotTag, UInventoryComponent* SourceInventory, int32 SourceIndex, bool bAlsoWield)
 {
-	EquipByItemIDTag(SlotTag, ItemIDTag, bAutoApplyModifiers, bAlsoWield);
+	TryEquipByInventoryIndex(SlotTag, SourceInventory, SourceIndex, bAlsoWield);
 }
 
-bool UEquipmentComponent::ServerUnequipSlot_Validate(FGameplayTag) { return true; }
-void UEquipmentComponent::ServerUnequipSlot_Implementation(FGameplayTag SlotTag)
+void UEquipmentComponent::Server_TryEquipByItemIDTag_Implementation(const FGameplayTag& SlotTag, FGameplayTag ItemIDTag, bool bAlsoWield)
 {
-	UnequipSlot(SlotTag);
+	TryEquipByItemIDTag(SlotTag, ItemIDTag, bAlsoWield);
 }
 
-bool UEquipmentComponent::ServerUnequipSlotToInventory_Validate(FGameplayTag, UInventoryComponent*) { return true; }
-void UEquipmentComponent::ServerUnequipSlotToInventory_Implementation(FGameplayTag SlotTag, UInventoryComponent* DestInventory)
+void UEquipmentComponent::Server_TryUnequipSlotToInventory_Implementation(const FGameplayTag& SlotTag, UInventoryComponent* DestInventory)
 {
-	UnequipSlotToInventory(SlotTag, DestInventory);
+	TryUnequipSlotToInventory(SlotTag, DestInventory);
+}
+
+void UEquipmentComponent::Server_TryUnequipSlot_Implementation(const FGameplayTag& SlotTag)
+{
+	TryUnequipSlot(SlotTag);
+}
+
+UItemDataAsset* UEquipmentComponent::GetEquippedItemData_Compat(const FGameplayTag& SlotTag) const
+{
+	return UEquipmentHelperLibrary::GetEquippedItemData(GetOwner(), SlotTag);
 }
