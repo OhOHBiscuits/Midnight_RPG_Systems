@@ -1,114 +1,153 @@
-﻿#include "EquipmentSystem/EquipmentHelperLibrary.h"
+#include "EquipmentSystem/EquipmentHelperLibrary.h"
+#include "EquipmentSystem/EquipmentComponent.h"
+#include "EquipmentSystem/WieldComponent.h"
+#include "Inventory/InventoryComponent.h"
+#include "Inventory/ItemDataAsset.h"
+#include "Inventory/InventoryAssetManager.h"
 
+#include "GameFramework/Actor.h"
 #include "GameFramework/Pawn.h"
 #include "GameFramework/PlayerState.h"
 
-#include "EquipmentSystem/EquipmentComponent.h"
-#include "EquipmentSystem/WieldComponent.h"
-#include "Inventory/ItemDataAsset.h"
-
-#include "Inventory/InventoryComponent.h"
-#include "Inventory/InventoryHelpers.h"
-#include "Inventory/InventoryAssetManager.h"
-
-static APlayerState* ResolvePS(AActor* ContextActor)
+UEquipmentComponent* UEquipmentHelperLibrary::GetEquipmentPS(AActor* ContextActor)
 {
 	if (!ContextActor) return nullptr;
 
-	if (const APawn* Pawn = Cast<APawn>(ContextActor))
+	// Prefer PlayerState (your setup keeps Inventory + Equipment there)
+	if (APawn* P = Cast<APawn>(ContextActor))
 	{
-		return Pawn->GetPlayerState();
+		if (APlayerState* PS = P->GetPlayerState())
+		{
+			if (UEquipmentComponent* C = PS->FindComponentByClass<UEquipmentComponent>())
+				return C;
+		}
 	}
-	return Cast<APlayerState>(ContextActor);
-}
 
-UEquipmentComponent* UEquipmentHelperLibrary::GetEquipmentPS(AActor* ContextActor)
-{
-	if (APlayerState* PS = ResolvePS(ContextActor))
-	{
-		return PS->FindComponentByClass<UEquipmentComponent>();
-	}
-	return nullptr;
+	// Fallback: look on the owner directly
+	return ContextActor->FindComponentByClass<UEquipmentComponent>();
 }
 
 UInventoryComponent* UEquipmentHelperLibrary::GetInventoryPS(AActor* ContextActor)
 {
-	if (APlayerState* PS = ResolvePS(ContextActor))
+	if (!ContextActor) return nullptr;
+
+	if (APawn* P = Cast<APawn>(ContextActor))
 	{
-		return PS->FindComponentByClass<UInventoryComponent>();
+		if (APlayerState* PS = P->GetPlayerState())
+		{
+			if (UInventoryComponent* C = PS->FindComponentByClass<UInventoryComponent>())
+				return C;
+		}
 	}
-	return nullptr;
+
+	return ContextActor->FindComponentByClass<UInventoryComponent>();
 }
 
 UWieldComponent* UEquipmentHelperLibrary::GetWieldPS(AActor* ContextActor)
 {
-	if (APlayerState* PS = ResolvePS(ContextActor))
+	if (!ContextActor) return nullptr;
+
+	if (APawn* P = Cast<APawn>(ContextActor))
 	{
-		return PS->FindComponentByClass<UWieldComponent>();
-	}
-	return nullptr;
-}
-
-bool UEquipmentHelperLibrary::EquipByItemIDTag(AActor* ContextActor, const FGameplayTag& SlotTag, const FGameplayTag& ItemIDTag, bool bAlsoWield)
-{
-	if (UEquipmentComponent* E = GetEquipmentPS(ContextActor))
-	{
-		return E->TryEquipByItemIDTag(SlotTag, ItemIDTag, bAlsoWield);
-	}
-	return false;
-}
-
-bool UEquipmentHelperLibrary::UnequipSlotToInventory(AActor* ContextActor, const FGameplayTag& SlotTag, UInventoryComponent* DestInventory)
-{
-	if (UEquipmentComponent* E = GetEquipmentPS(ContextActor))
-	{
-		return E->TryUnequipSlotToInventory(SlotTag, DestInventory);
-	}
-	return false;
-}
-
-bool UEquipmentHelperLibrary::EquipBestFromInventoryIndex(AActor* ContextActor, UInventoryComponent* SourceInventory, int32 SourceIndex, const FGameplayTag& PreferredSlot, bool bAlsoWield)
-{
-	if (!SourceInventory) return false;
-
-	UEquipmentComponent* Equip = GetEquipmentPS(ContextActor);
-	if (!Equip) return false;
-
-	// If caller specified a preferred slot, try that first.
-	if (PreferredSlot.IsValid())
-	{
-		if (Equip->TryEquipByInventoryIndex(PreferredSlot, SourceInventory, SourceIndex, bAlsoWield))
+		if (APlayerState* PS = P->GetPlayerState())
 		{
-			return true;
+			if (UWieldComponent* C = PS->FindComponentByClass<UWieldComponent>())
+				return C;
 		}
 	}
 
-	// Otherwise, iterate all slots and take the first that accepts the item.
-	UItemDataAsset* SourceData = nullptr;
-	{
-		FInventoryItem Item = SourceInventory->GetItem(SourceIndex);
-		SourceData = Item.ItemData.LoadSynchronous();
-	}
-	if (!SourceData) return false;
-
-	TArray<FGameplayTag> AllSlots;
-	Equip->GetAllSlotTags(AllSlots);
-
-	for (const FGameplayTag& S : AllSlots)
-	{
-		if (Equip->TryEquipByInventoryIndex(S, SourceInventory, SourceIndex, bAlsoWield))
-		{
-			return true;
-		}
-	}
-	return false;
+	return ContextActor->FindComponentByClass<UWieldComponent>();
 }
 
 UItemDataAsset* UEquipmentHelperLibrary::GetEquippedItemData(AActor* ContextActor, const FGameplayTag& SlotTag)
 {
 	if (UEquipmentComponent* E = GetEquipmentPS(ContextActor))
-	{
-		return E->GetEquippedItemDataForSlot(SlotTag);
-	}
+		return E->GetEquippedItemData(SlotTag);
 	return nullptr;
+}
+
+static FGameplayTag FirstValidTag(const TArray<FGameplayTag>& In)
+{
+	for (const FGameplayTag& T : In)
+	{
+		if (T.IsValid()) return T;
+	}
+	return FGameplayTag();
+}
+
+void UEquipmentHelperLibrary::GetPreferredEquipSlotsFromItem(UItemDataAsset* ItemData, TArray<FGameplayTag>& Out)
+{
+	Out.Reset();
+
+	if (!ItemData) return;
+
+	// Read a property named PreferredEquipSlots (TArray<FGameplayTag>) if it exists,
+	// so we don't hard-couple this library to a specific subclass.
+	static const FName PropName(TEXT("PreferredEquipSlots"));
+	if (FProperty* P = ItemData->GetClass()->FindPropertyByName(PropName))
+	{
+		if (FArrayProperty* Arr = CastField<FArrayProperty>(P))
+		{
+			if (Arr->Inner && Arr->Inner->IsA<FStructProperty>() &&
+				CastFieldChecked<FStructProperty>(Arr->Inner)->Struct == TBaseStructure<FGameplayTag>::Get())
+			{
+				FScriptArrayHelper Helper(Arr, Arr->ContainerPtrToValuePtr<void>(ItemData));
+				const int32 Num = Helper.Num();
+				for (int32 i = 0; i < Num; ++i)
+				{
+					const uint8* Elem = Helper.GetRawPtr(i);
+					Out.Add(*reinterpret_cast<const FGameplayTag*>(Elem));
+				}
+			}
+		}
+	}
+}
+
+bool UEquipmentHelperLibrary::EquipBestFromInventoryIndex(AActor* ContextActor,
+	UInventoryComponent* SourceInventory, int32 SourceIndex,
+	const FGameplayTag& PreferredSlot, bool bAlsoWield)
+{
+	if (!ContextActor || !SourceInventory)
+		return false;
+
+	// Peek the item to consult its preferred slots
+	const FInventoryItem Item = SourceInventory->GetItem(SourceIndex);
+	UItemDataAsset* Data = nullptr;
+
+	if (!Item.ItemData.IsNull())
+		Data = Item.ItemData.LoadSynchronous();
+
+	if (!Data && Item.ItemIDTag.IsValid())
+		Data = UInventoryAssetManager::Get().LoadItemDataByTag(Item.ItemIDTag, /*sync*/ true);
+
+	if (!Data && !Item.ItemIDTag.IsValid())
+		return false;
+
+	TArray<FGameplayTag> Choices;
+	GetPreferredEquipSlotsFromItem(Data, Choices);
+
+	FGameplayTag FinalSlot = FirstValidTag(Choices);
+	if (!FinalSlot.IsValid())
+		FinalSlot = PreferredSlot; // last resort, caller’s desired slot/root
+
+	if (!FinalSlot.IsValid())
+		return false;
+
+	if (UEquipmentComponent* Equip = GetEquipmentPS(ContextActor))
+	{
+		const bool bEquipped = Equip->TryEquipByInventoryIndex(FinalSlot, SourceInventory, SourceIndex);
+		if (!bEquipped) return false;
+
+		if (bAlsoWield)
+		{
+			if (UWieldComponent* Wield = GetWieldPS(ContextActor))
+			{
+				// Let wield component auto-holster into hands if it wants
+				Wield->TryWieldEquippedInSlot(FinalSlot);
+			}
+		}
+		return true;
+	}
+
+	return false;
 }
