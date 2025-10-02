@@ -14,67 +14,50 @@
 #include "Engine/StreamableManager.h"
 #include "Components/Image.h"
 
+void UEquipmentSlotWidget::NativeOnInitialized()
+{
+	Super::NativeOnInitialized();
+	BindToEquipment();
+	RefreshVisuals();
+}
+
 void UEquipmentSlotWidget::NativeConstruct()
 {
 	Super::NativeConstruct();
-	BindToEquipment();
 	RefreshVisuals();
+}
+
+void UEquipmentSlotWidget::NativeDestruct()
+{
+	if (UEquipmentComponent* Equip = BoundEquip.Get())
+	{
+		Equip->OnEquipmentChanged.RemoveDynamic(this, &UEquipmentSlotWidget::HandleEquipChanged);
+		Equip->OnEquipmentSlotCleared.RemoveDynamic(this, &UEquipmentSlotWidget::HandleSlotCleared);
+	}
+	Super::NativeDestruct();
 }
 
 void UEquipmentSlotWidget::BindToEquipment()
 {
 	APlayerController* PC = GetOwningPlayer();
 	AActor* Avatar = PC ? static_cast<AActor*>(PC->GetPawn()) : nullptr;
-	CachedEquip = UEquipmentHelperLibrary::GetEquipmentPS(Avatar);
 
-	if (UEquipmentComponent* Equip = CachedEquip.Get())
+	BoundEquip = UEquipmentHelperLibrary::GetEquipmentPS(Avatar);
+	if (UEquipmentComponent* Equip = BoundEquip.Get())
 	{
-		// Bind to YOUR delegates:
-		//  - FOnEquipmentChanged(FGameplayTag SlotTag, UItemDataAsset* ItemData)
-		//  - FOnEquipmentSlotCleared(FGameplayTag SlotTag)
-		Equip->OnEquipmentChanged.AddDynamic(this, &UEquipmentSlotWidget::HandleEquipChanged);
-		Equip->OnEquipmentSlotCleared.AddDynamic(this, &UEquipmentSlotWidget::HandleEquipCleared);
+		Equip->OnEquipmentChanged.AddUniqueDynamic(this, &UEquipmentSlotWidget::HandleEquipChanged);
+		Equip->OnEquipmentSlotCleared.AddUniqueDynamic(this, &UEquipmentSlotWidget::HandleSlotCleared);
 	}
 }
 
-APlayerState* UEquipmentHelperLibrary::ResolvePlayerState(AActor* ContextActor)
+void UEquipmentSlotWidget::HandleEquipChanged(FGameplayTag InSlot, UItemDataAsset* /*Item*/)
 {
-	if (!ContextActor) return nullptr;
-	if (APlayerState* PS = Cast<APlayerState>(ContextActor)) return PS;
-	if (APawn* Pawn = Cast<APawn>(ContextActor)) return Pawn->GetPlayerState();
-	if (APlayerController* PC = Cast<APlayerController>(ContextActor)) return PC->PlayerState;
-	return ContextActor->GetTypedOuter<APlayerState>(); // last resort
+	if (!SlotTag.IsValid() || InSlot.MatchesTagExact(SlotTag)) RefreshVisuals();
 }
 
-UEquipmentComponent* UEquipmentHelperLibrary::GetEquipmentPS(AActor* ContextActor)
+void UEquipmentSlotWidget::HandleSlotCleared(FGameplayTag InSlot)
 {
-	if (APlayerState* PS = ResolvePlayerState(ContextActor))
-		return PS->FindComponentByClass<UEquipmentComponent>();
-	return nullptr;
-}
-
-UInventoryComponent* UEquipmentHelperLibrary::GetInventoryPS(AActor* ContextActor)
-{
-	if (APlayerState* PS = ResolvePlayerState(ContextActor))
-		return PS->FindComponentByClass<UInventoryComponent>();
-	return nullptr;
-}
-
-void UEquipmentSlotWidget::HandleEquipChanged(FGameplayTag ChangedSlot, UItemDataAsset* /*NewData*/)
-{
-	// Only repaint if it's our slot (cheap and tidy)
-	if (!SlotTag.IsValid() || ChangedSlot == SlotTag)
-	{
-		RefreshVisuals();
-	}
-}
-
-void UEquipmentSlotWidget::HandleEquipCleared(FGameplayTag ClearedSlot)
-{
-	if (!SlotTag.IsValid() || ClearedSlot == SlotTag)
-	{
-		RefreshVisuals();
-	}
+	if (!SlotTag.IsValid() || InSlot.MatchesTagExact(SlotTag)) RefreshVisuals();
 }
 
 void UEquipmentSlotWidget::NativeOnDragEnter(const FGeometry& Geo, const FDragDropEvent& Ev, UDragDropOperation* Op)
@@ -99,8 +82,6 @@ bool UEquipmentSlotWidget::NativeOnDrop(const FGeometry& Geo, const FDragDropEve
 		OnDropOutcome(false, SlotTag);
 		return false;
 	}
-
-	// Optional BP veto first
 	if (!CanAcceptDrag_BP(Drag->SourceInventory, Drag->FromIndex))
 	{
 		OnDropOutcome(false, SlotTag);
@@ -111,68 +92,38 @@ bool UEquipmentSlotWidget::NativeOnDrop(const FGeometry& Geo, const FDragDropEve
 	AActor* Avatar = PC ? static_cast<AActor*>(PC->GetPawn()) : nullptr;
 	if (!Avatar) { OnDropOutcome(false, SlotTag); return false; }
 
-	UEquipmentComponent* Equip = CachedEquip.IsValid() ? CachedEquip.Get() : UEquipmentHelperLibrary::GetEquipmentPS(Avatar);
+	UEquipmentComponent* Equip = BoundEquip.IsValid() ? BoundEquip.Get() : UEquipmentHelperLibrary::GetEquipmentPS(Avatar);
 	if (!Equip) { OnDropOutcome(false, SlotTag); return false; }
 
-	// Resolve the dragged item's data so we can read PreferredEquipSlots
+	// Read the dragged item’s asset (for PreferredEquipSlots)
 	const FInventoryItem Item = Drag->SourceInventory->GetItem(Drag->FromIndex);
 	if (Item.ItemData.IsNull()) { OnDropOutcome(false, SlotTag); return false; }
 
 	UItemDataAsset* Data = Item.ItemData.Get();
-	if (!Data)
-	{
-		TSoftObjectPtr<UItemDataAsset> Soft = Item.ItemData;
-		Data = Soft.LoadSynchronous();
-	}
+	if (!Data) { TSoftObjectPtr<UItemDataAsset> Soft = Item.ItemData; Data = Soft.LoadSynchronous(); }
 	if (!Data) { OnDropOutcome(false, SlotTag); return false; }
 
-	// ------------------------------
-	// NEW: filter PreferredEquipSlots by AcceptRootTag (if set)
+	// Filter item’s preferences by our family root if set (Weapon vs Armor)
 	TArray<FGameplayTag> Preferred = Data->PreferredEquipSlots;
 	if (AcceptRootTag.IsValid())
 	{
 		TArray<FGameplayTag> Filtered;
-		for (const FGameplayTag& T : Preferred)
-		{
-			if (T.IsValid() && T.MatchesTag(AcceptRootTag))
-			{
-				Filtered.Add(T);
-			}
-		}
+		for (const FGameplayTag& T : Preferred) if (T.MatchesTag(AcceptRootTag)) Filtered.Add(T);
 		Preferred = MoveTemp(Filtered);
 	}
-	// ------------------------------
 
 	bool bSuccess = false;
 	FGameplayTag UsedSlot = SlotTag;
 
-	// Build the order we’ll try to equip into
+	// Build try order
 	TArray<FGameplayTag> TryOrder;
-	if (bPreferThisSlotOnDrop)
+	if (bPreferThisSlotOnDrop && (!AcceptRootTag.IsValid() || SlotTag.MatchesTag(AcceptRootTag)))
 	{
-		// Prefer this visual slot if it belongs to the same root (or no root set)
-		if (!AcceptRootTag.IsValid() || SlotTag.MatchesTag(AcceptRootTag))
-		{
-			TryOrder.Add(SlotTag);
-		}
-
-		// Also consider the item’s “secondary” within the same family
-		if (Preferred.Num() > 1 && Preferred[1].IsValid() && !TryOrder.Contains(Preferred[1]))
-		{
-			TryOrder.Add(Preferred[1]);
-		}
+		TryOrder.Add(SlotTag);
 	}
-	else
-	{
-		// Use asset’s order (already filtered by root), then also this visual slot
-		for (const FGameplayTag& T : Preferred) if (T.IsValid()) TryOrder.Add(T);
-		if ((!AcceptRootTag.IsValid() || SlotTag.MatchesTag(AcceptRootTag)) && !TryOrder.Contains(SlotTag))
-		{
-			TryOrder.Add(SlotTag);
-		}
-	}
+	for (const FGameplayTag& T : Preferred) if (T.IsValid() && !TryOrder.Contains(T)) TryOrder.Add(T);
 
-	// 1) Empty targets first
+	// 1) Empty first
 	for (const FGameplayTag& T : TryOrder)
 	{
 		if (Equip->GetEquippedItemData(T) == nullptr)
@@ -183,7 +134,7 @@ bool UEquipmentSlotWidget::NativeOnDrop(const FGeometry& Geo, const FDragDropEve
 		}
 	}
 
-	// 2) Swap into THIS visual slot if everything was full and swapping is allowed
+	// 2) Swap into our visual slot if all were full
 	if (!bSuccess && bAllowSwapWhenFull)
 	{
 		if (Equip->TryUnequipSlotToInventory(SlotTag, Drag->SourceInventory))
@@ -196,10 +147,7 @@ bool UEquipmentSlotWidget::NativeOnDrop(const FGeometry& Geo, const FDragDropEve
 	// Optional auto-wield
 	if (bSuccess && bWieldAfterEquip)
 	{
-		if (UWieldComponent* W = UEquipmentHelperLibrary::GetWieldPS(Avatar))
-		{
-			W->TryWieldEquippedInSlot(UsedSlot);
-		}
+		if (UWieldComponent* W = UEquipmentHelperLibrary::GetWieldPS(Avatar)) W->TryWieldEquippedInSlot(UsedSlot);
 	}
 
 	if (bSuccess) RefreshVisuals();
@@ -214,9 +162,9 @@ void UEquipmentSlotWidget::RefreshVisuals()
 	if (!Avatar) return;
 
 	UItemDataAsset* Data = UEquipmentHelperLibrary::GetEquippedItemData(Avatar, SlotTag);
-	OnRefreshVisualsBP(Data); // let BP set texts, rarity frame, tooltip, etc.
+	OnRefreshVisualsBP(Data);
 
-	if (!IconImage) return; // dev wants to drive visuals fully in BP
+	if (!IconImage) return;
 
 	if (Data && Data->Icon.IsValid())
 	{
@@ -237,41 +185,9 @@ void UEquipmentSlotWidget::RefreshVisuals()
 				{
 					IconImage->SetBrushFromTexture(Tex);
 				}
-			})
-		);
+			}));
 		return;
 	}
 
-	IconImage->SetBrushFromTexture(nullptr); // empty slot visual
+	IconImage->SetBrushFromTexture(nullptr);
 }
-
-void UEquipmentSlotWidget::NativeOnInitialized()
-{
-	Super::NativeOnInitialized();
-
-	if (UEquipmentComponent* Equip = UEquipmentHelperLibrary::GetEquipmentPS(GetOwningPlayer()))
-	{
-		BoundEquip = Equip;
-		Equip->OnEquipmentChanged.AddUniqueDynamic(this, &UEquipmentSlotWidget::HandleEquipChanged);
-		Equip->OnEquipmentSlotCleared.AddUniqueDynamic(this, &UEquipmentSlotWidget::HandleSlotCleared);
-	}
-
-	RefreshVisuals(); // initial fill for already equipped items (client-join, etc.)
-}
-
-void UEquipmentSlotWidget::NativeDestruct()
-{
-	if (UEquipmentComponent* Equip = BoundEquip.Get())
-	{
-		Equip->OnEquipmentChanged.RemoveDynamic(this, &UEquipmentSlotWidget::HandleEquipChanged);
-		Equip->OnEquipmentSlotCleared.RemoveDynamic(this, &UEquipmentSlotWidget::HandleSlotCleared);
-	}
-	Super::NativeDestruct();
-}
-
-void UEquipmentSlotWidget::HandleSlotCleared(FGameplayTag InSlot)
-{
-	if (InSlot.MatchesTagExact(SlotTag)) RefreshVisuals();
-}
-
-

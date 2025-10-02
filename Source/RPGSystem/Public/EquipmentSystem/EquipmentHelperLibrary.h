@@ -1,11 +1,11 @@
-﻿#pragma once
+﻿// Source/RPGSystem/Public/EquipmentSystem/EquipmentHelperLibrary.h
+#pragma once
 
 #include "CoreMinimal.h"
 #include "Kismet/BlueprintFunctionLibrary.h"
 #include "GameplayTagContainer.h"
 #include "Abilities/GameplayAbilityTypes.h"
 #include "EquipmentHelperLibrary.generated.h"
-
 
 class UInventoryComponent;
 class UEquipmentComponent;
@@ -62,16 +62,14 @@ public:
 	UFUNCTION(BlueprintCallable, Category="1_Equipment-Actions")
 	static bool EquipFromInventoryIndexByItemIDTag(AActor* ContextActor, UInventoryComponent* SourceInventory, int32 SourceIndex, FGameplayTag SlotTag, bool bAlsoWield=false, bool bLoadIfNeeded=true);
 
-	// (You still have the index-based path too)
+	// Index-based path (kept)
 	UFUNCTION(BlueprintCallable, Category="1_Equipment-Actions")
 	static bool EquipFromInventorySlot(AActor* ContextActor, UInventoryComponent* SourceInventory, int32 SourceIndex, FGameplayTag SlotTag, bool bAlsoWield=false);
 
 	// ---------- Ability bridge (TAG-ONLY) ----------
-	// UI → GA: send ItemIDTag + SlotTag via tags (no pointers)
 	UFUNCTION(BlueprintCallable, Category="1_Equipment-Ability")
 	static void SendEquipByItemIDEvent(AActor* AvatarActor, FGameplayTag EquipEventTag, FGameplayTag ItemIDTag, FGameplayTag SlotTag);
 
-	// GA → parse tags back out (ItemIDTag from InstigatorTags, SlotTag from TargetTags)
 	UFUNCTION(BlueprintCallable, BlueprintPure, Category="1_Equipment-Ability")
 	static bool ParseEquipByItemIDEvent(const FGameplayEventData& EventData, FGameplayTag& OutItemIDTag, FGameplayTag& OutSlotTag);
 
@@ -113,30 +111,20 @@ public:
 	UFUNCTION(BlueprintCallable, BlueprintPure, Category="1_Equipment-Toolbar")
 	static int32 GetToolbarActiveIndex(AActor* ContextActor);
 
-	// +++ New helpers (keep the rest of your file intact) +++
-
-	/** From an ItemID tag, pick the best slot using PreferredEquipSlots in the data asset. */
+	// ---------- “best slot” helpers ----------
 	UFUNCTION(BlueprintCallable, BlueprintPure, Category="1_Equipment-Queries")
 	static bool DetermineBestEquipSlotForItemID(AActor* ContextActor, FGameplayTag ItemIDTag, FGameplayTag& OutSlotTag);
 
-	/** Equip the clicked inventory item by ItemID preference:
-	 *  - Primary if empty, else Secondary if empty, else swap (old -> source inventory). */
 	UFUNCTION(BlueprintCallable, Category="1_Equipment-Actions")
-	static bool EquipBestFromInventoryIndex(AActor* ContextActor, class UInventoryComponent* SourceInventory, int32 SourceIndex, bool bAlsoWield = false);
+	static bool EquipBestFromInventoryIndex(AActor* ContextActor, class UInventoryComponent* SourceInventory, int32 SourceIndex, bool bAlsoWield=false);
 
-	/** Filter an item’s PreferredEquipSlots by a root (e.g., Slots.Weapon). */
 	UFUNCTION(BlueprintCallable, BlueprintPure, Category="1_Equipment-Queries")
 	static void FilterPreferredSlotsByRoot(class UItemDataAsset* ItemData, FGameplayTag RootTag, TArray<FGameplayTag>& OutSlots);
 
-	/** Equip best slot *within a family/root* (e.g., Weapons vs Armor) from an inventory index.
-	 *  Empty → equip; both full → swap back into SourceInventory, then equip.
-	 */
 	UFUNCTION(BlueprintCallable, Category="1_Equipment-Actions")
-	static bool EquipBestFromInventoryIndexUnder(AActor* ContextActor, class UInventoryComponent* SourceInventory, int32 SourceIndex, FGameplayTag RootTag, bool bAlsoWield = false);
+	static bool EquipBestFromInventoryIndexUnder(AActor* ContextActor, class UInventoryComponent* SourceInventory, int32 SourceIndex, FGameplayTag RootTag, bool bAlsoWield=false);
 
-	// Pass PS, PC, Pawn, or any Actor you have; we resolve to the owning PS.
+	// Pass PS, PC, Pawn, or any Actor; we resolve to the owning PlayerState.
 	UFUNCTION(BlueprintPure, Category="1_Equipment|Resolve")
 	static class APlayerState* ResolvePlayerState(AActor* ContextActor);
-
-	
 };

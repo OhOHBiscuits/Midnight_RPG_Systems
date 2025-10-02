@@ -1,4 +1,5 @@
-﻿#include "EquipmentSystem/EquipmentHelperLibrary.h"
+﻿// Source/RPGSystem/Private/EquipmentSystem/EquipmentHelperLibrary.cpp
+#include "EquipmentSystem/EquipmentHelperLibrary.h"
 
 #include "GameFramework/Actor.h"
 #include "GameFramework/Pawn.h"
@@ -19,7 +20,8 @@ static bool SlotHasItem(UEquipmentComponent* E, const FGameplayTag& Slot)
 {
 	return (E && E->GetEquippedItemData(Slot) != nullptr);
 }
-// Resolve PS on the owning chain
+
+// Resolve PS no matter what you pass (Pawn/PC/PS/Owner chain)
 static APlayerState* ResolvePS(const AActor* Actor)
 {
 	if (!Actor) return nullptr;
@@ -106,7 +108,7 @@ bool UEquipmentHelperLibrary::EquipFromInventoryIndexByItemIDTag(AActor* Context
 {
 	FGameplayTag ItemID;
 	if (!GetInventoryItemIDTag(SourceInventory, SourceIndex, ItemID, bLoadIfNeeded)) return false;
-	const bool bReq = EquipItemByTag(ContextActor, SlotTag, ItemID); // routes to Server via EquipmentComponent
+	const bool bReq = EquipItemByTag(ContextActor, SlotTag, ItemID); // server path inside component
 	if (bReq && bAlsoWield) if (UWieldComponent* W = GetWieldPS(ContextActor)) W->TryWieldEquippedInSlot(SlotTag);
 	return bReq;
 }
@@ -180,169 +182,130 @@ void UEquipmentHelperLibrary::SetCombatState(AActor* ContextActor, bool bInComba
 TArray<FGameplayTag> UEquipmentHelperLibrary::GetToolbarItemIDs(AActor* ContextActor) { if (UDynamicToolbarComponent* T = GetToolbarPS(ContextActor)) return T->ToolbarItemIDs; return {}; }
 int32 UEquipmentHelperLibrary::GetToolbarActiveIndex(AActor* ContextActor)            { if (UDynamicToolbarComponent* T = GetToolbarPS(ContextActor)) return T->ActiveIndex;   return INDEX_NONE; }
 
-
-bool UEquipmentHelperLibrary::DetermineBestEquipSlotForItemID(AActor* ContextActor, FGameplayTag ItemIDTag, FGameplayTag& OutSlotTag)
+// ---------- “best slot” helpers ----------
+bool UEquipmentHelperLibrary::DetermineBestEquipSlotForItemID(AActor* /*ContextActor*/, FGameplayTag ItemIDTag, FGameplayTag& OutSlotTag)
 {
-    OutSlotTag = FGameplayTag();
-    if (!ItemIDTag.IsValid()) return false;
+	OutSlotTag = FGameplayTag();
+	if (!ItemIDTag.IsValid()) return false;
 
-    UItemDataAsset* Data = LoadItemDataByTag(ItemIDTag, /*sync*/true);
-    if (!Data) return false;
+	UItemDataAsset* Data = LoadItemDataByTag(ItemIDTag, /*sync*/true);
+	if (!Data) return false;
 
-    // Prefer order from the asset
-    if (Data->PreferredEquipSlots.Num() > 0)
-    {
-        OutSlotTag = Data->PreferredEquipSlots[0];
-        return OutSlotTag.IsValid();
-    }
-    return false;
+	if (Data->PreferredEquipSlots.Num() > 0)
+	{
+		OutSlotTag = Data->PreferredEquipSlots[0];
+		return OutSlotTag.IsValid();
+	}
+	return false;
 }
 
 static FGameplayTag ChooseFirstEmptyOrSecond(UEquipmentComponent* E, const TArray<FGameplayTag>& Prefs)
 {
 	if (!E || Prefs.Num() == 0) return FGameplayTag();
-
-	// 1) First preference empty?
 	if (!SlotHasItem(E, Prefs[0])) return Prefs[0];
-
-	// 2) Second preference empty?
 	if (Prefs.Num() > 1 && !SlotHasItem(E, Prefs[1])) return Prefs[1];
-
-	// 3) Both full -> we'll swap into the primary
-	return Prefs[0];
+	return Prefs[0]; // both full -> primary for swap
 }
 
 bool UEquipmentHelperLibrary::EquipBestFromInventoryIndex(AActor* ContextActor, UInventoryComponent* SourceInventory, int32 SourceIndex, bool bAlsoWield)
 {
-    if (!ContextActor || !SourceInventory || SourceIndex < 0) return false;
+	if (!ContextActor || !SourceInventory || SourceIndex < 0) return false;
 
-    const FInventoryItem Item = SourceInventory->GetItem(SourceIndex);
-    if (Item.ItemData.IsNull()) return false;
+	const FInventoryItem Item = SourceInventory->GetItem(SourceIndex);
+	if (Item.ItemData.IsNull()) return false;
 
-    UItemDataAsset* Data = Item.ItemData.Get();
-    if (!Data) { TSoftObjectPtr<UItemDataAsset> Soft = Item.ItemData; Data = Soft.LoadSynchronous(); }
-    if (!Data) return false;
+	UItemDataAsset* Data = Item.ItemData.Get();
+	if (!Data) { TSoftObjectPtr<UItemDataAsset> Soft = Item.ItemData; Data = Soft.LoadSynchronous(); }
+	if (!Data) return false;
 
-    UEquipmentComponent* Equip = GetEquipmentPS(ContextActor);
-    if (!Equip) return false;
+	UEquipmentComponent* Equip = GetEquipmentPS(ContextActor);
+	if (!Equip) return false;
 
-    // Build preference order: asset → fallback none
-    TArray<FGameplayTag> Prefs = Data->PreferredEquipSlots;
+	TArray<FGameplayTag> Prefs = Data->PreferredEquipSlots;
+	if (Prefs.Num() == 0) return false;
 
-    if (Prefs.Num() == 0)
-    {
-        // No hints → bail to a known slot (you can choose a default tag if you want)
-        return false;
-    }
+	const FGameplayTag Target = ChooseFirstEmptyOrSecond(Equip, Prefs);
 
-    const FGameplayTag Target = ChooseFirstEmptyOrSecond(Equip, Prefs);
-
-    // If target slot is empty → equip and done
 	if (!SlotHasItem(Equip, Target))
 	{
 		const bool bReq = Equip->TryEquipByInventoryIndex(Target, SourceInventory, SourceIndex);
-		if (bReq && bAlsoWield)
-		{
-			if (UWieldComponent* W = GetWieldPS(ContextActor)) W->TryWieldEquippedInSlot(Target);
-		}
+		if (bReq && bAlsoWield) if (UWieldComponent* W = GetWieldPS(ContextActor)) W->TryWieldEquippedInSlot(Target);
 		return bReq;
 	}
 
-	// Both full → swap old into source inventory, then equip new
 	const bool bUnequipped = Equip->TryUnequipSlotToInventory(Target, SourceInventory);
 	if (!bUnequipped) return false;
 
 	const bool bEquipped = Equip->TryEquipByInventoryIndex(Target, SourceInventory, SourceIndex);
-	if (bEquipped && bAlsoWield)
-	{
-		if (UWieldComponent* W = GetWieldPS(ContextActor)) W->TryWieldEquippedInSlot(Target);
-	}
+	if (bEquipped && bAlsoWield) if (UWieldComponent* W = GetWieldPS(ContextActor)) W->TryWieldEquippedInSlot(Target);
 	return bEquipped;
 }
 
-static FGameplayTag ChooseEmptyOrPrimary(UEquipmentComponent* E, const TArray<FGameplayTag>& Prefs)
-{
-	if (!E || Prefs.Num() == 0) return FGameplayTag();
-
-	// pick the first empty slot; if none are empty, use primary (index 0)
-	for (const FGameplayTag& T : Prefs)
-	{
-		if (T.IsValid() && (E->GetEquippedItemData(T) == nullptr))
-			return T;
-	}
-	return Prefs[0];
-}
-
-// --- definitions for the missing UFUNCTIONs ---------------------------------
 void UEquipmentHelperLibrary::FilterPreferredSlotsByRoot(UItemDataAsset* ItemData, FGameplayTag RootTag, TArray<FGameplayTag>& OutSlots)
 {
 	OutSlots.Reset();
 	if (!ItemData) return;
 
-	// No root? just mirror the asset’s list
 	if (!RootTag.IsValid())
 	{
 		OutSlots = ItemData->PreferredEquipSlots;
 		return;
 	}
 
-	// Keep only slots under the given root (e.g., Slots.Weapon or Slots.Armor)
 	for (const FGameplayTag& T : ItemData->PreferredEquipSlots)
 	{
-		if (T.IsValid() && T.MatchesTag(RootTag))
-		{
-			OutSlots.Add(T);
-		}
+		if (T.IsValid() && T.MatchesTag(RootTag)) OutSlots.Add(T);
 	}
+}
+
+static FGameplayTag ChooseEmptyOrPrimary(UEquipmentComponent* E, const TArray<FGameplayTag>& Prefs)
+{
+	if (!E || Prefs.Num() == 0) return FGameplayTag();
+	for (const FGameplayTag& T : Prefs) if (T.IsValid() && (E->GetEquippedItemData(T) == nullptr)) return T;
+	return Prefs[0];
 }
 
 bool UEquipmentHelperLibrary::EquipBestFromInventoryIndexUnder(AActor* ContextActor, UInventoryComponent* SourceInventory, int32 SourceIndex, FGameplayTag RootTag, bool bAlsoWield)
 {
 	if (!ContextActor || !SourceInventory || SourceIndex < 0) return false;
 
-	// Read the item at SourceIndex
 	const FInventoryItem Item = SourceInventory->GetItem(SourceIndex);
 	if (Item.ItemData.IsNull()) return false;
 
 	UItemDataAsset* Data = Item.ItemData.Get();
-	if (!Data)
-	{
-		TSoftObjectPtr<UItemDataAsset> Soft = Item.ItemData;
-		Data = Soft.LoadSynchronous();
-	}
+	if (!Data) { TSoftObjectPtr<UItemDataAsset> Soft = Item.ItemData; Data = Soft.LoadSynchronous(); }
 	if (!Data) return false;
 
 	UEquipmentComponent* Equip = GetEquipmentPS(ContextActor);
 	if (!Equip) return false;
 
-	// Narrow item’s preferred slots to the requested family/root
 	TArray<FGameplayTag> Prefs;
 	FilterPreferredSlotsByRoot(Data, RootTag, Prefs);
-	if (Prefs.Num() == 0) return false; // item doesn’t belong to this family
+	if (Prefs.Num() == 0) return false;
 
-	// Choose where to put it (first empty else primary)
 	const FGameplayTag Target = ChooseEmptyOrPrimary(Equip, Prefs);
 	if (!Target.IsValid()) return false;
 
-	// If target empty → equip
 	if (Equip->GetEquippedItemData(Target) == nullptr)
 	{
 		const bool bReq = Equip->TryEquipByInventoryIndex(Target, SourceInventory, SourceIndex);
-		if (bReq && bAlsoWield)
-		{
-			if (UWieldComponent* W = GetWieldPS(ContextActor)) W->TryWieldEquippedInSlot(Target);
-		}
+		if (bReq && bAlsoWield) if (UWieldComponent* W = GetWieldPS(ContextActor)) W->TryWieldEquippedInSlot(Target);
 		return bReq;
 	}
 
-	// Otherwise swap: unequip target to source inventory, then equip new
 	const bool bUnequipped = Equip->TryUnequipSlotToInventory(Target, SourceInventory);
 	if (!bUnequipped) return false;
 
 	const bool bEquipped = Equip->TryEquipByInventoryIndex(Target, SourceInventory, SourceIndex);
-	if (bEquipped && bAlsoWield)
-	{
-		if (UWieldComponent* W = GetWieldPS(ContextActor)) W->TryWieldEquippedInSlot(Target);
-	}
+	if (bEquipped && bAlsoWield) if (UWieldComponent* W = GetWieldPS(ContextActor)) W->TryWieldEquippedInSlot(Target);
 	return bEquipped;
+}
+
+APlayerState* UEquipmentHelperLibrary::ResolvePlayerState(AActor* ContextActor)
+{
+	if (!ContextActor) return nullptr;
+	if (APlayerState* PS = Cast<APlayerState>(ContextActor)) return PS;
+	if (APawn*      P  = Cast<APawn>(ContextActor))          return P->GetPlayerState();
+	if (APlayerController* PC = Cast<APlayerController>(ContextActor)) return PC->PlayerState;
+	return ContextActor->GetTypedOuter<APlayerState>();
 }
