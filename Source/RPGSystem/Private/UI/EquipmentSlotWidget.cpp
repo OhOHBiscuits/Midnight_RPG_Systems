@@ -1,156 +1,178 @@
+//All rights Reserved Midnight Entertainment Studios LLC
 #include "UI/EquipmentSlotWidget.h"
 
-#include "Blueprint/WidgetBlueprintLibrary.h"
-#include "Blueprint/DragDropOperation.h"
-#include "Engine/AssetManager.h"
-#include "Engine/StreamableManager.h"
-#include "Components/Image.h"
-#include "GameFramework/PlayerState.h"
 #include "EquipmentSystem/EquipmentComponent.h"
 #include "EquipmentSystem/EquipmentHelperLibrary.h"
-#include "UI/InventoryDragDropOp.h"
-#include "Inventory/InventoryComponent.h"
+#include "Inventory/InventoryHelpers.h"
+#include "Inventory/ItemDataAsset.h"
 
-
+#include "GameFramework/PlayerController.h"
+#include "GameFramework/PlayerState.h"
+#include "GameFramework/Pawn.h"
 
 void UEquipmentSlotWidget::NativeConstruct()
 {
 	Super::NativeConstruct();
 
-	if (bAutoBindEquipment)
+	if (!Equipment)
 	{
-		if (APlayerState* PS = GetOwningPlayerState())
+		if (UEquipmentComponent* Found = AutoResolveEquipment())
 		{
-			if (UEquipmentComponent* Equip = PS->FindComponentByClass<UEquipmentComponent>())
-			{
-				BindToEquipment(Equip);
-			}
+			SetEquipmentComponent(Found);
 		}
 	}
+	RefreshFromComponent();
 }
 
 void UEquipmentSlotWidget::NativeDestruct()
 {
-	if (UEquipmentComponent* Equip = BoundEquip.Get())
-	{
-		Equip->OnEquipmentChanged.RemoveDynamic(this, &UEquipmentSlotWidget::HandleEquipChanged);
-		Equip->OnEquipmentSlotCleared.RemoveDynamic(this, &UEquipmentSlotWidget::HandleSlotCleared);
-	}
+	UnbindFromEquipment();
 	Super::NativeDestruct();
 }
 
-void UEquipmentSlotWidget::BindToEquipment(UEquipmentComponent* Equip)
+UEquipmentComponent* UEquipmentSlotWidget::AutoResolveEquipment() const
 {
-	if (!Equip) return;
-
-	if (UEquipmentComponent* Prev = BoundEquip.Get())
+	if (APlayerController* PC = GetOwningPlayer())
 	{
-		Prev->OnEquipmentChanged.RemoveDynamic(this, &UEquipmentSlotWidget::HandleEquipChanged);
-		Prev->OnEquipmentSlotCleared.RemoveDynamic(this, &UEquipmentSlotWidget::HandleSlotCleared);
+		if (UEquipmentComponent* OnPC = PC->FindComponentByClass<UEquipmentComponent>()) return OnPC;
+		if (APlayerState* PS = PC->PlayerState)
+			if (UEquipmentComponent* OnPS = PS->FindComponentByClass<UEquipmentComponent>()) return OnPS;
+		if (APawn* Pawn = PC->GetPawn())
+			if (UEquipmentComponent* OnPawn = Pawn->FindComponentByClass<UEquipmentComponent>()) return OnPawn;
+
+		if (UEquipmentComponent* FromPS = UEquipmentHelperLibrary::GetEquipmentPS(PC)) return FromPS;
 	}
-
-	BoundEquip = Equip;
-	Equip->OnEquipmentChanged.AddUniqueDynamic(this, &UEquipmentSlotWidget::HandleEquipChanged);
-	Equip->OnEquipmentSlotCleared.AddUniqueDynamic(this, &UEquipmentSlotWidget::HandleSlotCleared);
-
-	RefreshVisuals();
+	return nullptr;
 }
 
-void UEquipmentSlotWidget::HandleEquipChanged(FGameplayTag InSlot, UItemDataAsset* InData)
+void UEquipmentSlotWidget::SetEquipmentComponent(UEquipmentComponent* InEquipment)
 {
-	if (InSlot == SlotTag)
+	if (Equipment == InEquipment)
 	{
-		ApplyIcon(InData);
+		RefreshFromComponent();
+		return;
+	}
+	UnbindFromEquipment();
+	BindToEquipment(InEquipment);
+	RefreshFromComponent();
+}
+
+void UEquipmentSlotWidget::SetSlotTagAndRefresh(FGameplayTag NewSlotTag)
+{
+	SlotTag = NewSlotTag;
+	RefreshFromComponent();
+}
+
+void UEquipmentSlotWidget::RefreshFromComponent()
+{
+	UpdateCacheFromEquipment();
+}
+
+void UEquipmentSlotWidget::BindToEquipment(UEquipmentComponent* InEquipment)
+{
+	Equipment = InEquipment;
+	if (!IsValid(Equipment)) return;
+
+	Equipment->OnEquipmentChanged.AddUniqueDynamic(this, &UEquipmentSlotWidget::HandleEquipChanged);
+	Equipment->OnEquipmentSlotCleared.AddUniqueDynamic(this, &UEquipmentSlotWidget::HandleSlotCleared);
+}
+
+void UEquipmentSlotWidget::UnbindFromEquipment()
+{
+	if (!IsValid(Equipment)) return;
+
+	Equipment->OnEquipmentChanged.RemoveDynamic(this, &UEquipmentSlotWidget::HandleEquipChanged);
+	Equipment->OnEquipmentSlotCleared.RemoveDynamic(this, &UEquipmentSlotWidget::HandleSlotCleared);
+	Equipment = nullptr;
+}
+
+void UEquipmentSlotWidget::HandleEquipChanged(FGameplayTag ChangedSlot, UItemDataAsset* /*NewData*/)
+{
+	if (!SlotTag.IsValid()) return;
+
+	if (ChangedSlot.MatchesTagExact(SlotTag))
+	{
+		UpdateCacheFromEquipment();
 	}
 }
 
-void UEquipmentSlotWidget::HandleSlotCleared(FGameplayTag InSlot)
+void UEquipmentSlotWidget::HandleSlotCleared(FGameplayTag ClearedSlot)
 {
-	if (InSlot == SlotTag)
+	if (!SlotTag.IsValid()) return;
+
+	if (ClearedSlot.MatchesTagExact(SlotTag))
 	{
-		ApplyIcon(nullptr);
+		CurrentItemIDTag = FGameplayTag();
+		CurrentItemData  = nullptr;
+		BroadcastCache();
 	}
 }
 
-void UEquipmentSlotWidget::ApplyIcon(UItemDataAsset* Data)
+void UEquipmentSlotWidget::UpdateCacheFromEquipment()
 {
-	if (!IconImage) return;
-
-	if (Data && Data->Icon.IsValid())
+	if (!IsValid(Equipment) || !SlotTag.IsValid())
 	{
-		IconImage->SetBrushFromTexture(Data->Icon.Get());
-	}
-	else if (Data && Data->Icon.ToSoftObjectPath().IsValid())
-	{
-		TWeakObjectPtr<UImage> Img = IconImage;
-		FStreamableManager& Streamer = UAssetManager::GetStreamableManager();
-		Streamer.RequestAsyncLoad(Data->Icon.ToSoftObjectPath(), [Img, Data]()
-		{
-			if (Img.IsValid())
-			{
-				if (UTexture2D* Tex = Data->Icon.Get())
-				{
-					Img->SetBrushFromTexture(Tex);
-				}
-			}
-		});
-	}
-	else
-	{
-		IconImage->SetBrushFromTexture(nullptr);
-	}
-}
-
-void UEquipmentSlotWidget::RefreshVisuals()
-{
-	UItemDataAsset* Data = UEquipmentHelperLibrary::GetEquippedItemData(GetOwningPlayerState(), SlotTag);
-	ApplyIcon(Data);
-}
-
-// ---------------- Drag & Drop ----------------
-FReply UEquipmentSlotWidget::NativeOnMouseButtonDown(const FGeometry& Geo, const FPointerEvent& Evt)
-{
-	if (Evt.IsMouseButtonDown(EKeys::LeftMouseButton))
-	{
-		return UWidgetBlueprintLibrary::DetectDragIfPressed(Evt, this, EKeys::LeftMouseButton).NativeReply;
-	}
-	return Super::NativeOnMouseButtonDown(Geo, Evt);
-}
-
-void UEquipmentSlotWidget::NativeOnDragDetected(const FGeometry& Geo, const FPointerEvent& Evt, UDragDropOperation*& OutOp)
-{
-	// Allow BP override to craft custom op
-	UInventoryDragDropOp* Op = nullptr;
-	if (BuildDragOperation(Op))
-	{
-		OutOp = Op;
+		CurrentItemIDTag = FGameplayTag();
+		CurrentItemData  = nullptr;
+		BroadcastCache();
 		return;
 	}
 
-	// Minimal default operation (no payload required to drop back on equipment)
-	Op = NewObject<UInventoryDragDropOp>(this);
-	Op->Pivot = EDragPivot::MouseDown;
-	OutOp = Op;
-}
+	// Pull a snapshot then find my slot to get ItemIDTag
+	TArray<FEquippedEntry> Snapshot;
+	Equipment->GetAllEquipped(Snapshot);
 
-bool UEquipmentSlotWidget::NativeOnDrop(const FGeometry& Geo, const FDragDropEvent& DD, UDragDropOperation* Op)
-{
-	const UInventoryDragDropOp* Drag = Cast<UInventoryDragDropOp>(Op);
-	if (!Drag) return false;
-
-	// 1) If payload is inventory item -> try equip to this slot
-	if (Drag->SourceInventory && Drag->FromIndex >= 0)
+	CurrentItemIDTag = FGameplayTag();
+	for (const FEquippedEntry& E : Snapshot)
 	{
-		// Let helper pick best or enforce this slot
-		return UEquipmentHelperLibrary::EquipBestFromInventoryIndex(
-			GetOwningPlayerState(),
-			Drag->SourceInventory,
-			Drag->FromIndex,
-			/*PreferredSlot*/ SlotTag,
-			/*bAlsoWield*/ true
-		);
+		if (E.SlotTag.MatchesTagExact(SlotTag))
+		{
+			CurrentItemIDTag = E.ItemIDTag;
+			break;
+		}
 	}
 
-	// 2) If payload is another equipment slot op, you could swap here (optional)
-	return false;
+	// Resolve data: try component first, then by ItemIDTag (Standalone-safe)
+	CurrentItemData = Equipment->GetEquippedItemData(SlotTag);
+	if (!CurrentItemData && CurrentItemIDTag.IsValid())
+	{
+		CurrentItemData = UInventoryHelpers::FindItemDataByTag(this, CurrentItemIDTag);
+	}
+
+	BroadcastCache();
+}
+
+void UEquipmentSlotWidget::BroadcastCache()
+{
+	BP_OnSlotItemIDTagUpdated(CurrentItemIDTag);
+	BP_OnSlotUpdated(CurrentItemData);
+}
+
+// ---------------- UI-only setters (safe) ----------------
+
+void UEquipmentSlotWidget::BP_SetCurrentItemData(UItemDataAsset* InData, bool bFireEvents)
+{
+	CurrentItemData = InData;
+	CurrentItemIDTag = (InData ? InData->ItemIDTag : FGameplayTag());
+	if (bFireEvents)
+	{
+		BroadcastCache();
+	}
+}
+
+void UEquipmentSlotWidget::BP_SetCurrentItemIDTag(FGameplayTag InTag, bool bResolveData, bool bFireEvents)
+{
+	CurrentItemIDTag = InTag;
+
+	if (bResolveData && bResolveDataOnTagSet)
+	{
+		CurrentItemData = InTag.IsValid()
+			? UInventoryHelpers::FindItemDataByTag(this, InTag)
+			: nullptr;
+	}
+
+	if (bFireEvents)
+	{
+		BroadcastCache();
+	}
 }
