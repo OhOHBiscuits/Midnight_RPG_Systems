@@ -1,4 +1,5 @@
-﻿#pragma once
+﻿// Source/RPGSystem/Public/EquipmentSystem/EquipmentHelperLibrary.h
+#pragma once
 
 #include "Kismet/BlueprintFunctionLibrary.h"
 #include "GameplayTagContainer.h"
@@ -6,38 +7,60 @@
 
 class UEquipmentComponent;
 class UInventoryComponent;
-class UItemDataAsset;
 class UWieldComponent;
+class UItemDataAsset;
+class AActor;
+class APawn;
+class APlayerController;
 class APlayerState;
 
 UCLASS()
 class RPGSYSTEM_API UEquipmentHelperLibrary : public UBlueprintFunctionLibrary
 {
 	GENERATED_BODY()
+
 public:
-	/** PlayerState components – context can be Pawn, PS, or anything with access to it */
-	UFUNCTION(BlueprintCallable, Category="1_Equipment|Resolve")
-	static UEquipmentComponent* GetEquipmentPS(AActor* ContextActor);
+	// === BP-visible (keep original names / no overloads) ===
+	UFUNCTION(BlueprintCallable, Category="1_Equipment-Helpers")
+	static UEquipmentComponent* GetEquipmentPS(APlayerState* PlayerState);
 
-	UFUNCTION(BlueprintCallable, Category="1_Equipment|Resolve")
-	static UInventoryComponent* GetInventoryPS(AActor* ContextActor);
+	UFUNCTION(BlueprintCallable, Category="1_Equipment-Helpers")
+	static UEquipmentComponent* GetEquipmentAny(AActor* OwnerLike);
 
-	UFUNCTION(BlueprintCallable, Category="1_Equipment|Resolve")
-	static UWieldComponent* GetWieldPS(AActor* ContextActor);
+	UFUNCTION(BlueprintCallable, Category="1_Equipment-Helpers")
+	static UWieldComponent* GetWieldPS(AActor* OwnerLike);
 
-	/** Convenience: calls EquipmentComponent->TryEquipByItemIDTag */
-	UFUNCTION(BlueprintCallable, Category="1_Equipment|Actions")
-	static bool EquipByItemIDTag(AActor* ContextActor, const FGameplayTag& SlotTag, const FGameplayTag& ItemIDTag, bool bAlsoWield=false);
+	UFUNCTION(BlueprintCallable, Category="1_Equipment-Query")
+	static UItemDataAsset* GetEquippedItemData(AActor* OwnerLike, FGameplayTag SlotTag);
 
-	/** Convenience: calls EquipmentComponent->TryUnequipSlotToInventory */
-	UFUNCTION(BlueprintCallable, Category="1_Equipment|Actions")
-	static bool UnequipSlotToInventory(AActor* ContextActor, const FGameplayTag& SlotTag, UInventoryComponent* DestInventory);
+	UFUNCTION(BlueprintCallable, Category="1_Equipment-Actions")
+	static bool EquipBestFromInventoryIndex(
+		APlayerState* PlayerState,
+		UInventoryComponent* SourceInventory,
+		int32 SourceIndex,
+		FGameplayTag PreferredSlot,
+		bool bAlsoWield
+	);
 
-	/** Try equip from a source inventory index choosing a good slot (Preferred first, then any allowed) */
-	UFUNCTION(BlueprintCallable, Category="1_Equipment|Actions")
-	static bool EquipBestFromInventoryIndex(AActor* ContextActor, UInventoryComponent* SourceInventory, int32 SourceIndex, const FGameplayTag& PreferredSlot, bool bAlsoWield=false);
+	// === C++-only helpers (no UFUNCTION to avoid UHT overload conflicts) ===
+	static UEquipmentComponent* GetEquipmentPS(AActor* OwnerLike); // wrapper to ResolvePlayerState + GetEquipmentPS(PS)
 
-	/** Get item data currently in slot */
-	UFUNCTION(BlueprintCallable, Category="1_Equipment|Query")
-	static UItemDataAsset* GetEquippedItemData(AActor* ContextActor, const FGameplayTag& SlotTag);
+	static bool EquipBestFromInventoryIndex(
+		APawn* Pawn,
+		UInventoryComponent* SourceInventory,
+		int32 SourceIndex,
+		FGameplayTag PreferredSlot,
+		bool bAlsoWield
+	);
+
+	static bool EquipBestFromInventoryIndex(
+		AActor* OwnerLike,
+		UInventoryComponent* SourceInventory,
+		int32 SourceIndex,
+		FGameplayTag PreferredSlot,
+		bool bAlsoWield
+	);
+
+private:
+	static APlayerState* ResolvePlayerState(AActor* OwnerLike);
 };

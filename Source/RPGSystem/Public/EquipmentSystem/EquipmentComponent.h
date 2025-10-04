@@ -1,61 +1,62 @@
-// Copyright ...
+//All rights Reserved Midnight Entertainment Studios LLC
+// Source/RPGSystem/Public/EquipmentSystem/EquipmentComponent.h
 #pragma once
 
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
 #include "GameplayTagContainer.h"
-#include "Net/Serialization/FastArraySerializer.h"
 #include "EquipmentComponent.generated.h"
 
-class UInventoryComponent;
 class UItemDataAsset;
-class UWieldComponent;
+class UInventoryComponent;
 
-/** Simple entry: which slot holds which ItemID tag */
+/** Authoring-time definition for a single equipment slot */
+USTRUCT(BlueprintType)
+struct RPGSYSTEM_API FEquipmentSlotDef
+{
+	GENERATED_BODY()
+
+	/** Unique slot id (e.g., Slots.Weapon.Primary, Slots.Armor.Head) */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Slot")
+	FGameplayTag SlotTag;
+
+	/** UI-friendly name for this slot */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Slot")
+	FText SlotName;
+
+	/** Optional: default item to place here (by ID tag) */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Default")
+	FGameplayTag ItemIDTag;
+
+	/** Optional: default item to place here (soft fallback) */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Default")
+	TSoftObjectPtr<UItemDataAsset> ItemData;
+
+	/** Optional: root filter; item must have a tag matching this root to be valid for the slot */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Filter")
+	FGameplayTag AcceptRootTag;
+};
+
+/** Replicated state: what is currently equipped in a slot */
 USTRUCT(BlueprintType)
 struct FEquippedEntry
 {
 	GENERATED_BODY()
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	FGameplayTag SlotTag;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	FGameplayTag ItemIDTag;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	FGameplayTag ItemIDTag; // mirror for lightweight saves
 
-	FEquippedEntry() {}
-	FEquippedEntry(const FGameplayTag& InSlot, const FGameplayTag& InItemID)
-		: SlotTag(InSlot), ItemIDTag(InItemID) {}
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	TSoftObjectPtr<UItemDataAsset> ItemData;
 };
 
-/** Designer-facing slot definition */
-USTRUCT(BlueprintType)
-struct FEquipmentSlotDef
-{
-	GENERATED_BODY()
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FEquipmentChangedSignature, FGameplayTag, SlotTag, UItemDataAsset*, ItemData);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FEquipmentSlotClearedSignature, FGameplayTag, SlotTag);
 
-	/** Nice label for UI (e.g. "Primary", "Helmet") */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="1_Equipment|Slot")
-	FName SlotName = NAME_None;
-
-	/** Unique tag for the slot (e.g. Slots.Weapon.Primary) */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="1_Equipment|Slot")
-	FGameplayTag SlotTag;
-
-	/** What items are allowed here (query against item’s tags) */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="1_Equipment|Slot")
-	FGameplayTagQuery AllowedItemQuery;
-
-	/** Whether this slot may be left empty */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="1_Equipment|Slot")
-	bool bOptional = true;
-};
-
-/** Events for UI and systems */
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnEquipmentChanged, FGameplayTag, SlotTag, UItemDataAsset*, ItemData);
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnEquipmentSlotCleared, FGameplayTag, SlotTag);
-
-UCLASS(meta=(BlueprintSpawnableComponent))
+UCLASS(ClassGroup=(RPG), meta=(BlueprintSpawnableComponent))
 class RPGSYSTEM_API UEquipmentComponent : public UActorComponent
 {
 	GENERATED_BODY()
@@ -63,106 +64,86 @@ class RPGSYSTEM_API UEquipmentComponent : public UActorComponent
 public:
 	UEquipmentComponent();
 
-	// -------- Designer config --------
-	/** Weapon/tool slots (Primary/Secondary/etc.) */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="1_Equipment|Config")
-	TArray<FEquipmentSlotDef> WeaponSlots;
+	// --- Slot sets you author per character/class (BP-editable, not replicated) ---
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="1_Equipment-Slots|Weapons")
+	TArray<FEquipmentSlotDef> WeaponSlotDefs;
 
-	/** Armor/gear slots (Head/Chest/etc.) */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="1_Equipment|Config")
-	TArray<FEquipmentSlotDef> ArmorSlots;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="1_Equipment-Slots|Armor")
+	TArray<FEquipmentSlotDef>  ArmorSlotDefs;
 
-	/** If true, we try to wield after equip when asked */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="1_Equipment|Config")
-	bool bAutoWieldAfterEquip = true;
+	// Concatenate both arrays (for UI or logic)
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category="1_Equipment-Slots|Query")
+	void GetAllSlotDefs(TArray<FEquipmentSlotDef>& OutDefs) const;
 
-	// -------- Runtime state (replicated) --------
-	/** What’s currently equipped; replicated for UI on clients */
-		/** Called whenever the Equipped array changes (any slot) */
-	UPROPERTY(BlueprintAssignable, Category="1_Equipment|Events")
-	FOnEquipmentChanged OnEquipmentChanged;
+	// Find a specific slot definition
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category="1_Equipment-Slots|Query")
+	bool GetSlotDef(const FGameplayTag& SlotTag, FEquipmentSlotDef& OutDef) const;
 
-	/** Called when a slot is cleared */
-	UPROPERTY(BlueprintAssignable, Category="1_Equipment|Events")
-	FOnEquipmentSlotCleared OnEquipmentSlotCleared;
+	// Optional: server helper to prefill equipment from slot defs (uses ItemIDTag first, then ItemData)
+	UFUNCTION(BlueprintCallable, Category="1_Equipment-Slots|Init")
+	void InitializeSlotsFromDefinitions(bool bOnlyIfEmpty = true);
 
-	/** Back-compat aliases for any listeners using older names */
-	UPROPERTY(BlueprintAssignable, Category="1_Equipment|Events")
-	FOnEquipmentChanged OnEquippedItemChanged;
-
-	UPROPERTY(BlueprintAssignable, Category="1_Equipment|Events")
-	FOnEquipmentSlotCleared OnEquippedSlotCleared;
-
-	// -------- Queries --------
-	/** Returns display name for a slot tag, falling back to prettified tag */
-	UFUNCTION(BlueprintCallable, Category="1_Equipment|Query")
-	FText GetSlotDisplayName(const FGameplayTag& Slot) const;
-
-	/** Get all slot tags (Weapons + Armor) */
-	UFUNCTION(BlueprintCallable, Category="1_Equipment|Query")
-	void GetAllSlotTags(TArray<FGameplayTag>& Out) const;
-
-	/** True if the slot currently has an item */
-	UFUNCTION(BlueprintCallable, Category="1_Equipment|Query")
-	bool IsSlotOccupied(const FGameplayTag& Slot) const;
-
-	/** Returns the equipped Item Data (loaded) for a slot, or nullptr */
-	UFUNCTION(BlueprintCallable, Category="1_Equipment|Query")
-	UItemDataAsset* GetEquippedItemDataForSlot(const FGameplayTag& Slot) const;
-
-	// -------- Actions (BP-callable, server-authoritative) --------
-	/** Equip by inventory index (consumes 1 from SourceInventory) */
-	UFUNCTION(BlueprintCallable, Category="1_Equipment|Actions")
-	bool TryEquipByInventoryIndex(const FGameplayTag& SlotTag, UInventoryComponent* SourceInventory, int32 SourceIndex, bool bAlsoWield=false);
-
-	/** Equip directly by ItemID tag (no inventory index) */
-	UFUNCTION(BlueprintCallable, Category="1_Equipment|Actions")
-	bool TryEquipByItemIDTag(const FGameplayTag& SlotTag, const FGameplayTag& ItemIDTag, bool bAlsoWield=false);
-
-	/** Unequip to an inventory (player’s PS inventory if DestInventory null) */
-	UFUNCTION(BlueprintCallable, Category="1_Equipment|Actions")
-	bool TryUnequipSlotToInventory(const FGameplayTag& SlotTag, UInventoryComponent* DestInventory=nullptr);
-
-	/** Just clear the slot (drops equipment state; does not return to inv) */
-	UFUNCTION(BlueprintCallable, Category="1_Equipment|Actions")
-	bool TryUnequipSlot(const FGameplayTag& SlotTag);
-
-	// Networking
+	// --- Replication: equipped state ---
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
-	
-	UFUNCTION(BlueprintCallable, Category="Equipment|Query", meta=(DisplayName="Get Equipped Item Data (compat)"))
-	UItemDataAsset* GetEquippedItemData_Compat(const FGameplayTag& SlotTag) const;
-protected:
+
+	UPROPERTY(ReplicatedUsing=OnRep_Equipped, VisibleAnywhere, BlueprintReadOnly, Category="1_Equipment-State")
+	TArray<FEquippedEntry> Equipped;
+
 	UFUNCTION()
 	void OnRep_Equipped();
-	
-	UPROPERTY(ReplicatedUsing=OnRep_Equipped, VisibleAnywhere, BlueprintReadOnly, Category="1_Equipment|State")
-	TArray<FEquippedEntry> Equipped;
-	// Server RPCs mirror BP methods (so BP calls on client still work)
-	UFUNCTION(Server, Reliable)
-	void Server_TryEquipByInventoryIndex(const FGameplayTag& SlotTag, UInventoryComponent* SourceInventory, int32 SourceIndex, bool bAlsoWield);
 
-	UFUNCTION(Server, Reliable)
-	void Server_TryEquipByItemIDTag(const FGameplayTag& SlotTag, FGameplayTag ItemIDTag, bool bAlsoWield);
+	// --- Events ---
+	UPROPERTY(BlueprintAssignable, Category="1_Equipment-Events")
+	FEquipmentChangedSignature OnEquipmentChanged;
 
-	UFUNCTION(Server, Reliable)
-	void Server_TryUnequipSlotToInventory(const FGameplayTag& SlotTag, UInventoryComponent* DestInventory);
+	UPROPERTY(BlueprintAssignable, Category="1_Equipment-Events")
+	FEquipmentSlotClearedSignature OnEquipmentSlotCleared;
 
-	UFUNCTION(Server, Reliable)
-	void Server_TryUnequipSlot(const FGameplayTag& SlotTag);
+	// Back-compat aliases
+	UPROPERTY(BlueprintAssignable, Category="1_Equipment-Events")
+	FEquipmentChangedSignature OnEquippedItemChanged;
+
+	UPROPERTY(BlueprintAssignable, Category="1_Equipment-Events")
+	FEquipmentSlotClearedSignature OnEquippedSlotCleared;
+
+	// --- Queries ---
+	UFUNCTION(BlueprintCallable, Category="1_Equipment-Query")
+	UItemDataAsset* GetEquippedItemData(const FGameplayTag& SlotTag) const;
+
+	UFUNCTION(BlueprintCallable, Category="1_Equipment-Query")
+	bool IsSlotOccupied(const FGameplayTag& SlotTag) const;
+
+	UFUNCTION(BlueprintCallable, Category="1_Equipment-Query")
+	void GetAllEquipped(TArray<FEquippedEntry>& Out) const { Out = Equipped; }
+
+	// --- Actions (client → server) ---
+	UFUNCTION(BlueprintCallable, Category="1_Equipment-Actions")
+	bool TryEquipByInventoryIndex(const FGameplayTag& SlotTag, UInventoryComponent* SourceInventory, int32 SourceIndex);
+
+	UFUNCTION(BlueprintCallable, Category="1_Equipment-Actions")
+	bool TryUnequipSlotToInventory(const FGameplayTag& SlotTag, UInventoryComponent* DestInventory);
 
 private:
-	/** Internal helpers */
-	int32 FindEquippedIndex(const FGameplayTag& Slot) const;
-	void SetSlot_Internal(const FGameplayTag& Slot, const FGameplayTag& ItemID);
-	void ClearSlot_Internal(const FGameplayTag& Slot);
+	// Lookup
+	const FEquipmentSlotDef* FindSlotDef(const FGameplayTag& SlotTag) const;
 
-	/** Resolve or fallback to the player-state inventory for this owner */
-	UInventoryComponent* FindPlayerStateInventory() const;
+	// Replicated state helpers
+	FEquippedEntry*       FindOrAddEntry(const FGameplayTag& SlotTag);
+	const FEquippedEntry* FindEntry(const FGameplayTag& SlotTag) const;
+	bool                  RemoveEntry(const FGameplayTag& SlotTag);
+	UItemDataAsset*       ResolveData(const FEquippedEntry& E) const;
 
-	/** True if item (by data) passes slot’s AllowedItemQuery */
-	bool IsItemAllowedInSlot(const UItemDataAsset* ItemData, const FGameplayTag& Slot) const;
+	// Validation
+	bool ValidateItemForSlot(const FGameplayTag& SlotTag, const UItemDataAsset* Data) const;
 
-	/** Load item by ItemID tag via InventoryAssetManager/Helpers */
-	UItemDataAsset* LoadItemDataByID(const FGameplayTag& ItemID) const;
+	// Server logic
+	bool Equip_Internal(const FGameplayTag& SlotTag, UInventoryComponent* SourceInventory, int32 SourceIndex);
+	bool Unequip_Internal(const FGameplayTag& SlotTag, UInventoryComponent* DestInventory);
+
+	// RPCs (implement *_Implementation in .cpp)
+	UFUNCTION(Server, Reliable)
+	void Server_TryEquipByInventoryIndex(FGameplayTag SlotTag, UInventoryComponent* SourceInventory, int32 SourceIndex);
+
+	UFUNCTION(Server, Reliable)
+	void Server_TryUnequipSlotToInventory(FGameplayTag SlotTag, UInventoryComponent* DestInventory);
 };
