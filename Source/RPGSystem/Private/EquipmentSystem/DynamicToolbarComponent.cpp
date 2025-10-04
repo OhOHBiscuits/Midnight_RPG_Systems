@@ -1,15 +1,13 @@
-﻿#include "EquipmentSystem/DynamicToolbarComponent.h"
-#include "Net/UnrealNetwork.h"
-
+﻿// All rights Reserved Midnight Entertainment Studios LLC
+#include "EquipmentSystem/DynamicToolbarComponent.h"
 #include "EquipmentSystem/EquipmentComponent.h"
 #include "EquipmentSystem/WieldComponent.h"
-#include "EquipmentSystem/EquipmentHelperLibrary.h"
-#include "Inventory/ItemDataAsset.h"
+#include "Net/UnrealNetwork.h"
 
 UDynamicToolbarComponent::UDynamicToolbarComponent()
 {
-	PrimaryComponentTick.bCanEverTick = false;
 	SetIsReplicatedByDefault(true);
+	PrimaryComponentTick.bCanEverTick = false;
 }
 
 void UDynamicToolbarComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -17,10 +15,9 @@ void UDynamicToolbarComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProper
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME(UDynamicToolbarComponent, bVisible);
 	DOREPLIFETIME(UDynamicToolbarComponent, ActiveIndex);
-	DOREPLIFETIME(UDynamicToolbarComponent, ActiveSetTags);
-	// We replicate the mirror (ToolbarItemIDs) for convenience
 	DOREPLIFETIME(UDynamicToolbarComponent, ToolbarItemIDs);
 	DOREPLIFETIME(UDynamicToolbarComponent, ActiveToolSlotTag);
+	DOREPLIFETIME(UDynamicToolbarComponent, ActiveSetTags);
 }
 
 bool UDynamicToolbarComponent::IsAuth() const
@@ -31,12 +28,12 @@ bool UDynamicToolbarComponent::IsAuth() const
 
 UEquipmentComponent* UDynamicToolbarComponent::ResolveEquipment() const
 {
-	return UEquipmentHelperLibrary::GetEquipmentPS(GetOwner());
+	return GetOwner() ? GetOwner()->FindComponentByClass<UEquipmentComponent>() : nullptr;
 }
 
 UWieldComponent* UDynamicToolbarComponent::ResolveWield() const
 {
-	return UEquipmentHelperLibrary::GetWieldPS(GetOwner());
+	return GetOwner() ? GetOwner()->FindComponentByClass<UWieldComponent>() : nullptr;
 }
 
 void UDynamicToolbarComponent::OnRep_Visible()
@@ -44,235 +41,152 @@ void UDynamicToolbarComponent::OnRep_Visible()
 	OnToolbarVisibilityChanged.Broadcast(bVisible);
 }
 
-void UDynamicToolbarComponent::OnRep_ComposedSlots()
-{
-	// ComposedSlots is not replicated directly; ToolbarItemIDs is.
-	// Keep ActiveToolSlotTag consistent on clients when list changes.
-	if (ToolbarItemIDs.IsValidIndex(ActiveIndex))
-	{
-		ActiveToolSlotTag = ToolbarItemIDs[ActiveIndex];
-	}
-	else
-	{
-		ActiveToolSlotTag = FGameplayTag();
-		ActiveIndex = INDEX_NONE;
-	}
-
-	OnToolbarChanged.Broadcast();
-
-	// Let UI know the active tool's data (if any)
-	if (ActiveIndex != INDEX_NONE)
-	{
-		UItemDataAsset* Data = UEquipmentHelperLibrary::GetEquippedItemData(GetOwner(), ActiveToolSlotTag);
-		OnActiveToolChanged.Broadcast(ActiveIndex, Data);
-	}
-	else
-	{
-		OnActiveToolChanged.Broadcast(INDEX_NONE, nullptr);
-	}
-}
-
 void UDynamicToolbarComponent::OnRep_ActiveIndex()
 {
-	if (ToolbarItemIDs.IsValidIndex(ActiveIndex))
-	{
-		ActiveToolSlotTag = ToolbarItemIDs[ActiveIndex];
-
-		UItemDataAsset* Data = UEquipmentHelperLibrary::GetEquippedItemData(GetOwner(), ActiveToolSlotTag);
-		OnActiveToolChanged.Broadcast(ActiveIndex, Data);
-	}
-	else
-	{
-		ActiveToolSlotTag = FGameplayTag();
-		OnActiveToolChanged.Broadcast(INDEX_NONE, nullptr);
-	}
+	const FGameplayTag NewTag = (ActiveIndex >= 0 && ActiveIndex < ToolbarItemIDs.Num())
+		? ToolbarItemIDs[ActiveIndex] : FGameplayTag();
+	ActiveToolSlotTag = NewTag;
+	OnActiveToolChanged.Broadcast(ActiveIndex, nullptr);
 }
 
-void UDynamicToolbarComponent::GetAllSetNames(TMap<FGameplayTag, FText>& OutNames) const
+void UDynamicToolbarComponent::OnRep_ComposedSlots()
 {
-	OutNames.Reset();
-	for (const FToolbarSlotSet& S : SlotSets)
-	{
-		OutNames.Add(S.SetTag, S.DisplayName);
-	}
+	ToolbarItemIDs = ComposedSlots;
+	OnToolbarChanged.Broadcast();
 }
-
-void UDynamicToolbarComponent::GetActiveSetNames(TMap<FGameplayTag, FText>& OutNames) const
-{
-	OutNames.Reset();
-	for (const FToolbarSlotSet& S : SlotSets)
-	{
-		if (ActiveSetTags.HasTag(S.SetTag))
-		{
-			OutNames.Add(S.SetTag, S.DisplayName);
-		}
-	}
-}
-
-bool UDynamicToolbarComponent::GetActiveSlotTag(FGameplayTag& OutSlot) const
-{
-	OutSlot = ActiveToolSlotTag;
-	return ActiveToolSlotTag.IsValid();
-}
-
-// ---- composition ----
 
 void UDynamicToolbarComponent::RecomposeToolbar()
 {
-	if (!IsAuth()) return;
+	ComposedSlots.Reset();
 
-	TArray<FGameplayTag> NewSlots;
-	TSet<FGameplayTag> Seen;
-
-	for (const FToolbarSlotSet& S : SlotSets)
+	// Compose order from active sets
+	for (const FToolbarSlotSet& Set : SlotSets)
 	{
-		if (!ActiveSetTags.HasTag(S.SetTag)) continue;
+		const bool bActive = ActiveSetTags.HasTagExact(Set.SetTag) || Set.bEnabledByDefault;
+		if (!bActive) continue;
 
-		for (const FGameplayTag& T : S.SlotTags)
+		for (const FGameplayTag& Tag : Set.SlotTags)
 		{
-			if (T.IsValid() && !Seen.Contains(T))
-			{
-				Seen.Add(T);
-				NewSlots.Add(T);
-			}
+			if (Tag.IsValid())
+				ComposedSlots.Add(Tag);
 		}
 	}
 
-	ComposedSlots = MoveTemp(NewSlots);
-	ToolbarItemIDs = ComposedSlots; // mirror for BP/back-compat
+	ToolbarItemIDs = ComposedSlots;
 
-	// Clamp and update ActiveToolSlotTag
-	if (ToolbarItemIDs.Num() == 0)
+	// Clamp ActiveIndex and mirror ActiveToolSlotTag
+	if (ComposedSlots.Num() == 0)
 	{
 		ActiveIndex = INDEX_NONE;
 		ActiveToolSlotTag = FGameplayTag();
 	}
 	else
 	{
-		if (!ToolbarItemIDs.IsValidIndex(ActiveIndex))
-		{
+		if (ActiveIndex < 0 || ActiveIndex >= ComposedSlots.Num())
 			ActiveIndex = 0;
-		}
-		ActiveToolSlotTag = ToolbarItemIDs[ActiveIndex];
+		ActiveToolSlotTag = ComposedSlots[ActiveIndex];
 	}
 
-	// Locally notify; replicated props will trigger client notifies
-	OnRep_ComposedSlots();
+	OnToolbarChanged.Broadcast();
+	OnActiveToolChanged.Broadcast(ActiveIndex, nullptr);
 }
-
-// ---- control ----
 
 void UDynamicToolbarComponent::ActivateSet(FGameplayTag SetTag)
 {
-	if (!SetTag.IsValid()) return;
 	if (!IsAuth()) { ServerActivateSet(SetTag); return; }
-
-	if (!ActiveSetTags.HasTag(SetTag))
-	{
-		ActiveSetTags.AddTag(SetTag);
-		RecomposeToolbar();
-	}
+	ActiveSetTags.AddTag(SetTag);
+	RecomposeToolbar();
 }
-
 void UDynamicToolbarComponent::DeactivateSet(FGameplayTag SetTag)
 {
-	if (!SetTag.IsValid()) return;
 	if (!IsAuth()) { ServerDeactivateSet(SetTag); return; }
-
-	if (ActiveSetTags.HasTag(SetTag))
-	{
-		ActiveSetTags.RemoveTag(SetTag);
-		RecomposeToolbar();
-	}
+	ActiveSetTags.RemoveTag(SetTag);
+	RecomposeToolbar();
 }
-
 void UDynamicToolbarComponent::SetActiveSets(FGameplayTagContainer NewActiveSets)
 {
 	if (!IsAuth()) { ServerSetActiveSets(NewActiveSets); return; }
-	ActiveSetTags = MoveTemp(NewActiveSets);
+	ActiveSetTags = NewActiveSets;
 	RecomposeToolbar();
 }
-
 void UDynamicToolbarComponent::SetActiveIndex(int32 NewIndex)
 {
 	if (!IsAuth()) { ServerSetActiveIndex(NewIndex); return; }
-	ServerSetActiveIndex_Implementation(NewIndex);
+	ActiveIndex = NewIndex;
+	const FGameplayTag NewTag = (ActiveIndex >= 0 && ActiveIndex < ToolbarItemIDs.Num())
+		? ToolbarItemIDs[ActiveIndex] : FGameplayTag();
+	ActiveToolSlotTag = NewTag;
+	OnActiveToolChanged.Broadcast(ActiveIndex, nullptr);
 }
 
 void UDynamicToolbarComponent::CycleNext()
 {
-	SetActiveIndex(ActiveIndex + 1);
+	if (!IsAuth()) { ServerSetActiveIndex(ActiveIndex + 1); return; }
+	if (ComposedSlots.Num() <= 0) return;
+	ActiveIndex = (ActiveIndex + 1 + ComposedSlots.Num()) % ComposedSlots.Num();
+	ActiveToolSlotTag = ComposedSlots[ActiveIndex];
+	OnActiveToolChanged.Broadcast(ActiveIndex, nullptr);
 }
-
 void UDynamicToolbarComponent::CyclePrev()
 {
-	SetActiveIndex(ActiveIndex - 1);
+	if (!IsAuth()) { ServerSetActiveIndex(ActiveIndex - 1); return; }
+	if (ComposedSlots.Num() <= 0) return;
+	ActiveIndex = (ActiveIndex - 1 + ComposedSlots.Num()) % ComposedSlots.Num();
+	ActiveToolSlotTag = ComposedSlots[ActiveIndex];
+	OnActiveToolChanged.Broadcast(ActiveIndex, nullptr);
 }
 
-void UDynamicToolbarComponent::TryNotifyZoneTagsUpdated(const FGameplayTagContainer& ZoneTags)
-{
-	// Lightweight default: if any set's SetTag exists in ZoneTags → activate it, else leave as-is.
-	// You can make this stricter later or drive via a data table.
-	if (!IsAuth()) { ServerSetActiveSets(ActiveSetTags); return; }
-
-	bool bChanged = false;
-	for (const FToolbarSlotSet& S : SlotSets)
-	{
-		const bool bShouldBeActive   = ZoneTags.HasTag(S.SetTag) || S.bEnabledByDefault;
-		const bool bCurrentlyActive  = ActiveSetTags.HasTag(S.SetTag); // ← renamed (was bIsActive)
-
-		if (bShouldBeActive != bCurrentlyActive)
-		{
-			bChanged = true;
-			if (bShouldBeActive) { ActiveSetTags.AddTag(S.SetTag); }
-			else                 { ActiveSetTags.RemoveTag(S.SetTag); }
-		}
-	}
-	if (bChanged) RecomposeToolbar();
-}
-void UDynamicToolbarComponent::TrySetCombatState(bool bInCombat)
-{
-	if (!CombatSetTag.IsValid()) return; // nothing configured
-	if (bInCombat) ActivateSet(CombatSetTag);
-	else           DeactivateSet(CombatSetTag);
-}
+void UDynamicToolbarComponent::TryNotifyZoneTagsUpdated(const FGameplayTagContainer& /*ZoneTags*/) {}
+void UDynamicToolbarComponent::TrySetCombatState(bool /*bInCombat*/) {}
 
 void UDynamicToolbarComponent::WieldActiveSlot()
 {
-	if (!IsAuth()) { ServerWieldActiveSlot(); return; }
-	ServerWieldActiveSlot_Implementation();
-}
-
-// ---- RPCs ----
-
-void UDynamicToolbarComponent::ServerActivateSet_Implementation(FGameplayTag SetTag)        { ActivateSet(SetTag); }
-void UDynamicToolbarComponent::ServerDeactivateSet_Implementation(FGameplayTag SetTag)      { DeactivateSet(SetTag); }
-void UDynamicToolbarComponent::ServerSetActiveSets_Implementation(FGameplayTagContainer S)  { ActiveSetTags = MoveTemp(S); RecomposeToolbar(); }
-
-void UDynamicToolbarComponent::ServerSetActiveIndex_Implementation(int32 NewIndex)
-{
-	if (ToolbarItemIDs.Num() <= 0)
-	{
-		ActiveIndex = INDEX_NONE;
-		ActiveToolSlotTag = FGameplayTag();
-		OnRep_ActiveIndex();
-		return;
-	}
-
-	const int32 Count = ToolbarItemIDs.Num();
-	int32 Wrapped = (Count > 0) ? (NewIndex % Count) : INDEX_NONE;
-	if (Wrapped < 0) Wrapped += Count;
-
-	ActiveIndex = Wrapped;
-	ActiveToolSlotTag = ToolbarItemIDs.IsValidIndex(ActiveIndex) ? ToolbarItemIDs[ActiveIndex] : FGameplayTag();
-	OnRep_ActiveIndex();
-}
-
-void UDynamicToolbarComponent::ServerWieldActiveSlot_Implementation()
-{
-	if (!ToolbarItemIDs.IsValidIndex(ActiveIndex)) return;
 	if (UWieldComponent* W = ResolveWield())
 	{
-		W->TryWieldEquippedInSlot(ToolbarItemIDs[ActiveIndex]);
+		if (ActiveToolSlotTag.IsValid())
+			W->TryWieldEquippedInSlot(ActiveToolSlotTag);
+	}
+}
+
+// ---------------- RPCs ----------------
+void UDynamicToolbarComponent::ServerActivateSet_Implementation(FGameplayTag SetTag) { ActivateSet(SetTag); }
+void UDynamicToolbarComponent::ServerDeactivateSet_Implementation(FGameplayTag SetTag) { DeactivateSet(SetTag); }
+void UDynamicToolbarComponent::ServerSetActiveSets_Implementation(FGameplayTagContainer NewActiveSets) { SetActiveSets(NewActiveSets); }
+void UDynamicToolbarComponent::ServerSetActiveIndex_Implementation(int32 NewIndex) { SetActiveIndex(NewIndex); }
+void UDynamicToolbarComponent::ServerWieldActiveSlot_Implementation() { WieldActiveSlot(); }
+
+// ---------------- Helper UFUNCTION bodies ----------------
+
+bool UDynamicToolbarComponent::GetActiveSlotTag(FGameplayTag& OutSlotTag) const
+{
+	OutSlotTag = ActiveToolSlotTag;
+	return ActiveToolSlotTag.IsValid();
+}
+
+static FText MakeNameFromTag(const FGameplayTag& Tag)
+{
+	if (!Tag.IsValid())
+		return FText::FromString(TEXT("Unnamed"));
+	return FText::FromName(Tag.GetTagName());
+}
+
+void UDynamicToolbarComponent::GetAllSetNames(TMap<FGameplayTag, FText>& Out) const
+{
+	Out.Reset();
+	for (const FToolbarSlotSet& Set : SlotSets)
+	{
+		Out.Add(Set.SetTag, MakeNameFromTag(Set.SetTag));
+	}
+}
+
+void UDynamicToolbarComponent::GetActiveSetNames(TMap<FGameplayTag, FText>& Out) const
+{
+	Out.Reset();
+	for (const FToolbarSlotSet& Set : SlotSets)
+	{
+		if (ActiveSetTags.HasTagExact(Set.SetTag))
+		{
+			Out.Add(Set.SetTag, MakeNameFromTag(Set.SetTag));
+		}
 	}
 }
