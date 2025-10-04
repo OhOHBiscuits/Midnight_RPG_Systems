@@ -1,64 +1,99 @@
+//All rights Reserved Midnight Entertainment Studios LLC
 #pragma once
 
+#include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
 #include "GameplayTagContainer.h"
 #include "EquipmentSlotWidget.generated.h"
 
-class UImage;
 class UEquipmentComponent;
 class UItemDataAsset;
-class UInventoryDragDropOp;
 
-UCLASS()
+/**
+ * Tracks one equipment slot and caches ItemIDTag + ItemData.
+ * Safe BP setters keep both in sync and fire UI events.
+ * NOTE: This widget is UI-only; it does not equip/unequip on the component.
+ */
+UCLASS(BlueprintType, Blueprintable)
 class RPGSYSTEM_API UEquipmentSlotWidget : public UUserWidget
 {
 	GENERATED_BODY()
 
 public:
-	/** Which slot does this widget represent */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="1_Equipment|UI")
+	/** Which slot this widget represents (e.g., Slots.Weapon.Primary) */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="1_Inventory-Equipment")
 	FGameplayTag SlotTag;
 
-	/** Optional: auto-bind to local player’s PS equipment at construct */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="1_Equipment|UI")
-	bool bAutoBindEquipment = true;
+	/** Cached item data for this slot (may be null when empty) */
+	UPROPERTY(BlueprintReadWrite, Category="1_Inventory-Equipment")
+	TObjectPtr<UItemDataAsset> CurrentItemData = nullptr;
 
-	/** Optional icon brush receiver (hook this in UMG) */
-	UPROPERTY(meta=(BindWidgetOptional), BlueprintReadOnly)
-	UImage* IconImage = nullptr;
+	/** Cached lightweight ID tag for the equipped item (Invalid when empty) */
+	UPROPERTY(BlueprintReadWrite, Category="1_Inventory-Equipment")
+	FGameplayTag CurrentItemIDTag;
 
-	/** Manual binding API if you don’t use auto-bind */
-	UFUNCTION(BlueprintCallable, Category="1_Equipment|UI")
-	void BindToEquipment(UEquipmentComponent* Equip);
+	/** When setting the tag via BP setters, automatically try to resolve/load the data */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="1_Inventory-Equipment")
+	bool bResolveDataOnTagSet = true;
 
-	UFUNCTION(BlueprintCallable, Category="1_Equipment|UI")
-	void RefreshVisuals();
+	/** Manually set the EquipmentComponent (unbinds previous, binds new, refreshes) */
+	UFUNCTION(BlueprintCallable, Category="1_Inventory-Equipment")
+	void SetEquipmentComponent(UEquipmentComponent* InEquipment);
+
+	/** Change the slot this widget watches and refresh */
+	UFUNCTION(BlueprintCallable, Category="1_Inventory-Equipment")
+	void SetSlotTagAndRefresh(FGameplayTag NewSlotTag);
+
+	/** Pull state from the component once (safe to call anytime) */
+	UFUNCTION(BlueprintCallable, Category="1_Inventory-Equipment")
+	void RefreshFromComponent();
+
+	/** Force a re-sync from the EquipmentComponent (alias for RefreshFromComponent) */
+	UFUNCTION(BlueprintCallable, Category="1_Inventory-Equipment")
+	void ForceSyncFromEquipment() { RefreshFromComponent(); }
+
+	/** UI hook — implement in BP to update icon, text, etc. */
+	UFUNCTION(BlueprintImplementableEvent, Category="1_Inventory-Equipment")
+	void BP_OnSlotUpdated(UItemDataAsset* NewItemData);
+
+	/** UI hook — fires whenever the cached ItemIDTag changes (equip/unequip). */
+	UFUNCTION(BlueprintImplementableEvent, Category="1_Inventory-Equipment")
+	void BP_OnSlotItemIDTagUpdated(const FGameplayTag& NewItemIDTag);
+
+	/** UI-only setters (do NOT modify EquipmentComponent). Useful for BP hotfixes/overrides. */
+	UFUNCTION(BlueprintCallable, Category="1_Inventory-Equipment")
+	void BP_SetCurrentItemData(UItemDataAsset* InData, bool bFireEvents = true);
+
+	UFUNCTION(BlueprintCallable, Category="1_Inventory-Equipment")
+	void BP_SetCurrentItemIDTag(FGameplayTag InTag, bool bResolveData = true, bool bFireEvents = true);
+
+	/** Convenience */
+	UFUNCTION(BlueprintPure, Category="1_Inventory-Equipment")
+	UEquipmentComponent* GetEquipmentComponent() const { return Equipment; }
 
 protected:
-	UPROPERTY()
-	TWeakObjectPtr<UEquipmentComponent> BoundEquip;
-
-	// Events from component
-	UFUNCTION()
-	void HandleEquipChanged(FGameplayTag InSlot, UItemDataAsset* InData);
-
-	UFUNCTION()
-	void HandleSlotCleared(FGameplayTag InSlot);
-
-	// UUserWidget
 	virtual void NativeConstruct() override;
 	virtual void NativeDestruct() override;
 
-	// Drag & Drop
-	virtual FReply NativeOnMouseButtonDown(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent) override;
-	virtual void NativeOnDragDetected(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent, UDragDropOperation*& OutOperation) override;
-	virtual bool NativeOnDrop(const FGeometry& InGeometry, const FDragDropEvent& InDragDropEvent, UDragDropOperation* InOperation) override;
-
-	// For building drag payloads in Blueprints if desired
-	UFUNCTION(BlueprintNativeEvent, Category="1_Equipment|UI")
-	bool BuildDragOperation(UInventoryDragDropOp*& OutOperation);
-	virtual bool BuildDragOperation_Implementation(UInventoryDragDropOp*& OutOperation) { OutOperation = nullptr; return false; }
-
 private:
-	void ApplyIcon(UItemDataAsset* Data);
+	UPROPERTY(Transient)
+	TObjectPtr<UEquipmentComponent> Equipment = nullptr;
+
+	// Event handlers
+	UFUNCTION()
+	void HandleEquipChanged(FGameplayTag ChangedSlot, UItemDataAsset* NewData);
+
+	UFUNCTION()
+	void HandleSlotCleared(FGameplayTag ClearedSlot);
+
+	// Helpers
+	UEquipmentComponent* AutoResolveEquipment() const;
+	void BindToEquipment(UEquipmentComponent* InEquipment);
+	void UnbindFromEquipment();
+
+	/** Pull ItemIDTag + ItemData for SlotTag from Equipment; loads by tag if needed. */
+	void UpdateCacheFromEquipment();
+
+	/** Internal single place to broadcast after cache changes (de-duped) */
+	void BroadcastCache();
 };
