@@ -1,369 +1,189 @@
-﻿// InventoryHelpers.cpp
+﻿//All rights Reserved Midnight Entertainment Studios LLC
+// Source/RPGSystem/Private/Inventory/InventoryHelpers.cpp
+
 #include "Inventory/InventoryHelpers.h"
 
 #include "Inventory/InventoryComponent.h"
 #include "Inventory/ItemDataAsset.h"
-#include "Blueprint/UserWidget.h"
 #include "Inventory/InventoryAssetManager.h"
 
+#include "Blueprint/UserWidget.h"
 #include "Kismet/GameplayStatics.h"
-#include "Components/ActorComponent.h"
+
+#include "GameFramework/Actor.h"
+#include "GameFramework/Controller.h"
+#include "GameFramework/Pawn.h"
 #include "GameFramework/PlayerController.h"
 #include "GameFramework/PlayerState.h"
-#include "GameFramework/Pawn.h"
-#include "GameFramework/Controller.h"
 #include "Engine/World.h"
 #include "Engine/Engine.h"
 
-static UInventoryComponent* FindInvOnActor(const AActor* Actor)
+DEFINE_LOG_CATEGORY_STATIC(LogInvHelpers, Log, All);
+
+// --------------------- Resolve helpers ---------------------
+
+AController* UInventoryHelpers::ResolveController_Internal(AActor* Actor)
 {
 	if (!Actor) return nullptr;
 
-	// 1) Directly on the actor
-	if (const UActorComponent* C = Actor->GetComponentByClass(UInventoryComponent::StaticClass()))
-	{
-		return Cast<UInventoryComponent>(const_cast<UActorComponent*>(C));
-	}
+	if (AController* AsCtrl = Cast<AController>(Actor))
+		return AsCtrl;
 
-	// 2) Common places for player-owned inventories
-	if (const APawn* Pawn = Cast<APawn>(Actor))
-	{
-		// On Pawn
-		if (const UActorComponent* C2 = Pawn->GetComponentByClass(UInventoryComponent::StaticClass()))
-			return Cast<UInventoryComponent>(const_cast<UActorComponent*>(C2));
+	if (APawn* AsPawn = Cast<APawn>(Actor))
+		return AsPawn->GetController();
 
-		// On PlayerState
-		if (const APlayerState* PS = Pawn->GetPlayerState())
-		{
-			if (const UActorComponent* C3 = PS->GetComponentByClass(UInventoryComponent::StaticClass()))
-				return Cast<UInventoryComponent>(const_cast<UActorComponent*>(C3));
-		}
-
-		// On Controller
-		if (const AController* Ctrl = Pawn->GetController())
-		{
-			if (const UActorComponent* C4 = Ctrl->GetComponentByClass(UInventoryComponent::StaticClass()))
-				return Cast<UInventoryComponent>(const_cast<UActorComponent*>(C4));
-		}
-	}
-
-	// 3) If it's already a Controller
-	if (const AController* Ctrl = Cast<AController>(Actor))
-	{
-		if (const UActorComponent* C5 = Ctrl->GetComponentByClass(UInventoryComponent::StaticClass()))
-			return Cast<UInventoryComponent>(const_cast<UActorComponent*>(C5));
-
-		// Check possessed pawn
-		if (const APawn* Pawn2 = Ctrl->GetPawn())
-		{
-			if (const UActorComponent* C6 = Pawn2->GetComponentByClass(UInventoryComponent::StaticClass()))
-				return Cast<UInventoryComponent>(const_cast<UActorComponent*>(C6));
-		}
-
-		// Check PlayerState
-		if (const APlayerState* PS2 = Ctrl->PlayerState)
-		{
-			if (const UActorComponent* C7 = PS2->GetComponentByClass(UInventoryComponent::StaticClass()))
-				return Cast<UInventoryComponent>(const_cast<UActorComponent*>(C7));
-		}
-	}
+	if (const APawn* InstPawn = Cast<APawn>(Actor->GetInstigator()))
+		return InstPawn->GetController();
 
 	return nullptr;
+}
+
+APlayerState* UInventoryHelpers::ResolvePlayerState_Internal(AActor* Actor)
+{
+	if (!Actor) return nullptr;
+
+	if (APlayerState* AsPS = Cast<APlayerState>(Actor))
+		return AsPS;
+
+	if (const APawn* AsPawn = Cast<APawn>(Actor))
+		return AsPawn->GetPlayerState();
+
+	if (AController* C = ResolveController_Internal(Actor))
+		return C->PlayerState;
+
+	return nullptr;
+}
+
+APlayerController* UInventoryHelpers::ResolvePC_Internal(AActor* Actor)
+{
+	if (!Actor) return nullptr;
+
+	if (APlayerController* AsPC = Cast<APlayerController>(Actor))
+		return AsPC;
+
+	if (AController* C = ResolveController_Internal(Actor))
+		return Cast<APlayerController>(C);
+
+	if (const APlayerState* PS = ResolvePlayerState_Internal(Actor))
+	{
+		if (const APawn* Pawn = PS->GetPawn())
+			return Cast<APlayerController>(Pawn->GetController());
+	}
+	return nullptr;
+}
+
+APlayerController* UInventoryHelpers::ResolvePlayerController(AActor* Actor)
+{
+	return ResolvePC_Internal(Actor);
 }
 
 UInventoryComponent* UInventoryHelpers::GetInventoryComponent(AActor* Actor)
 {
 	if (!Actor) return nullptr;
-	if (UInventoryComponent* C = Actor->FindComponentByClass<UInventoryComponent>()) return C;
 
-	if (const APawn* P = Cast<APawn>(Actor))
+	if (UInventoryComponent* Direct = Actor->FindComponentByClass<UInventoryComponent>())
+		return Direct;
+
+	if (AController* Ctrl = ResolveController_Internal(Actor))
 	{
-		if (AController* PC = P->GetController())
+		if (UInventoryComponent* OnCtrl = Ctrl->FindComponentByClass<UInventoryComponent>())
+			return OnCtrl;
+
+		if (APawn* Pawn = Ctrl->GetPawn())
 		{
-			if (UInventoryComponent* C2 = PC->FindComponentByClass<UInventoryComponent>())
-			{
-				return C2;
-			}
+			if (UInventoryComponent* OnPawn = Pawn->FindComponentByClass<UInventoryComponent>())
+				return OnPawn;
 		}
 	}
-	return nullptr;
-}
-UInventoryComponent* UInventoryHelpers::GetInventoryComponentFromObject(const UObject* Object)
-{
-	if (!Object) return nullptr;
 
-	// If it's an actor or derives from it, scan likely owners
-	if (const AActor* AsActor = Cast<AActor>(Object))
+	if (APlayerState* PS = ResolvePlayerState_Internal(Actor))
 	{
-		if (UInventoryComponent* Inv = FindInvOnActor(AsActor)) return Inv;
-
-		// Owner chain
-		if (const AActor* Owner = AsActor->GetOwner())
-			if (UInventoryComponent* Inv2 = FindInvOnActor(Owner)) return Inv2;
-	}
-
-	// If it's a component, try its owner
-	if (const UActorComponent* Comp = Cast<UActorComponent>(Object))
-	{
-		if (const AActor* Owner = Comp->GetOwner())
-			if (UInventoryComponent* Inv3 = FindInvOnActor(Owner)) return Inv3;
-	}
-
-	// Last resort: try player 0 pawn
-	if (UWorld* World = GEngine ? GEngine->GetWorldFromContextObject(Object, EGetWorldErrorMode::ReturnNull) : nullptr)
-	{
-		if (APlayerController* PC = UGameplayStatics::GetPlayerController(World, 0))
-			return FindInvOnActor(PC);
+		if (UInventoryComponent* OnPS = PS->FindComponentByClass<UInventoryComponent>())
+			return OnPS;
 	}
 
 	return nullptr;
 }
 
-APlayerController* UInventoryHelpers::GetPlayerControllerFromActor(AActor* Actor)
+// --------------------- UI helpers ---------------------
+
+bool UInventoryHelpers::CreateWidgetOnInteractor(AActor* Interactor, TSubclassOf<UUserWidget> WidgetClass, UUserWidget*& OutWidget)
 {
-	if (!Actor) return nullptr;
-
-	// 1) Instigator controller if it’s a player
-	if (AController* InstCtrl = Actor->GetInstigatorController())
-	{
-		if (APlayerController* PC = Cast<APlayerController>(InstCtrl))
-			return PC;
-	}
-
-	// 2) Direct controller if a pawn
-	if (APawn* Pawn = Cast<APawn>(Actor))
-	{
-		if (AController* Ctrl = Pawn->GetController())
-			if (APlayerController* PC2 = Cast<APlayerController>(Ctrl))
-				return PC2;
-	}
-
-	// 3) If the owner is a PC
-	if (APlayerController* OwnerPC = Cast<APlayerController>(Actor->GetOwner()))
-		return OwnerPC;
-
-	// 4) Fallback: local player 0
-	return UGameplayStatics::GetPlayerController(Actor, 0);
-}
-
-APlayerController* UInventoryHelpers::GetPlayerControllerFromObject(const UObject* Object)
-{
-	if (!Object) return nullptr;
-
-	// If it's an actor, delegate
-	if (const AActor* AsActor = Cast<AActor>(Object))
-	{
-		return GetPlayerControllerFromActor(const_cast<AActor*>(AsActor));
-	}
-
-	// If it's a controller already, just cast it to player controller
-	if (const AController* Ctrl = Cast<AController>(Object))
-	{
-		return Cast<APlayerController>(const_cast<AController*>(Ctrl));
-	}
-
-	// If it’s a component, use its owner
-	if (const UActorComponent* Comp = Cast<UActorComponent>(Object))
-	{
-		return GetPlayerControllerFromActor(Comp->GetOwner());
-	}
-
-	// Fallback to world player 0 using the world context
-	if (UWorld* World = GEngine ? GEngine->GetWorldFromContextObject(Object, EGetWorldErrorMode::ReturnNull) : nullptr)
-	{
-		return UGameplayStatics::GetPlayerController(World, 0);
-	}
-
-	return nullptr;
-}
-
-APlayerController* UInventoryHelpers::GetNetOwningPlayerController(const UObject* WorldContextObject, AActor* Interactor)
-{
-	if (APlayerController* PC = GetPlayerControllerFromActor(Interactor))
-		return PC;
-
-	// Fallback to world 0 if nothing else
-	if (WorldContextObject)
-	{
-		return UGameplayStatics::GetPlayerController(WorldContextObject, 0);
-	}
-	return nullptr;
-}
-
-UItemDataAsset* UInventoryHelpers::FindItemDataByTag(UObject* /*WorldContextObject*/, FGameplayTag ItemIdTag)
-{
-	if (UInventoryAssetManager* IAM = UInventoryAssetManager::GetOptional())
-	{
-		return IAM->FindItemDataByTag(ItemIdTag);
-	}
-	UE_LOG(LogTemp, Warning, TEXT("InventoryAssetManager not configured; FindItemDataByTag fallback returned nullptr."));
-	return nullptr;
-}
-
-UUserWidget* UInventoryHelpers::CreateWidgetOnInteractor(AActor* Interactor, TSubclassOf<UUserWidget> WidgetClass, bool& bIsLocalPlayer)
-{
-	bIsLocalPlayer = false;
+	OutWidget = nullptr;
 	if (!Interactor || !*WidgetClass)
-	{
-		return nullptr;
-	}
+		return false;
 
-	APlayerController* PC = nullptr;
-
-	// If the interactor is (or owns) a Pawn with a PlayerController, prefer that.
-	if (APawn* AsPawn = Cast<APawn>(Interactor))
+	if (APlayerController* PC = ResolvePC_Internal(Interactor))
 	{
-		PC = Cast<APlayerController>(AsPawn->GetController());
-	}
-	else
-	{
-		// Try owner chain -> controller
-		if (AController* Ctrl = Cast<AController>(Interactor->GetOwner()))
+		if (UWorld* World = PC->GetWorld())
 		{
-			PC = Cast<APlayerController>(Ctrl);
-		}
-	}
-
-	// If still none, try to resolve via instigator
-	if (!PC)
-	{
-		if (APawn* InstPawn = Interactor->GetInstigator())
-		{
-			PC = Cast<APlayerController>(InstPawn->GetController());
-		}
-	}
-
-	if (!PC)
-	{
-		// Fallback: first local player (useful for testing)
-		UWorld* World = Interactor->GetWorld();
-		if (World && World->GetFirstPlayerController())
-		{
-			PC = World->GetFirstPlayerController();
-		}
-	}
-
-	if (!PC)
-	{
-		return nullptr;
-	}
-
-	// Only create the widget if this is the *local* player
-	if (!PC->IsLocalController())
-	{
-		return nullptr;
-	}
-
-	bIsLocalPlayer = true;
-	return CreateWidget<UUserWidget>(PC, WidgetClass);
-}
-
-APlayerController* UInventoryHelpers::ResolvePlayerController(AActor* InActor)
-{
-	if (!InActor) return nullptr;
-
-	// 1) If it's already a PC
-	if (APlayerController* AsPC = Cast<APlayerController>(InActor))
-	{
-		return AsPC;
-	}
-
-	// 2) If it's a pawn, use its controller (if a PC)
-	if (APawn* Pawn = Cast<APawn>(InActor))
-	{
-		if (APlayerController* PC = Cast<APlayerController>(Pawn->GetController()))
-		{
-			return PC;
-		}
-	}
-
-	// 3) If it's a controller, try to cast to PC
-	if (AController* Ctrl = Cast<AController>(InActor))
-	{
-		if (APlayerController* PC = Cast<APlayerController>(Ctrl))
-		{
-			return PC;
-		}
-	}
-
-	// 4) Try the owner chain
-	if (AActor* Owner = InActor->GetOwner())
-	{
-		if (APlayerController* PC = Cast<APlayerController>(Owner))
-		{
-			return PC;
-		}
-		if (APawn* OwnerPawn = Cast<APawn>(Owner))
-		{
-			if (APlayerController* PC = Cast<APlayerController>(OwnerPawn->GetController()))
+			OutWidget = CreateWidget<UUserWidget>(World, WidgetClass);
+			if (OutWidget)
 			{
-				return PC;
-			}
-		}
-		if (AController* OwnerCtrl = Cast<AController>(Owner))
-		{
-			if (APlayerController* PC = Cast<APlayerController>(OwnerCtrl))
-			{
-				return PC;
+				OutWidget->AddToViewport();
+				return true;
 			}
 		}
 	}
-
-	// 5) Fallback: local player 0
-	return UGameplayStatics::GetPlayerController(InActor, 0);
-}
-
-bool UInventoryHelpers::ClientRequestTransfer(AActor* Requestor, UInventoryComponent* SourceInventory, int32 SourceIndex, UInventoryComponent* TargetInventory, int32 TargetIndex)
-{
-	if (!Requestor || !SourceInventory || !TargetInventory) return false;
-
-	// Always issue via an inventory the client owns (usually on the pawn or controller)
-	if (UInventoryComponent* OwnedInv = GetInventoryComponent(Requestor))
-	{
-		return OwnedInv->RequestTransferItem(SourceInventory, SourceIndex, TargetInventory, TargetIndex);
-	}
-
-	// If no owned inventory was found, we can’t safely RPC from client → server
 	return false;
 }
 
-bool UInventoryHelpers::TryAddByItemIDTag(UInventoryComponent* Inventory, FGameplayTag ItemIDTag, int32 Quantity, int32& OutAddedIndex)
+// --------------------- Tag → Asset helpers ---------------------
+
+UItemDataAsset* UInventoryHelpers::FindItemDataByTag(UObject* /*WorldContextObject*/, FGameplayTag ItemIDTag, bool bSyncLoad)
+{
+	if (!ItemIDTag.IsValid())
+		return nullptr;
+
+	if (UInventoryAssetManager* AM = UInventoryAssetManager::GetOptional())
+	{
+		return AM->LoadDataAssetByTag<UItemDataAsset>(ItemIDTag, bSyncLoad);
+	}
+	return nullptr;
+}
+
+// C++-only convenience overload forwards with bSyncLoad=true
+UItemDataAsset* UInventoryHelpers::FindItemDataByTag(UObject* WorldContextObject, FGameplayTag ItemIDTag)
+{
+	return FindItemDataByTag(WorldContextObject, ItemIDTag, /*bSyncLoad=*/true);
+}
+
+UDataAsset* UInventoryHelpers::LoadDataAssetByTag(UObject* /*WorldContextObject*/, FGameplayTag Tag, TSubclassOf<UDataAsset> AssetClass, bool bSyncLoad)
+{
+	if (!AssetClass || !Tag.IsValid())
+		return nullptr;
+
+	if (UInventoryAssetManager* AM = UInventoryAssetManager::GetOptional())
+	{
+		return AM->LoadDataAssetByTag(Tag, AssetClass, bSyncLoad);
+	}
+	return nullptr;
+}
+
+bool UInventoryHelpers::ResolveDataAssetPathByTag(const FGameplayTag& Tag, TSubclassOf<UDataAsset> AssetClass, FSoftObjectPath& OutPath)
+{
+	OutPath.Reset();
+	if (!AssetClass || !Tag.IsValid())
+		return false;
+
+	if (const UInventoryAssetManager* AM = UInventoryAssetManager::GetOptional())
+	{
+		return AM->ResolveDataAssetPathByTag(Tag, AssetClass, OutPath);
+	}
+	return false;
+}
+
+// --------------------- Compatibility stubs ---------------------
+
+bool UInventoryHelpers::ClientRequestTransfer(AActor* Requestor, UInventoryComponent* /*SourceInventory*/, int32 /*SourceIndex*/, UInventoryComponent* /*TargetInventory*/, int32 /*TargetIndex*/)
+{
+	UE_LOG(LogInvHelpers, Verbose, TEXT("ClientRequestTransfer called (stub). Wire to InventoryComponent server transfer API."));
+	return false;
+}
+
+bool UInventoryHelpers::TryAddByItemIDTag(UInventoryComponent* /*Inventory*/, FGameplayTag /*ItemIDTag*/, int32 /*Quantity*/, int32& OutAddedIndex)
 {
 	OutAddedIndex = INDEX_NONE;
-
-	// Sanity checks — we're not adding negative bananas to no inventory.
-	if (!Inventory || !ItemIDTag.IsValid() || Quantity <= 0)
-	{
-		return false;
-	}
-
-	// Translate "ItemID tag" -> the actual item data (safe for Standalone/cooked builds).
-	UItemDataAsset* Data = UInventoryAssetManager::Get().LoadItemDataByTag(ItemIDTag, /*bSyncLoad*/ true);
-	if (!Data)
-	{
-		return false; // Unknown item id
-	}
-
-	// IMPORTANT: Your inventory API wants (UItemDataAsset*, Quantity), not FInventoryItem.
-	const bool bAdded = Inventory->TryAddItem(Data, Quantity);
-
-	// Friendly extra: try to tell callers where it landed (best effort).
-	if (bAdded)
-	{
-		const int32 Num = Inventory->GetNumUISlots();
-		for (int32 i = 0; i < Num; ++i)
-		{
-			const FInventoryItem Slot = Inventory->GetItem(i);
-			if (Slot.Quantity > 0 && !Slot.ItemData.IsNull())
-			{
-				if (Slot.ItemData.Get() == Data) // pointer compare is cheap & good enough
-				{
-					OutAddedIndex = i;
-					break;
-				}
-			}
-		}
-	}
-
-	return bAdded;
+	UE_LOG(LogInvHelpers, Verbose, TEXT("TryAddByItemIDTag called (stub). Replace with your InventoryComponent add API."));
+	return false;
 }

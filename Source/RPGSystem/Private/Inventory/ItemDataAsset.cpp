@@ -66,3 +66,4 @@ void UItemDataAsset::GetActionTags(TArray<FGameplayTag>& OutTags) const
 		}
 	}
 }
+
